@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..c7fb41d2ca313acc489b49396a4116659ae3eb7e
 --- /dev/null
 +++ b/chrome/browser/browseros/extensions/browseros_extension_loader.cc
-@@ -0,0 +1,654 @@
+@@ -0,0 +1,706 @@
 +// Copyright 2024 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -14,6 +14,8 @@ index 0000000000000000000000000000000000000000..c7fb41d2ca313acc489b49396a411665
 +#include <utility>
 +
 +#include "base/feature_list.h"
++#include "base/files/file_util.h"
++#include "base/path_service.h"
 +#include "base/functional/bind.h"
 +#include "base/json/values_util.h"
 +#include "base/logging.h"
@@ -21,6 +23,9 @@ index 0000000000000000000000000000000000000000..c7fb41d2ca313acc489b49396a411665
 +#include "base/task/single_thread_task_runner.h"
 +#include "base/version.h"
 +#include "chrome/browser/browser_features.h"
++#include "chrome/browser/browseros/buildflags.h"
++#include "chrome/common/chrome_paths.h"
++#include "extensions/browser/unpacked_installer.h"
 +#include "chrome/browser/browseros/core/browseros_constants.h"
 +#include "chrome/browser/browseros/core/browseros_prefs.h"
 +#include "chrome/browser/extensions/external_provider_impl.h"
@@ -294,9 +299,39 @@ index 0000000000000000000000000000000000000000..c7fb41d2ca313acc489b49396a411665
 +  // Chromium may ask the provider to load repeatedly. Never replace helpers:
 +  // their weak replies belong to this single discovery operation.
 +  started_ = true;
++  MaybeStartAsterUnpackedDevelopmentInstall();
 +  installer_->DiscoverBundled(
 +      base::BindOnce(&BrowserOSExtensionLoader::OnLocalDiscoveryComplete,
 +                     weak_ptr_factory_.GetWeakPtr()));
++}
++
++void BrowserOSExtensionLoader::MaybeStartAsterUnpackedDevelopmentInstall() {
++#if BUILDFLAG(ASTER_UNPACKED_DEV_EXTENSION)
++  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
++  if (!IsAsterProduct() || !profile_ || unpacked_development_started_ ||
++      IsPrimaryReady()) {
++    return;
++  }
++  base::FilePath bundle_path;
++  if (!base::PathService::Get(chrome::DIR_BROWSEROS_BUNDLED_EXTENSIONS,
++                              &bundle_path)) {
++    unpacked_development_missing_ = true;
++    return;
++  }
++  const base::FilePath unpacked_dir =
++      bundle_path.Append(FILE_PATH_LITERAL("aster_unpacked_dev"));
++  const base::FilePath manifest =
++      unpacked_dir.Append(FILE_PATH_LITERAL("manifest.json"));
++  if (!base::DirectoryExists(unpacked_dir) || base::IsLink(unpacked_dir) ||
++      !base::PathExists(manifest) || base::IsLink(manifest)) {
++    unpacked_development_missing_ = true;
++    return;
++  }
++  unpacked_development_missing_ = false;
++  unpacked_development_started_ = true;
++  LOG(INFO) << "aster: installing explicitly gated unpacked development extension";
++  extensions::UnpackedInstaller::Create(profile_)->Load(unpacked_dir);
++#endif
 +}
 +
 +void BrowserOSExtensionLoader::EnsureReady(ReadyCallback callback) {
@@ -325,6 +360,9 @@ index 0000000000000000000000000000000000000000..c7fb41d2ca313acc489b49396a411665
 +  BeginReadiness();
 +  if (!started_) {
 +    StartLoading();
++  } else {
++    // An explicit user Retry can reattempt an interrupted unpacked install.
++    MaybeStartAsterUnpackedDevelopmentInstall();
 +  }
 +  if (local_discovery_complete_) {
 +    PublishUpdates();
@@ -483,10 +521,21 @@ index 0000000000000000000000000000000000000000..c7fb41d2ca313acc489b49396a411665
 +    return;
 +  }
 +  if (!HasUsableLocalPrimary() && IsAsterProduct()) {
++#if BUILDFLAG(ASTER_UNPACKED_DEV_EXTENSION)
++    // Metadata discovery correctly returns an empty CRX catalog in this mode.
++    // Keep waiting for ExtensionRegistry::READY from the unpacked installer.
++    // Never start remote/foreign CRX fallback during development.
++    if (unpacked_development_missing_) {
++      LOG(ERROR) << "aster: unpacked development extension unavailable";
++      FinishReadiness(false);
++    }
++    return;
++#else
 +    LOG(ERROR) << "aster: required bundled extension is unavailable; "
 +                  "remote recovery is disabled";
 +    FinishReadiness(false);
 +    return;
++#endif
 +  }
 +  if (!HasUsableLocalPrimary() && !remote_requested_) {
 +    // Config fetches never delay LoadFinished. Only the absence of a usable
@@ -543,6 +592,9 @@ index 0000000000000000000000000000000000000000..c7fb41d2ca313acc489b49396a411665
 +    return;
 +  }
 +  waiting_for_ready_ = false;
++#if BUILDFLAG(ASTER_UNPACKED_DEV_EXTENSION)
++  if (!ready) unpacked_development_started_ = false;
++#endif
 +  readiness_timer_.Stop();
 +  maintainer_->Cancel();
 +  remote_requested_ = false;
