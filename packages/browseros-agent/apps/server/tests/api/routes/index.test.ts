@@ -172,7 +172,7 @@ describe('createApiRoutes', () => {
     const app = createTestApp()
     const denied = await app.request(
       '/mcp-manager/access',
-      { headers: { Host: 'localhost' } },
+      { method: 'POST', headers: { Host: 'localhost' } },
       localServer,
     )
     expect(denied.status).toBe(403)
@@ -180,6 +180,7 @@ describe('createApiRoutes', () => {
     const allowed = await app.request(
       '/mcp-manager/access',
       {
+        method: 'POST',
         headers: {
           Host: 'localhost',
           Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',

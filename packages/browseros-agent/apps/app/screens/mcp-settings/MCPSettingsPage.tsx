@@ -21,7 +21,11 @@ export const MCPSettingsPage: FC = () => {
         getAgentServerUrl(),
       ])
       setServerUrl(mcpUrl)
-      const response = await fetch(`${agentUrl}/mcp-manager/access`)
+      const response = await fetch(`${agentUrl}/mcp-manager/access`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      })
       if (!response.ok)
         throw new Error(
           `Failed to load MCP access credentials: ${response.status}`,

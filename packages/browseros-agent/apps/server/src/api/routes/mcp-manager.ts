@@ -70,7 +70,7 @@ export function createMcpManagerRoutes(options: McpManagerRouteOptions) {
         return c.json({ message }, 500)
       }
     })
-    .get('/access', (c) => c.json({ token: mcpAccessToken }))
+    .post('/access', (c) => c.json({ token: mcpAccessToken }))
     .get('/agents', async (c) => {
       try {
         const agents = await listAgents()
