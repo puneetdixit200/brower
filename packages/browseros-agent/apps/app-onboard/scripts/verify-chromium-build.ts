@@ -2,6 +2,15 @@ import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 
 const buildDir = path.resolve(import.meta.dir, '../dist/chromium')
+const args = process.argv.slice(2)
+if (
+  args.length !== 2 ||
+  args[0] !== '--brand' ||
+  !['aster', 'browseros'].includes(args[1] ?? '')
+) {
+  throw new Error('Specify --brand aster or --brand browseros')
+}
+const expectedBrand = args[1]
 const textResourceFiles = ['app.css', 'app.js', 'index.html']
 // Keep the legacy screenshot packaged: already-shipped Chromium resource lists
 // still enumerate it, although the UI now renders a CSS illustration.
@@ -88,11 +97,20 @@ function verifyIndexReferences(indexHtml: string) {
 
   if (!hasCss) fail('index.html does not reference ./app.css')
   if (!hasJs) fail('index.html does not reference ./app.js')
+  // Distinctly verify each build mode: merely allowing either favicon
+  // silently shipped the BrowserOS icon in Aster distributions.
+  const expectedTitle = `<title>${expectedBrand === 'aster' ? 'Aster' : 'BrowserOS'} Onboarding</title>`
+  if (!indexHtml.includes(expectedTitle)) {
+    fail(`index.html has incorrect title for ${expectedBrand}`)
+  }
+  const expectedIcon =
+    expectedBrand === 'aster' ? './icon/aster-mark.svg' : './icon/32.png'
+  const iconLinks = indexHtml.match(/<link\\b[^>]*\\brel=["']icon["'][^>]*>/gi) ?? []
   if (
-    !indexHtml.includes('href="./icon/32.png"') &&
-    !indexHtml.includes('href="./icon/aster-mark.svg"')
+    iconLinks.length !== 1 ||
+    !iconLinks[0]?.includes(`href="${expectedIcon}"`)
   ) {
-    fail('index.html does not reference an allowed onboarding icon')
+    fail(`index.html has incorrect favicon for ${expectedBrand}`)
   }
 }
 
