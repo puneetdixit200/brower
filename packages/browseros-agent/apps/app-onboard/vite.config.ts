@@ -14,17 +14,26 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       {
         name: 'onboarding-brand-title',
-        transformIndexHtml(html) {
+        // Run before Vite rewrites public URLs according to base './'.
+        // A normal-priority hook sees ./icon/32.png and misses the original path.
+        transformIndexHtml: {
+          order: 'pre',
+          handler(html) {
           const branded = html.replace(
             '<title>BrowserOS Onboarding</title>',
             `<title>${isAsterBuild ? 'Aster' : 'BrowserOS'} Onboarding</title>`,
           )
-          return isAsterBuild
-            ? branded.replace(
-                '<link rel="icon" type="image/png" sizes="32x32" href="/icon/32.png" />',
-                '<link rel="icon" type="image/svg+xml" href="/icon/aster-mark.svg" />',
-              )
-            : branded
+            if (!isAsterBuild) return branded
+            const browserosIcon =
+              '<link rel="icon" type="image/png" sizes="32x32" href="/icon/32.png" />'
+            if (!html.includes(browserosIcon)) {
+              throw new Error('Aster onboarding source favicon changed; cannot brand safely')
+            }
+            return branded.replace(
+              browserosIcon,
+              '<link rel="icon" type="image/svg+xml" href="/icon/aster-mark.svg" />',
+            )
+          },
         },
       },
     ],
