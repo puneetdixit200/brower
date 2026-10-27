@@ -18,7 +18,6 @@ import requests
 
 from ..core.products import BROWSEROS_BUG_REPORTER_EXTENSION_ID
 from ..products.resource_sources import source_resources_for_product
-from ..steps.storage.download import extract_artifact_zip
 from .extensions.build import build_extension_crx
 from .extensions.crx import find_chrome_binary, read_crx_extension_id
 from .extensions.specs import spec_by_name
@@ -213,6 +212,10 @@ def _validate_onboarding_archive(path: Path, version: str) -> None:
         raise ValueError("Onboarding artifact metadata must be an object")
     if metadata.get("version") != version or metadata.get("target") != "universal":
         raise ValueError("Onboarding artifact identity does not match the checkout")
+    # Import after this module is initialized. Importing bos_build.steps eagerly
+    # triggers pipeline registration, including source.py which imports us.
+    from ..steps.storage.download import extract_artifact_zip
+
     with tempfile.TemporaryDirectory(prefix="browseros-onboarding-validate-") as temp_dir:
         try:
             extract_artifact_zip(path, Path(temp_dir))
