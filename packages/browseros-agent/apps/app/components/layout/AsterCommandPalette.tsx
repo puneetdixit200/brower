@@ -112,8 +112,15 @@ export function AsterCommandPalette() {
         setOpen((previous) => !previous)
       }
     }
+    function onOpenCommandPalette() {
+      if (!isOnboarding) setOpen(true)
+    }
     window.addEventListener('keydown', onShortcut)
-    return () => window.removeEventListener('keydown', onShortcut)
+    window.addEventListener('aster:open-command-palette', onOpenCommandPalette)
+    return () => {
+      window.removeEventListener('keydown', onShortcut)
+      window.removeEventListener('aster:open-command-palette', onOpenCommandPalette)
+    }
   }, [isOnboarding])
 
   useEffect(() => {
