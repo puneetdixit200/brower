@@ -1,6 +1,7 @@
 import { onScheduleMessage } from '@/lib/messaging/schedules/scheduleMessages'
 import { createAlarmFromJob } from '@/lib/schedules/createAlarmFromJob'
 import { getChatServerResponse } from '@/lib/schedules/getChatServerResponse'
+import { isAlarmWithinGracePeriod } from '@/lib/schedules/scheduled-run-policy'
 import type { ScheduledJobRun } from '@/lib/schedules/scheduleTypes'
 import {
   listScheduledJobRunsOrNull,
@@ -11,7 +12,7 @@ import {
 import { applyLastRunAt } from '@/modules/schedules/schedules.helpers'
 
 const STALE_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
-const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000
+const activeJobIds = new Set<string>()
 
 const runAbortControllers = new Map<string, AbortController>()
 
@@ -45,6 +46,14 @@ export const scheduledJobRuns = async () => {
   const syncAlarmState = async () => {
     const loaded = await listScheduledJobsOrNull()
     if (loaded === null) return
+    // Rebuild schedules from now on startup/install. An alarm that expired
+    // while the browser was closed must not become an unattended catch-up run.
+    const alarms = await chrome.alarms.getAll()
+    for (const alarm of alarms) {
+      if (alarm.name.startsWith('scheduled-job-')) {
+        await chrome.alarms.clear(alarm.name)
+      }
+    }
     const jobs = loaded.filter((each) => each.enabled)
 
     for (let i = 0; i < jobs.length; i++) {
@@ -96,111 +105,78 @@ export const scheduledJobRuns = async () => {
   }
 
   const executeScheduledJob = async (jobId: string): Promise<void> => {
-    const jobs = await listScheduledJobsOrNull()
-    if (jobs === null) {
-      throw new Error('Cannot reach the BrowserOS server to load the job')
+    if (activeJobIds.has(jobId)) {
+      throw new Error(`Job is already running: ${jobId}`)
     }
-
-    const job = jobs.find((each) => each.id === jobId)
-    if (!job) {
-      throw new Error(`Job not found: ${jobId}`)
-    }
-
-    const jobRun = await createJobRun(jobId, 'running')
-    const abortController = new AbortController()
-    runAbortControllers.set(jobRun.id, abortController)
-
+    activeJobIds.add(jobId)
     try {
-      const response = await getChatServerResponse({
-        message: job.query,
-        signal: abortController.signal,
-        providerId: job.providerId,
-      })
+      const jobs = await listScheduledJobsOrNull()
+      if (jobs === null) {
+        throw new Error('Cannot reach the BrowserOS server to load the job')
+      }
 
-      await updateJobRun(jobRun, {
-        status: 'completed',
-        completedAt: new Date().toISOString(),
-        result: response.text,
-        finalResult: response.finalResult,
-        executionLog: response.executionLog,
-        toolCalls: response.toolCalls,
-      })
-    } catch (e) {
-      const isCancelled = abortController.signal.aborted
-      const errorMessage = isCancelled
-        ? 'Cancelled by user'
-        : e instanceof Error
-          ? e.message
-          : String(e)
-      await updateJobRun(jobRun, {
-        status: 'failed',
-        completedAt: new Date().toISOString(),
-        result: errorMessage,
-        error: errorMessage,
-      })
-    } finally {
-      runAbortControllers.delete(jobRun.id)
-      await updateJobLastRunAt(jobId)
-    }
-  }
+      const job = jobs.find((each) => each.id === jobId)
+      if (!job) {
+        throw new Error(`Job not found: ${jobId}`)
+      }
 
-  let runningMissedJobs = false
+      const jobRun = await createJobRun(jobId, 'running')
+      const abortController = new AbortController()
+      runAbortControllers.set(jobRun.id, abortController)
 
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: TODO(dani) refactor to reduce complexity
-  const runMissedJobs = async () => {
-    if (runningMissedJobs) return
-    runningMissedJobs = true
+      try {
+        const response = await getChatServerResponse({
+          message: job.query,
+          signal: abortController.signal,
+          providerId: job.providerId,
+        })
 
-    try {
-      const loadedJobs = await listScheduledJobsOrNull()
-      const runs = await listScheduledJobRunsOrNull()
-      if (loadedJobs === null || runs === null) return
-
-      const jobs = loadedJobs.filter((j) => j.enabled)
-      const now = Date.now()
-      const cutoff = now - TWENTY_FOUR_HOURS_MS
-
-      for (const job of jobs) {
-        const hasRecentRun = runs.some(
-          (r) => r.jobId === job.id && new Date(r.startedAt).getTime() > cutoff,
-        )
-        if (hasRecentRun) continue
-
-        const hasRunningRun = runs.some(
-          (r) => r.jobId === job.id && r.status === 'running',
-        )
-        if (hasRunningRun) continue
-
-        if (job.scheduleType === 'daily' && job.scheduleTime) {
-          const [hours, minutes] = job.scheduleTime.split(':').map(Number)
-          const scheduledToday = new Date()
-          scheduledToday.setHours(hours, minutes, 0, 0)
-          if (now < scheduledToday.getTime()) continue
-        }
-
-        if (
-          (job.scheduleType === 'hourly' || job.scheduleType === 'minutes') &&
-          job.scheduleInterval
-        ) {
-          const intervalMs =
-            job.scheduleType === 'hourly'
-              ? job.scheduleInterval * 60 * 60 * 1000
-              : job.scheduleInterval * 60 * 1000
-          const createdAt = new Date(job.createdAt).getTime()
-          if (now - createdAt < intervalMs) continue
-        }
-
-        await executeScheduledJob(job.id)
+        await updateJobRun(jobRun, {
+          status: 'completed',
+          completedAt: new Date().toISOString(),
+          result: response.text,
+          finalResult: response.finalResult,
+          executionLog: response.executionLog,
+          toolCalls: response.toolCalls,
+        })
+      } catch (e) {
+        const isCancelled = abortController.signal.aborted
+        const errorMessage = isCancelled
+          ? 'Cancelled by user'
+          : e instanceof Error
+            ? e.message
+            : String(e)
+        await updateJobRun(jobRun, {
+          status: 'failed',
+          completedAt: new Date().toISOString(),
+          result: errorMessage,
+          error: errorMessage,
+        })
+      } finally {
+        runAbortControllers.delete(jobRun.id)
+        await updateJobLastRunAt(jobId)
       }
     } finally {
-      runningMissedJobs = false
+      activeJobIds.delete(jobId)
     }
   }
 
   chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (!alarm.name.startsWith('scheduled-job-')) return
+    // A Chrome alarm may be delivered late after system sleep. Skip it after
+    // the supported one-minute grace window; the recurring alarm remains set.
+    if (!isAlarmWithinGracePeriod(alarm.scheduledTime, Date.now())) return
     const jobId = alarm.name.replace('scheduled-job-', '')
-    await executeScheduledJob(jobId)
+    try {
+      await executeScheduledJob(jobId)
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        error.message !== `Job is already running: ${jobId}`
+      ) {
+        throw error
+      }
+    }
   })
 
   onScheduleMessage('runScheduledJob', async ({ data }) => {
@@ -227,12 +203,10 @@ export const scheduledJobRuns = async () => {
   chrome.runtime.onStartup.addListener(async () => {
     await cleanupStaleJobRuns()
     await syncAlarmState()
-    await runMissedJobs()
   })
 
   chrome.runtime.onInstalled.addListener(async () => {
     await cleanupStaleJobRuns()
     await syncAlarmState()
-    await runMissedJobs()
   })
 }
