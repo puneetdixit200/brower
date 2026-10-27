@@ -1,6 +1,6 @@
 # Aster native development path
 
-Planning checkpoint: 2026-10-28. Terra inspected the existing Python source-resource pipeline and native extension loader. This path is **proposed, not implemented or compiled**. It does not replace the release requirements.
+Planning checkpoint: 2026-10-28. Terra inspected the existing Python source-resource pipeline and native extension loader. The original path was proposed at this checkpoint. Later 2026-10-28 GitHub source commits implemented much of its Python resource/GN/native-loader wiring, but **nothing has been compiled or runtime-tested**. It does not replace the release requirements.
 
 ## Why the current source build stops
 
@@ -31,3 +31,10 @@ A release needs a provisioned private signing key, the matching public extension
 ## Implementation checkpoint — 2026-10-28
 
 A partial first step now exists at `bos_build/release/extensions/aster_unpacked_dev.py`, with `aster_unpacked_dev_test.py`. It implements a **read-only** identity, manifest, file-tree and request-mode validator and has no effect on the existing signed release path. These are committed source changes, not runtime-verified tests in this session. The validator is **not** yet called by `steps/resources/source.py`, `prepared_resources.py`, GN or C++ loader. Explicit debug-only prepared-resource roles, path staging, GN input/copy lists, the native unpacked loader, and the native test remain open. See [resume evidence](evidence/aster-github-resume-2026-10-28.md).
+
+
+## Subsequent implementation, not yet verified — 2026-10-28
+
+GitHub commits on `feat/aster-linux-ui` implement a build CLI switch `--aster-unpacked-dev`, Linux/debug/source planner checks, `unpacked-dev` prepared resource roles, safe unpacked ZIP/file-tree validation, product-owned resource staging, a generated GN source list and debug-only GN copy action. Native loader patches attempt `extensions::UnpackedInstaller` asynchronously behind `ASTER_UNPACKED_DEV_EXTENSION` and wait for primary READY. These are uncompiled hypotheses until checked with the repository's pinned Chromium version. See [source checkpoint](evidence/aster-unpacked-integration-source-only-2026-10-28.md).
+
+**Never call this done based on the GitHub commit alone.** Verify both onboarding brands, Python tests, patch apply/doctor, GN generation, C++ compilation and headed runtime as described above. The signed-CRX/release signing requirements are unaffected.
