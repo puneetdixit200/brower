@@ -109,73 +109,73 @@ export const App: FC = () => {
         }
       >
         <Routes>
-        <Route element={<SidebarLayout />}>
-          <Route path="home" element={<NewTabLayout />}>
-            <Route index element={<AgentCommandHome />} />
-            <Route path="chat" element={<NewTabChat />} />
-            <Route path="personalize" element={<Personalize />} />
+          <Route element={<SidebarLayout />}>
+            <Route path="home" element={<NewTabLayout />}>
+              <Route index element={<AgentCommandHome />} />
+              <Route path="chat" element={<NewTabChat />} />
+              <Route path="personalize" element={<Personalize />} />
+            </Route>
+
+            <Route path="connect-apps" element={<ConnectMCP />} />
+            <Route path="scheduled" element={<ScheduledTasksPage />} />
+            <Route path="tasks" element={<TaskHistoryPage />} />
+            <Route path="tasks/:taskId" element={<TaskHistoryPage />} />
           </Route>
 
-          <Route path="connect-apps" element={<ConnectMCP />} />
-          <Route path="scheduled" element={<ScheduledTasksPage />} />
-          <Route path="tasks" element={<TaskHistoryPage />} />
-          <Route path="tasks/:taskId" element={<TaskHistoryPage />} />
-        </Route>
-
-        <Route element={<SettingsSidebarLayout />}>
-          <Route path="settings">
-            <Route index element={<Navigate to="/settings/ai" replace />} />
-            <Route path="ai" element={<AISettingsPage key="ai" />} />
-            <Route path="chat" element={<LlmHubPage />} />
-            <Route path="mcp" element={<MCPSettingsPage />} />
-            <Route path="memory" element={<MemoryPage />} />
-            <Route path="privacy" element={<PrivacySettingsPage />} />
-            <Route path="customization" element={<CustomizationPage />} />
-            <Route path="diagnostics" element={<DiagnosticsPage />} />
-            <Route
-              path="search"
-              element={<Navigate to="/settings/ai" replace />}
-            />
-            <Route path="survey" element={<SurveyPage {...surveyParams} />} />
-            <Route path="*" element={<Navigate to="/settings/ai" replace />} />
+          <Route element={<SettingsSidebarLayout />}>
+            <Route path="settings">
+              <Route index element={<Navigate to="/settings/ai" replace />} />
+              <Route path="ai" element={<AISettingsPage key="ai" />} />
+              <Route path="chat" element={<LlmHubPage />} />
+              <Route path="mcp" element={<MCPSettingsPage />} />
+              <Route path="memory" element={<MemoryPage />} />
+              <Route path="privacy" element={<PrivacySettingsPage />} />
+              <Route path="customization" element={<CustomizationPage />} />
+              <Route path="diagnostics" element={<DiagnosticsPage />} />
+              <Route
+                path="search"
+                element={<Navigate to="/settings/ai" replace />}
+              />
+              <Route path="survey" element={<SurveyPage {...surveyParams} />} />
+              <Route path="*" element={<Navigate to="/settings/ai" replace />} />
+            </Route>
           </Route>
-        </Route>
 
-        <Route path="features" element={<FeaturesPage />} />
+          <Route path="features" element={<FeaturesPage />} />
 
-        {/* First-run setup, opened by the native onboarding on completion.
-            Outside every layout route on purpose: no sidebar, no chrome. */}
-        <Route path="onboarding">
-          <Route path="ai" element={<OnboardingAiPage />} />
-          <Route index element={<Navigate to="/onboarding/ai" replace />} />
-        </Route>
+          {/* First-run setup, opened by the native onboarding on completion.
+              Outside every layout route on purpose: no sidebar, no chrome. */}
+          <Route path="onboarding">
+            <Route path="ai" element={<OnboardingAiPage />} />
+            <Route index element={<Navigate to="/onboarding/ai" replace />} />
+          </Route>
 
-        <Route path="/" element={<Navigate to="/home" replace />} />
-        <Route
-          path="/personalize"
-          element={<Navigate to="/home/personalize" replace />}
-        />
-        <Route
-          path="/settings/connect-mcp"
-          element={<Navigate to="/connect-apps" replace />}
-        />
-        <Route path="/audit" element={<Navigate to="/home" replace />} />
-        <Route
-          path="/observability"
-          element={<Navigate to="/home" replace />}
-        />
-        <Route path="/executions" element={<Navigate to="/home" replace />} />
-        <Route
-          path="/agents"
-          element={<Navigate to="/settings/ai" replace />}
-        />
-        <Route
-          path="/agents/:agentId"
-          element={<Navigate to="/settings/ai" replace />}
-        />
-        <Route path="/options/*" element={<OptionsRedirect />} />
+          <Route path="/" element={<Navigate to="/home" replace />} />
+          <Route
+            path="/personalize"
+            element={<Navigate to="/home/personalize" replace />}
+          />
+          <Route
+            path="/settings/connect-mcp"
+            element={<Navigate to="/connect-apps" replace />}
+          />
+          <Route path="/audit" element={<Navigate to="/home" replace />} />
+          <Route
+            path="/observability"
+            element={<Navigate to="/home" replace />}
+          />
+          <Route path="/executions" element={<Navigate to="/home" replace />} />
+          <Route
+            path="/agents"
+            element={<Navigate to="/settings/ai" replace />}
+          />
+          <Route
+            path="/agents/:agentId"
+            element={<Navigate to="/settings/ai" replace />}
+          />
+          <Route path="/options/*" element={<OptionsRedirect />} />
 
-        <Route path="*" element={<Navigate to="/home" replace />} />
+          <Route path="*" element={<Navigate to="/home" replace />} />
         </Routes>
       </Suspense>
     </HashRouter>
