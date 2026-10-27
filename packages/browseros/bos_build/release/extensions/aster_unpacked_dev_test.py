@@ -93,6 +93,7 @@ class AsterUnpackedDevelopmentTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self._validate()
                 del self.manifest[field]
+                self.manifest["externally_connectable"] = {"ids": []}
                 self._write()
 
     def test_rejects_symlinks_and_missing_manifest(self):
