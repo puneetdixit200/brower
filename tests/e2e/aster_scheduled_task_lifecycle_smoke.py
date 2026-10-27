@@ -20,8 +20,34 @@ def main() -> int:
     cdp = CDP(target["webSocketDebuggerUrl"])
     cdp.call("Runtime.enable")
     name = f"Aster schedule smoke {uuid.uuid4().hex[:8]}"
+    provider_id = f"aster-schedule-smoke-{uuid.uuid4()}"
+    provider_saved = False
     job_id: str | None = None
     try:
+        wait_for(
+            cdp,
+            "fetch('http://127.0.0.1:9105/system/health').then(r=>r.ok).catch(()=>false)",
+            timeout=45,
+        )
+        provider_status = cdp.evaluate(
+            "(async({providerId})=>{const p={type:'openai-compatible',"
+            "name:'Aster Schedule Fixture Mock',baseUrl:'http://127.0.0.1:9105/v1',"
+            "modelId:'aster-test-mock',supportsImages:false,contextWindow:32000,"
+            "temperature:0.2,apiKey:'test-only-dummy',createdAt:Date.now()};"
+            "const headers={'Content-Type':'application/json'};"
+            "const saved=await fetch(`http://127.0.0.1:9105/providers/${providerId}`,"
+            "{method:'PUT',headers,body:JSON.stringify(p)});"
+            "if(!saved.ok)return {saved:saved.status};"
+            "const selected=await fetch('http://127.0.0.1:9105/providers/default',"
+            "{method:'PUT',headers,body:JSON.stringify({providerId})});"
+            "return {saved:saved.status,selected:selected.status}})({providerId:"
+            + json.dumps(provider_id)
+            + "})"
+        )
+        provider_saved = provider_status.get("saved") == 200
+        if provider_status.get("saved") != 200 or provider_status.get("selected") != 200:
+            raise RuntimeError(f"could not configure the local mock provider: {provider_status}")
+
         cdp.evaluate("location.hash='#/scheduled'")
         wait_for(cdp, "document.body.innerText.includes('Scheduled Tasks')")
         click_text(cdp, "New Task")
@@ -61,6 +87,18 @@ def main() -> int:
         click_text(cdp, "Update")
         wait_for(cdp, "document.body.innerText.includes('Edited local fixture summary.')")
 
+        click_text(cdp, "Test")
+        wait_for(
+            cdp,
+            "(async({id})=>{const r=await fetch('http://127.0.0.1:9105/scheduled-job-runs');"
+            "if(!r.ok)return false;const d=await r.json();"
+            "return d.runs.some(x=>x.jobId===id&&x.status==='completed')})({id:"
+            + json.dumps(job_id)
+            + "})",
+            timeout=60,
+        )
+        click_text(cdp, "Scheduled Tasks")
+
         click_aria(cdp, f"Disable {name}")
         wait_for(cdp, "document.body.innerText.includes('Disabled')")
         disabled_alarm = cdp.evaluate(
@@ -89,9 +127,10 @@ def main() -> int:
                 {
                     "create_and_alarm": "passed",
                     "edit": "passed",
+                    "manual_test_and_run_history": "passed",
                     "disable_cleared_alarm": "passed",
                     "delete": "passed",
-                    "provider_request": "none",
+                    "provider_request": "local mock only; dummy key",
                     "network": "isolated",
                 },
                 indent=2,
@@ -106,6 +145,16 @@ def main() -> int:
                     "await fetch(`http://127.0.0.1:9105/scheduled-jobs/${id}`,"
                     "{method:'DELETE'}).catch(()=>{});})({id:"
                     + json.dumps(job_id)
+                    + "})"
+                )
+            except Exception:
+                pass
+        if provider_saved:
+            try:
+                cdp.evaluate(
+                    "(async({providerId})=>fetch(`http://127.0.0.1:9105/providers/${providerId}`,"
+                    "{method:'DELETE'}).catch(()=>{}))({providerId:"
+                    + json.dumps(provider_id)
                     + "})"
                 )
             except Exception:
