@@ -52,3 +52,39 @@ uv run browseros build --preset debug --product aster --arch x64 \\
 ```
 
 The Chromium source checkout is large, and 14 GiB RAM may cause the native build to be resource-constrained even at jobs=2. Do not pretend a source commit or GN doctor demonstrates a working packaged browser. Capture output and fix actual errors. The debug extension is intentionally unpacked and uses stable ID `oifdmombnijnaiocijiacjhajbnpdlhb`; do not generate fake signing keys or release feeds. See [source integration evidence](evidence/aster-unpacked-integration-source-only-2026-10-28.md).
+
+
+## Safer native build and Omarchy developer utilities (source-only)
+
+After reviewing and synchronizing `aster/feat/aster-linux-ui` without overwriting local work, use the monorepo's checked-in driver rather than pasting a long command directly:
+
+```sh
+cd /home/puneet/Projects/aster-browser/upstream-browseros
+# Existing pinned Chromium checkout is expected at the path below.
+python3 packages/browseros/scripts/aster_native_debug_build.py \\
+  --chromium-src /ABSOLUTE/PATH/TO/PINNED/CHROMIUM/src --jobs 2
+# The same driver can provision shallowly when explicitly requested:
+# python3 packages/browseros/scripts/aster_native_debug_build.py \\
+#   --chromium-src /ABSOLUTE/PATH/TO/PINNED/CHROMIUM/src \\
+#   --provision shallow --jobs 2
+```
+
+The driver checks for a clean `feat/aster-linux-ui` checkout, minimum free disk, the Linux host, and required commands, then captures the actual build exit code and writes logs under the user's XDG state folder. It never force-resets Git, kills unrelated processes, or switches off the Chromium sandbox. It **has not been executed successfully** in this session.
+
+Only after an Aster debug binary is actually built and its path verified, the optional desktop entry can be installed:
+
+```sh
+python3 packages/browseros/scripts/install_omarchy_aster_launcher.py install \\
+  --binary /ABSOLUTE/PATH/TO/BUILT/ASTER/BINARY
+# Removes the managed desktop entry, not your debug profile:
+python3 packages/browseros/scripts/install_omarchy_aster_launcher.py uninstall
+```
+
+Once running, record numeric memory/CPU benchmarks with a real browser PID:
+
+```sh
+python3 packages/browseros/scripts/aster_perf_sample.py \\
+  --pid ACTUAL_BROWSER_PID --label aster --seconds 60
+```
+
+This sampler captures numeric process-tree CPU/RSS only, not browser startup readiness, page paint time or UI latency. Compare to stock BrowserOS on the **same machine and workload** before declaring a speed improvement.
