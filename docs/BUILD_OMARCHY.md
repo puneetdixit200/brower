@@ -5,6 +5,7 @@
 - Omarchy 4.0.6, Arch Linux x86_64, Hyprland/Wayland, AMD Lucienne iGPU, 14 GiB RAM.
 - Official BrowserOS v0.51.0 x64 AppImage checksum verified and run in an isolated profile. It rendered under Wayland/Ozone with AMD/Mesa acceleration.
 - Bun 1.4.2 installed under `/home/puneet/.local/bin`; frozen dependency installation passed.
+- Bubblewrap 0.13.1 is available at `/usr/bin/bwrap`; Linux `filesystem_bash` now fails closed without it and confines shell access to the selected workspace.
 - Go 1.27.3 installed user-locally; `go test ./...` passes for the dev supervisor. The Linux runner accepts `ASTER_BROWSER_BINARY` or `BROWSEROS_BINARY`, with `browseros` on PATH as fallback.
 - WXT development extension build passed with `NODE_OPTIONS=--max-old-space-size=4096`; output is `packages/browseros-agent/apps/app/dist/chrome-mv3-dev`.
 - Full Chromium build is intentionally deferred on this host because its RAM is below upstream guidance. No `--no-sandbox` workaround is permitted.
