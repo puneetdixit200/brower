@@ -65,10 +65,12 @@ def _preflight(repo: Path, source: Path, *, provision: str, allow_dirty: bool) -
     available_bytes = shutil.disk_usage(source.parent if source.parent.exists() else repo).free
     # Native Chromium disk footprint is extremely large. An existing checkout
     # may already occupy space; this is an advisory, never a destructive cleanup.
-    if available_bytes < 35 * 1024**3:
+    required_gib = 100 if provision == "shallow" else 35
+    if available_bytes < required_gib * 1024**3:
         raise RuntimeError(
-            "Under 35 GiB available. Native Chromium builds typically need "
-            "substantially more workspace; free space outside this tool first."
+            f"Under {required_gib} GiB available for the selected source mode. "
+            "Chromium provisioning/builds need substantial disk; free space "
+            "outside this tool first."
         )
 
 
