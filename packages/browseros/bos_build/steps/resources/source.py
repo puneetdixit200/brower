@@ -67,6 +67,7 @@ def _request_from_manifest(
         component_versions=manifest.component_versions,
         output_dir=root,
         manifest_url=ctx.get_extensions_manifest_url(),
+        aster_unpacked_dev=ctx.aster_unpacked_dev,
     )
 
 
@@ -100,6 +101,10 @@ class PrepareCommonResourcesModule(Step):
             raise ValidationError(f"Prepared-resource directory not found: {output}")
         if shutil.which("bun") is None:
             raise ValidationError("Source common resources require Bun")
+        if ctx.aster_unpacked_dev:
+            if ctx.product.id != "aster" or ctx.build_type != "debug" or get_platform() != "linux":
+                raise ValidationError("Unpacked Aster resources require Linux debug mode")
+            return
         source = source_resources_for_product(ctx.product.id)
         spec = spec_by_name(source.extension_name)
         missing = []
@@ -147,6 +152,7 @@ class PrepareCommonResourcesModule(Step):
             component_versions=versions,
             output_dir=output,
             manifest_url=ctx.get_extensions_manifest_url(),
+            aster_unpacked_dev=ctx.aster_unpacked_dev,
         )
         log_info(f"Preparing common resources from {ctx.source_sha}")
         manifest = prepare_common_resources(
