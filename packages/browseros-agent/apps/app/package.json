@@ -9,6 +9,7 @@
     "dev:web": "serve dist/chrome-mv3-dev -p 5175 --no-clipboard",
     "build": "wxt build",
     "build:dev": "bun --env-file=../../.env.development wxt build --mode development",
+    "build:aster-unpacked": "wxt build --mode development",
     "zip": "wxt zip",
     "test": "bun --env-file=../../.env.development wxt prepare && bun run ../../scripts/run-bun-test.ts --cwd=apps/app ./apps/app",
     "compile": "bun --env-file=../../.env.development wxt prepare && tsc --noEmit",
