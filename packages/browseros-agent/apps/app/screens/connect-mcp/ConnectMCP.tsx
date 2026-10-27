@@ -13,6 +13,7 @@ import { track } from '@/lib/metrics/track'
 import { sentry } from '@/lib/sentry/sentry'
 import { useAddManagedServer } from '@/modules/mcp/add-managed-server.hooks'
 import { useGetMCPServersList } from '@/modules/mcp/managed-mcp-servers.hooks'
+import { useActivateRemoteIntegrations } from '@/modules/mcp/remote-integrations.hooks'
 import { useRemoveManagedServer } from '@/modules/mcp/remove-managed-server.hooks'
 import { useSubmitApiKey } from '@/modules/mcp/submit-api-key.hooks'
 import { useSyncRemoteIntegrations } from '@/modules/mcp/sync-remote-integrations.hooks'
@@ -35,6 +36,7 @@ const failedToRemoveMcp = (serverName: string, e: unknown) => {
  * @public
  */
 export const ConnectMCP: FC = () => {
+  useActivateRemoteIntegrations(true)
   const { servers: createdServers, addServer, removeServer } = useMcpServers()
   const [addingManagedMcp, setAddingManagedMcp] = useState(false)
   const [addingCustomMcp, setAddingCustomMcp] = useState(false)

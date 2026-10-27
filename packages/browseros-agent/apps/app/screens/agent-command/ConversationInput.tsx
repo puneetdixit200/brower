@@ -33,7 +33,6 @@ import { ProviderIcon } from '@/lib/llm-providers/providerIcons'
 import type { ProviderType } from '@/lib/llm-providers/types'
 import { useMcpServers } from '@/lib/mcp/mcpServerStorage'
 import { cn } from '@/lib/utils'
-import { useGetUserMCPIntegrations } from '@/modules/mcp/user-integrations.hooks'
 import { useWorkspace } from '@/modules/workspace/workspace.hooks'
 import {
   findTabMention,
@@ -152,14 +151,9 @@ function CalmContextControls({
 }) {
   const { selectedFolder } = useWorkspace()
   const { servers: mcpServers } = useMcpServers()
-  const { data: userMCPIntegrations } = useGetUserMCPIntegrations()
-
-  const connectedManagedServers = mcpServers.filter((server) => {
-    if (server.type !== 'managed' || !server.managedServerName) return false
-    return userMCPIntegrations?.integrations?.find(
-      (integration) => integration.name === server.managedServerName,
-    )?.is_authenticated
-  })
+  const managedServers = mcpServers.filter(
+    (server) => server.type === 'managed' && server.managedServerName,
+  )
 
   return (
     <div className="mx-3 flex items-center gap-1 border-border/60 border-t border-dashed py-2">
@@ -248,9 +242,9 @@ function CalmContextControls({
           type="button"
           className="inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-[11.5px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground"
         >
-          {connectedManagedServers.length > 0 ? (
+          {managedServers.length > 0 ? (
             <span className="flex items-center -space-x-1.5">
-              {connectedManagedServers.slice(0, 4).map((server) => (
+              {managedServers.slice(0, 4).map((server) => (
                 <span key={server.id} className="rounded-full ring-2 ring-card">
                   <McpServerIcon
                     serverName={server.managedServerName ?? ''}

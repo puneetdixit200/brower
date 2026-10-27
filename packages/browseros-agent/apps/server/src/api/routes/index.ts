@@ -84,7 +84,6 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
       .route('/shutdown', createShutdownRoute({ onShutdown }))
       .route('/status', createStatusRoute({ browser, activity }))
       .route('/oauth', oauthRoutes(tokenManager))
-      .route('/klavis', createKlavisRoutes({ klavis }))
       .route(
         '/mcp',
         createMcpRoutes({
@@ -130,8 +129,10 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
       .use('/providers/*', requireTrustedAppOrigin())
       .use('/test-provider/*', requireTrustedAppOrigin())
       .use('/refine-prompt/*', requireTrustedAppOrigin())
+      .use('/klavis/*', requireTrustedAppOrigin())
       .use('/scheduled-jobs/*', requireTrustedAppOrigin())
       .use('/scheduled-job-runs/*', requireTrustedAppOrigin())
+      .route('/klavis', createKlavisRoutes({ klavis }))
       .route('/acpx/probe', createAcpxProbeRoutes({ resourcesDir }))
       .route('/agents', resolvedAgentRoutes)
       .route('/conversations', createConversationRoutes())

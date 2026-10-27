@@ -15,11 +15,11 @@ const getAllManagedServers = async ([hostUrl]: [hostUrl: string]) => {
   return servers
 }
 
-export const useGetMCPServersList = () => {
+export const useGetMCPServersList = (enabled = true) => {
   const { baseUrl: agentServerUrl } = useAgentServerUrl()
 
   return useSWR(
-    agentServerUrl ? [agentServerUrl, 'klavis/servers'] : null,
+    agentServerUrl && enabled ? [agentServerUrl, 'klavis/servers'] : null,
     getAllManagedServers,
     {
       keepPreviousData: true,

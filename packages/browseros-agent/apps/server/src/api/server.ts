@@ -52,7 +52,6 @@ export async function createHttpServer(config: HttpServerConfig) {
   if (!browserosId) shutdownOAuth()
 
   const klavis = new KlavisService({ browserosId })
-  klavis.start()
 
   const activity = new ServerActivity()
 

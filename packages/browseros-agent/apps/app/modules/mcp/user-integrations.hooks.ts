@@ -19,14 +19,14 @@ const getUserMCPIntegrations = async (
   return data
 }
 
-export const useGetUserMCPIntegrations = () => {
+export const useGetUserMCPIntegrations = (enabled = true) => {
   const { baseUrl: agentServerUrl } = useAgentServerUrl()
 
   const query = useQuery({
     queryKey: [INTEGRATIONS_QUERY_KEY, agentServerUrl],
     // biome-ignore lint/style/noNonNullAssertion: guarded by enabled
     queryFn: () => getUserMCPIntegrations(agentServerUrl!),
-    enabled: !!agentServerUrl,
+    enabled: !!agentServerUrl && enabled,
     refetchOnWindowFocus: true,
   })
 

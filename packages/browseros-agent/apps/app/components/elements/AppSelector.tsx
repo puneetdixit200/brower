@@ -23,6 +23,7 @@ import { track } from '@/lib/metrics/track'
 import { sentry } from '@/lib/sentry/sentry'
 import { useAddManagedServer } from '@/modules/mcp/add-managed-server.hooks'
 import { useGetMCPServersList } from '@/modules/mcp/managed-mcp-servers.hooks'
+import { useActivateRemoteIntegrations } from '@/modules/mcp/remote-integrations.hooks'
 import { useSubmitApiKey } from '@/modules/mcp/submit-api-key.hooks'
 import { useSyncRemoteIntegrations } from '@/modules/mcp/sync-remote-integrations.hooks'
 import { useGetUserMCPIntegrations } from '@/modules/mcp/user-integrations.hooks'
@@ -44,16 +45,17 @@ export const AppSelector: FC<AppSelectorProps> = ({
   } | null>(null)
 
   const { servers: createdServers, addServer } = useMcpServers()
-  useSyncRemoteIntegrations()
+  useActivateRemoteIntegrations(open)
+  useSyncRemoteIntegrations(open)
   const { trigger: addManagedServerMutation } = useAddManagedServer()
   const { trigger: submitApiKeyMutation, isMutating: isSubmittingApiKey } =
     useSubmitApiKey()
-  const { data: serversList } = useGetMCPServersList()
+  const { data: serversList } = useGetMCPServersList(open)
   const {
     data: userMCPIntegrations,
     isLoading: isIntegrationsLoading,
     mutate: mutateUserIntegrations,
-  } = useGetUserMCPIntegrations()
+  } = useGetUserMCPIntegrations(open)
 
   const query = filterText.toLowerCase()
 

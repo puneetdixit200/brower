@@ -22,10 +22,10 @@ export interface SyncStatus {
  *
  * Returns sync status so consumers can gate behavior on sync completion.
  */
-export function useSyncRemoteIntegrations(): SyncStatus {
+export function useSyncRemoteIntegrations(enabled = true): SyncStatus {
   const { data: userMCPIntegrations, isLoading: isIntegrationsLoading } =
-    useGetUserMCPIntegrations()
-  const { data: serversList } = useGetMCPServersList()
+    useGetUserMCPIntegrations(enabled)
+  const { data: serversList } = useGetMCPServersList(enabled)
   const integrationsRef = useRef(userMCPIntegrations)
   const serversListRef = useRef(serversList)
   integrationsRef.current = userMCPIntegrations
@@ -39,8 +39,16 @@ export function useSyncRemoteIntegrations(): SyncStatus {
   const integrationCount = userMCPIntegrations?.integrations?.length ?? 0
 
   useEffect(() => {
+    if (!enabled) {
+      setSyncState({ isSyncing: false, hasSynced: true })
+      return
+    }
+
     // Still loading data — keep isSyncing: true
-    if (isIntegrationsLoading) return
+    if (isIntegrationsLoading) {
+      setSyncState({ isSyncing: true, hasSynced: false })
+      return
+    }
 
     // No integrations at all — nothing to sync, mark done
     if (!integrationCount) {
@@ -85,7 +93,7 @@ export function useSyncRemoteIntegrations(): SyncStatus {
     }
 
     syncMissing()
-  }, [isIntegrationsLoading, integrationCount])
+  }, [enabled, isIntegrationsLoading, integrationCount])
 
   return syncState
 }

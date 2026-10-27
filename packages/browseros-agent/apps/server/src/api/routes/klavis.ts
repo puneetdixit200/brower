@@ -22,6 +22,13 @@ export function createKlavisRoutes(deps: KlavisRouteDeps) {
   const { klavis } = deps
 
   return new Hono()
+    .post('/activate', (c) => {
+      // A user opens Connect Apps or the dedicated integrations settings page
+      // before the extension starts any remote connector traffic. The server
+      // deliberately does not auto-connect Klavis during ordinary startup.
+      klavis.start()
+      return c.json({ status: klavis.getProxyStatus().state })
+    })
     .get('/servers', (c) => {
       const servers = klavis.listAvailableConnectors()
       return c.json({

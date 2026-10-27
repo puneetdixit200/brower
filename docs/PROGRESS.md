@@ -68,6 +68,13 @@
 - The real home submit path navigated to the chat surface, sent the selected tab context through the extension/server chat route, and rendered the full canned response. Server logs recorded the chat request and `Agent execution complete`; provider row was deleted before shutdown. No real credential or external model request was used.
 - A01 is PARTIAL: transport and page-context display pass, but the mock response does not establish page comprehension, browser tool execution, approvals, or real provider behavior.
 
+### Privacy hardening — remote connector opt-in (partial)
+
+- Removed automatic Klavis proxy startup. Home/sidebar no longer fetch remote integration status on mount; opening Connect Apps activates the optional connector service. The dedicated Apps settings screen is also an explicit activation point.
+- Protected `/klavis/*` with trusted local extension-origin middleware. Route tests reject originless activation and accept the registered extension origin.
+- In a network-isolated headed run, startup and the closed home produced no Klavis request logs. Opening Connect Apps triggered integration and proxy requests, which the namespace blocked. No external response was received.
+- Targeted tests: server route suite 19/19 passed; full workspace typecheck passed; targeted Biome passed. S03 remains PARTIAL because the complete MCP route set, packaged ports, telemetry, updater, and other outbound traffic have not been audited.
+
 ### Current blockers / limits
 
 - Aster still inherits BrowserOS UI, branding, product identity, and distribution/update wiring. No modified Chromium shell, installer, desktop entry, or release artifact has been produced.
@@ -77,4 +84,4 @@
 
 ### Next action
 
-Add deterministic local fixture tasks that exercise browser tools and approval boundaries; then complete U06 history/file/memory context coverage or accurately narrow the product target. Finish the matched stock/Aster navigation, startup, tab-switch, and idle CPU/RSS harness, continue shell regressions, and audit inherited extension identity/updater assumptions before distribution work.
+Add deterministic local fixture tasks that exercise browser tools and approval boundaries; then audit every local control route and third-party network path. Continue U06 history/file/memory context, matched browser benchmarks, shell regressions, and inherited extension identity/updater cleanup before any distribution work.

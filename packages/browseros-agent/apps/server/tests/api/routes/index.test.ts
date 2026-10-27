@@ -54,6 +54,30 @@ const localServer = {
 } as never
 
 describe('createApiRoutes', () => {
+  it('requires a trusted extension origin to activate remote integrations', async () => {
+    const app = createTestApp()
+    const blocked = await app.request(
+      '/klavis/activate',
+      { method: 'POST' },
+      localServer,
+    )
+    expect(blocked.status).toBe(403)
+
+    const allowed = await app.request(
+      '/klavis/activate',
+      {
+        method: 'POST',
+        headers: {
+          Host: 'localhost',
+          Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+        },
+      },
+      localServer,
+    )
+    expect(allowed.status).toBe(200)
+    await expect(allowed.json()).resolves.toEqual({ status: 'disabled' })
+  })
+
   it('mounts the canonical system health route', async () => {
     const response = await createTestApp().request('/system/health')
 
