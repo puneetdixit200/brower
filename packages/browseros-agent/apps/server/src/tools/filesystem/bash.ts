@@ -1,4 +1,4 @@
-import { existsSync, realpathSync } from 'node:fs'
+import { existsSync, realpathSync, statSync } from 'node:fs'
 import { dirname, resolve, sep } from 'node:path'
 import { type Tool, tool } from 'ai'
 import { z } from 'zod/v4'
@@ -93,19 +93,13 @@ function getLinuxSandboxArgs(cwd: string): string[] {
   }
   args.push('--dir', root, '--bind', root, root, '--chdir', root)
 
-  // Bun is commonly installed per-user rather than under /usr. Expose that one
-  // executable explicitly without making the rest of the home directory visible.
-  const home = process.env.HOME
-  if (home) {
-    for (const candidate of [
-      resolve(home, '.local/bin/bun'),
-      resolve(home, '.bun/bin/bun'),
-    ]) {
-      if (existsSync(candidate)) {
-        args.push('--ro-bind', candidate, '/tmp/bin/bun')
-        break
-      }
-    }
+  // The server runtime may live outside /usr. Expose only its Bun executable,
+  // not the user's home directory or PATH entries.
+  const runtimeStat = existsSync(process.execPath)
+    ? statSync(process.execPath)
+    : undefined
+  if (runtimeStat && runtimeStat.uid === process.getuid?.()) {
+    args.push('--ro-bind', process.execPath, '/tmp/bin/bun')
   }
   args.push(
     '--setenv',

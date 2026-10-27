@@ -134,6 +134,13 @@ describe('filesystem_bash', () => {
     expect(result.isError).toBeUndefined()
   })
 
+  it('keeps the server Bun runtime available inside the sandbox', async () => {
+    if (process.platform !== 'linux' || process.getuid?.() === 0) return
+    const result = await exec({ command: 'bun --version' })
+    expect(result.isError).toBeUndefined()
+    expect(result.text.trim()).toMatch(/^\d+\.\d+\.\d+/)
+  })
+
   it('fails closed when Bubblewrap is unavailable', async () => {
     if (process.platform !== 'linux') return
     const previous = process.env.BWRAP_PATH
