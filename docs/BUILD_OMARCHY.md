@@ -28,3 +28,27 @@ For the live Linux dev flow, see [`packages/browseros-agent/tools/dev/linux/READ
 ## Not ready for installation
 
 There is no Aster browser binary, package, desktop entry, installer, or release feed. Do not point a daily profile at this development extension. Packaging work must use a dedicated Aster profile, retain Chromium sandboxing and upstream license notices, and remove BrowserOS extension IDs/update-feed wiring before distribution.
+
+
+## Experimental Aster source/debug build path (unverified)
+
+The source branch includes a separate **unpacked development extension** route. It is intentionally different from signed release and must not be used to ship an official browser. The following is a candidate command, **not an executed or verified build**:
+
+```sh
+cd /home/puneet/Projects/aster-browser/upstream-browseros
+# Inspect before syncing: preserve local and newer commits.
+git status --short --branch
+git fetch aster feat/aster-linux-ui
+git log --oneline --left-right HEAD...aster/feat/aster-linux-ui
+# Only fast-forward if the checkout is clean and has no divergent work:
+git merge --ff-only aster/feat/aster-linux-ui
+
+cd packages/browseros
+export BROWSEROS_NINJA_JOBS=2
+uv run browseros build --preset debug --product aster --arch x64 \\
+  --resource-mode source --aster-unpacked-dev --provision none \\
+  --no-clean --no-sign --no-upload \\
+  --chromium-src /ABSOLUTE/PATH/TO/PINNED/CHROMIUM/src
+```
+
+The Chromium source checkout is large, and 14 GiB RAM may cause the native build to be resource-constrained even at jobs=2. Do not pretend a source commit or GN doctor demonstrates a working packaged browser. Capture output and fix actual errors. The debug extension is intentionally unpacked and uses stable ID `oifdmombnijnaiocijiacjhajbnpdlhb`; do not generate fake signing keys or release feeds. See [source integration evidence](evidence/aster-unpacked-integration-source-only-2026-10-28.md).
