@@ -84,7 +84,7 @@
 - Headed BrowserOS v0.51.0 verification ran in a network-isolated namespace with the fixed `act.click` mock fixture. The real agent stream emitted `tool-approval-request` before the action executed. Sending Deny resumed the stream with `tool-output-denied` and the final assistant response. A forged approval ID returned HTTP 409 `No matching pending tool approval`; originless approvals return 403 in route tests. The browser action was not executed in the denial run.
 - Focused policy, pending-response, mock-model, route-auth and request-shaping tests passed (30/30 across five test files), the full workspace typecheck passed, and targeted Biome passed. A headed, network-isolated denial run verified the pending card and Deny response.
 - Follow-up approval smoke uses a disposable local page with one button and a dummy-only mock provider. A fixed snapshot → approval request → Approve sequence changed the fixture button text to `Clicked safely`; server logs recorded the approved `act` call and completed tool execution. The script deleted the provider and closed the fixture tab; a follow-up API check confirmed no test provider remained. This proves one approved local click, not an external send/payment or generalized action classifier.
-- A06 is PARTIAL: runtime gating, classified external tool verbs, unknown-tool fail-closed behavior, and headed UI denial are verified; an approved action, a concrete send/payment fixture, editable allow/ask/deny rules, persistence, and restart recovery remain. A09 remains PARTIAL: only existing read-only mode and new approval gates exist; Guard/Full access modes are not implemented.
+- A06 is PARTIAL: runtime gating, classified external tool verbs, unknown-tool fail-closed behavior, and headed UI Deny and Approve are verified. The approved `act.click` changed a harmless local fixture after a snapshot. A concrete send/payment fixture, editable allow/ask/deny rules, persistence, and restart recovery remain. A09 remains PARTIAL: only existing read-only mode and approval gates exist; Guard/Full access modes are not implemented.
 
 ### Privacy hardening — remote connector opt-in (partial)
 
@@ -109,7 +109,7 @@
 
 ### Next action
 
-Run an actual third-party MCP client against the authenticated endpoint, then audit packaged ports, telemetry/updater, and remaining third-party requests. Add explicit approval-rule configuration and Guard/Full modes; verify an approved-action fixture and external send/payment fixture. Continue U06 history/file/memory context, matched browser benchmarks, shell regressions, and inherited extension identity/updater cleanup before distribution work.
+Reconcile the feature matrix with completed history/memory and approval work, then close the highest-impact testable gaps in incognito persistence and security controls. Release blockers remain Aster extension identity/update ownership, telemetry and outbound-traffic audit, external send/payment classification, Guard/Full policy configuration, native packaging, and matched stock/Aster browser performance.
 
 
 ### Phase 7 follow-up — persistent external MCP authentication (implemented; packaged verification pending)
