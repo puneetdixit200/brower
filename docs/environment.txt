@@ -1,0 +1,22 @@
+# Environment inventory (redacted)
+# Captured 2026-10-27 from the current shell environment.
+# Usernames, home paths, serial numbers, tokens, and private identifiers omitted.
+
+Host OS: Omarchy 4.0.6 (Arch Linux base)
+Kernel: Linux 7.2.8-9-omarchy x86_64
+Session desktop: Hyprland
+Session type: Wayland
+Live Hyprland process: running as the desktop user; Wayland socket `wayland-1` exists. Automation shells do not inherit `HYPRLAND_INSTANCE_SIGNATURE` or `WAYLAND_DISPLAY`; the smoke run supplied the active user session socket explicitly.
+CPU: AMD Ryzen 5 5500U with Radeon Graphics, 12 logical CPUs
+RAM: 14 GiB total; 4.6 GiB available at capture; 29 GiB swap
+GPU: AMD Lucienne integrated graphics (PCI 03:00.0)
+Root filesystem: 349 GiB total, 56 GiB used, 293 GiB available
+Architecture: x86_64
+
+System tools found: git, curl, gcc, clang, Python 3.14.8, Node.js, npm, cmake, ninja, lspci, Chromium 155.0.8059.84, Zen Browser.
+User-local tools installed: Bun 1.4.2 at `~/.local/bin/bun`; Go 1.27.3 at `~/.local/opt/go/bin/go`. No system packages were installed.
+Other tools: uv and Rust/cargo are unavailable.
+BrowserOS 0.51.0 x86_64 AppImage: downloaded to the user Downloads folder; SHA-256 verified against official GitHub release API; executable mode 755; launched in a dedicated profile.
+Existing browsers: system Chromium and Zen Browser are present; BrowserOS baseline recorded separately in `PROGRESS.md`.
+
+Decision: no Chromium source build. RAM is below the upstream contributor guide's 16 GiB minimum; available disk is above its approximate 100 GB recommendation. Proceed with agent/UI path using the repository-pinned Bun runtime and Linux BrowserOS release binary.
