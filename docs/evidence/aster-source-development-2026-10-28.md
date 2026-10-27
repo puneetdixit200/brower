@@ -42,3 +42,8 @@ Release signing/key custody and the update service are not configured.
 **No completion claim:** Aside feature parity, actual performance and
 release readiness remain OPEN. See the full feature matrix for individual
 capability state.
+
+
+## Additional source-only performance change
+
+`packages/browseros-agent/apps/app/entrypoints/app/App.tsx` now defers 15 secondary screens with `React.lazy` and `Suspense`, retaining the normal home composer as the eagerly loaded route. This is intended to reduce initial app parse/execute cost. No chunk-size or startup benchmarks were run, and a source-level optimization alone is not proof of a fast Aster browser.
