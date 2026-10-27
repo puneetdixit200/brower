@@ -170,9 +170,9 @@ Reconcile the feature matrix with completed history/memory and approval work, th
 ### Phase 5 follow-up — offline provider feedback (partial)
 
 - A headed network-isolated run against a configured provider at unused loopback port 9106 exposed a classification gap: the AI SDK wraps refused sockets in a retryable `APICallError`, which had been rendered as generic “Something went wrong.” `toChatError` now maps retryable API errors without an HTTP status to the existing `connection_failed` envelope and troubleshooting guidance.
-- The headed BrowserOS smoke verifies the side panel displays “Connection failed” and Retry, retrying produces the same actionable error, and the test-only dummy key is absent from both views. It uses no external network or provider credential. The repeatable flow is `tests/e2e/aster_provider_offline_smoke.py`.
-- Chat-error classifier and stream tests pass (28/28), full workspace typecheck and targeted Biome pass, and the headed smoke passes. A real missing-provider/agent-server outage flow remains to verify; A13 stays PARTIAL.
-- Legacy local fetch failures now tell the user that Aster’s local AI service could not be reached, with a retry action and no BrowserOS-branded help link. The focused `ChatError` suite passes (10/10); a headed agent-process outage flow is still not verified.
+- The headed BrowserOS smoke verifies the side panel displays “Connection failed” and Retry for a refused local provider, then uses CDP to block the extension’s `/chat` request and verifies the Aster local-service message and Retry recovery after unblocking. The test-only dummy key is absent from both views; no external network or provider credential is used. The repeatable flow is `tests/e2e/aster_provider_offline_smoke.py`.
+- Chat-error classifier and stream tests pass (28/28), full workspace typecheck and targeted Biome pass, the `ChatError` suite passes (10/10), and the updated headed smoke passes. Empty provider-selection UX and an actual stopped agent-server process remain unverified, so A13 stays PARTIAL.
+- Legacy local fetch failures now tell the user that Aster’s local AI service could not be reached, with a retry action and no BrowserOS-branded help link.
 
 ### Security follow-up — filesystem path boundaries (partial)
 

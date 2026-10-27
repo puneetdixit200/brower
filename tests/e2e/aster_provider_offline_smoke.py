@@ -104,6 +104,45 @@ def main() -> int:
         if DUMMY_KEY in retried_error:
             raise AssertionError("provider dummy key appeared after retry")
 
+        # Simulate the local agent endpoint being unavailable only for this
+        # extension target, without stopping the shared dev server process.
+        panel_cdp.call("Network.enable")
+        panel_cdp.call(
+            "Network.setBlockedURLs", {"urls": [f"{SERVER}/chat*"]}
+        )
+        panel_cdp.evaluate(
+            "(()=>{const e=document.querySelector('textarea');"
+            "const set=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set;"
+            "set.call(e,'Check local agent availability.');"
+            "e.dispatchEvent(new Event('input',{bubbles:true}));return true})()"
+        )
+        wait_for(
+            panel_cdp,
+            "[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='Send'&&!b.disabled)",
+        )
+        panel_cdp.evaluate(
+            "[...document.querySelectorAll('button')].find(b=>b.textContent.trim()==='Send').click()"
+        )
+        wait_for(
+            panel_cdp,
+            "document.body.innerText.includes('Could not reach Aster’s local AI service')&&"
+            "[...document.querySelectorAll('button')].some(b=>b.textContent.includes('Try again'))",
+            timeout=45,
+        )
+        local_error = panel_cdp.evaluate("document.body.innerText")
+        if "docs.browseros.com/troubleshooting" in local_error:
+            raise AssertionError("local agent error retained the upstream help URL")
+        panel_cdp.call("Network.setBlockedURLs", {"urls": []})
+        panel_cdp.evaluate(
+            "[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Try again')).click()"
+        )
+        wait_for(
+            panel_cdp,
+            "document.body.innerText.includes('Connection failed')&&"
+            "[...document.querySelectorAll('button')].some(b=>b.textContent.includes('Try again'))",
+            timeout=45,
+        )
+
         print(
             json.dumps(
                 {
@@ -111,6 +150,8 @@ def main() -> int:
                     "user_visible_error": "Connection failed",
                     "retry_control": "passed",
                     "retry_repeats_connection_error": "passed",
+                    "local_agent_failure_copy": "passed",
+                    "retry_recovers_after_local_request_unblocked": "passed",
                     "dummy_key_redaction": "passed",
                     "network": "isolated; no external provider contacted",
                 },
