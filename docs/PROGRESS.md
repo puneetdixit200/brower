@@ -150,3 +150,8 @@ Reconcile the feature matrix with completed history/memory and approval work, th
 - Scheduled-task startup no longer executes every missed job as a catch-up batch. It rebuilds BrowserOS alarms from enabled schedules, and an alarm delivered more than 60 seconds after its scheduled time is skipped. Same-job triggers are guarded within the extension worker; the existing persisted run records continue to provide restart visibility.
 - Added policy tests for on-time, late, early, and invalid alarm timestamps. App typecheck passes. A real laptop sleep/restart test has not been performed, and skipped runs are not yet written as audit records.
 - Routines remain partial: schedules still use the machine-local timezone, there is no explicit `skip`/`run once on wake` setting, heartbeat continuation is absent, no DST preview exists, and cross-context locking has not been proven.
+
+### Phase 8 follow-up — scheduled task lifecycle smoke (partial)
+
+- The existing scheduled-task UI's create → edit → disable → delete flow was exercised in headed BrowserOS v0.51.0 inside the network-isolated dev profile. The test confirmed that create installs a browser alarm and disable removes it; delete returned 404 from the local job API. No provider was configured and no task was executed.
+- The repeatable smoke is `tests/e2e/aster_scheduled_task_lifecycle_smoke.py`. Schedule conversion, provider resolution, result selection, and alarm-policy tests pass (24/24). Manual run, cancellation/retry, displayed run history, and real recurring fire remain unverified; R01/R04 stay PARTIAL.
