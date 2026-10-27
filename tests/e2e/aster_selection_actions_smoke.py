@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""Verify selected-text actions populate the side-panel composer."""
+
+from __future__ import annotations
+
+import json
+import time
+import urllib.request
+
+from aster_ui_latency_benchmark import CDP
+
+
+def main() -> int:
+    base = "http://127.0.0.1:9005"
+    extension_target = wait_for_target(base, "#/home")
+    cdp = CDP(extension_target["webSocketDebuggerUrl"])
+    cdp.call("Runtime.enable")
+    fixture_tab_id: int | None = None
+    try:
+        fixture = cdp.evaluate(
+            "(async()=>await chrome.tabs.create({"
+            "url:'http://127.0.0.1:9105/system/health'}))()"
+        )
+        fixture_tab_id = fixture["id"]
+        selected = select_fixture_text(base, fixture_tab_id)
+        cdp.evaluate(
+            "(async({tabId})=>{await chrome.sidePanel.setOptions({"
+            "tabId,path:`sidepanel.html?tabId=${tabId}`,enabled:true});"
+            "await chrome.sidePanel.open({tabId});return true})({tabId:"
+            + str(fixture_tab_id)
+            + "})"
+        )
+
+        panel = wait_for_target(base, f"sidepanel.html?tabId={fixture_tab_id}")
+        panel_cdp = CDP(panel["webSocketDebuggerUrl"])
+        panel_cdp.call("Runtime.enable")
+        try:
+            wait_for(
+                panel_cdp,
+                "!!document.querySelector('button[aria-label=\"Summarize selected text\"]')",
+            )
+            panel_cdp.evaluate(
+                "[...document.querySelectorAll('button')].find(b=>"
+                "b.getAttribute('aria-label')==='Summarize selected text')?.click()"
+            )
+            wait_for(
+                panel_cdp,
+                "document.querySelector('textarea')?.value.includes('three concise bullet points')",
+            )
+            summarize = panel_cdp.evaluate(
+                "document.querySelector('textarea')?.value"
+            )
+            panel_cdp.evaluate(
+                "[...document.querySelectorAll('button')].find(b=>"
+                "b.getAttribute('aria-label')==='Translate selected text')?.click()"
+            )
+            wait_for(
+                panel_cdp,
+                "document.querySelector('textarea')?.value.includes('target language')",
+            )
+            translate = panel_cdp.evaluate(
+                "document.querySelector('textarea')?.value"
+            )
+        finally:
+            panel_cdp.ws.sock.close()
+
+        print(
+            json.dumps(
+                {
+                    "selected_text_context": selected,
+                    "summarize_action": summarize,
+                    "translate_action": translate,
+                    "provider_request": "not sent; composer prompts only",
+                    "network": "isolated",
+                },
+                indent=2,
+            )
+        )
+        return 0
+    finally:
+        try:
+            cdp.evaluate(
+                "(async({tabId})=>{if(tabId!==null){"
+                "await chrome.storage.local.remove('selectedTextMap').catch(()=>{});"
+                "await chrome.sidePanel.close({tabId}).catch(()=>{});"
+                "await chrome.tabs.remove(tabId).catch(()=>{});}})({tabId:"
+                + json.dumps(fixture_tab_id)
+                + "})"
+            )
+        except Exception:
+            pass
+        cdp.ws.close()
+
+
+def select_fixture_text(base: str, tab_id: int) -> str:
+    target = wait_for_target(base, "127.0.0.1:9105/system/health")
+    cdp = CDP(target["webSocketDebuggerUrl"])
+    cdp.call("Runtime.enable")
+    try:
+        wait_for(cdp, "document.readyState === 'complete'")
+        # The content script waits for the extension worker to return its tab
+        # ID before it registers the mouseup handler.
+        time.sleep(1)
+        selected = cdp.evaluate(
+            "(()=>{const range=document.createRange();"
+            "range.selectNodeContents(document.body);"
+            "const selection=window.getSelection();selection.removeAllRanges();"
+            "selection.addRange(range);"
+            "document.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));"
+            "return selection.toString()})()"
+        )
+    finally:
+        cdp.ws.close()
+
+    deadline = time.monotonic() + 8
+    while time.monotonic() < deadline:
+        extension = wait_for_target(base, "#/home")
+        ext = CDP(extension["webSocketDebuggerUrl"])
+        ext.call("Runtime.enable")
+        try:
+            saved = ext.evaluate(
+                "(async({tabId})=>{const data=await chrome.storage.local.get('selectedTextMap');"
+                "return data.selectedTextMap?.[String(tabId)]?.text ?? null})({tabId:"
+                + str(tab_id)
+                + "})"
+            )
+        finally:
+            ext.ws.close()
+        if saved:
+            return saved
+        time.sleep(0.1)
+    raise TimeoutError("Selected text was not stored for the fixture tab")
+
+
+def wait_for_target(base: str, url_fragment: str) -> dict:
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        try:
+            targets = json.load(urllib.request.urlopen(f"{base}/json/list", timeout=2))
+            target = next(
+                (
+                    item
+                    for item in targets
+                    if item.get("type") == "page" and url_fragment in item.get("url", "")
+                ),
+                None,
+            )
+            if target:
+                return target
+        except Exception:
+            pass
+        time.sleep(0.2)
+    raise TimeoutError(f"Browser target not found: {url_fragment}")
+
+
+def wait_for(cdp: CDP, expression: str, timeout: float = 15) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            if cdp.evaluate(expression):
+                return
+        except Exception:
+            pass
+        time.sleep(0.1)
+    raise TimeoutError(f"Timed out waiting for UI condition: {expression}")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

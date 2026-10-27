@@ -16,6 +16,7 @@ import { ChatAttachedTabs } from './ChatAttachedTabs'
 import { ChatInput, type ChatInputHandle } from './ChatInput'
 import { ChatModeToggle } from './ChatModeToggle'
 import { ChatSelectedText } from './ChatSelectedText'
+import { getSelectedTextActionPrompt } from './selected-text-actions'
 
 export interface ChatFooterProps {
   mode: ChatMode
@@ -107,6 +108,10 @@ export const ChatFooter: FC<ChatFooterProps> = ({
       {visibleSelectedText && (
         <ChatSelectedText
           selectedText={visibleSelectedText}
+          onAction={(action) => {
+            onInputChange(getSelectedTextActionPrompt(action))
+            chatInputRef.current?.focus()
+          }}
           onDismiss={() => {
             if (!activeTabId) return
             const key = String(activeTabId)

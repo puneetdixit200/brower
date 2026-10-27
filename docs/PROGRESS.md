@@ -77,6 +77,12 @@
 - A follow-up MCP policy run passed 18/18 across `browser-mcp-module.test.ts` and `mcp.test.ts`. It verifies a read-only lease cannot be widened by a client query, rejects `tabs.new` under that lease, and omits `navigate` from an externally requested read-only tool surface. These are read-only denials, not interactive approval support.
 - This proved one read-only tool dispatch end to end; approval work below now covers one mutation boundary. Page comprehension, cancellation, retries, multi-step tasks, and real-provider behavior remain unverified.
 
+### Phase 6 — split tabs and selection actions (partial)
+
+- Source review found BrowserOS Chromium patch integration for the native split-view new-tab URL and a default-pinned Split Tab toolbar action. Aster does not currently own split-state UI or controls; two live panes and resize/swap/close/restart behavior have not been verified. Native Chromium compilation remains deferred on this 14 GiB host against the project's 16 GiB guidance.
+- Existing selection capture is per tab and selected text can be attached to chat. Added explicit Summarize and Translate prompt buttons to the selected-text card; they only populate the composer, so no provider request occurs until the user submits. Translation asks for a target language when one is missing.
+- The selection prompt tests pass (2/2), app typecheck passes, and targeted Biome passes. A headed isolated BrowserOS smoke selected text from the local health page, opened the side panel, and verified that Summarize and Translate populate the composer without sending a provider request. A streamed answer is still untested. U11 and U12 remain PARTIAL; screenshot/lasso tools (U13) are not implemented.
+
 ### Phase 7 — approval gate and response path (partial)
 
 - Added server-side tool approval decisions to `ToolLoopAgent`. Browser `act`, code execution (`run`/`evaluate`), file upload/download/write/delete, tab close, and connector tools whose name or description indicates external/destructive side effects require user approval. Read-only observations and navigation continue without a prompt. Decisions are evaluated after the model proposes a call and before execution.

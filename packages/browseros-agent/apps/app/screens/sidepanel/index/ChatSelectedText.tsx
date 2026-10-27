@@ -1,17 +1,20 @@
-import { FileText, X } from 'lucide-react'
+import { FileText, Languages, ListChecks, X } from 'lucide-react'
 import type { FC } from 'react'
 import type { SelectedTextData } from '@/lib/selected-text/selectedTextStorage'
+import type { SelectedTextAction } from './selected-text-actions'
 
 const MAX_DISPLAY_LENGTH = 200
 
 export interface ChatSelectedTextProps {
   selectedText: SelectedTextData
   onDismiss: () => void
+  onAction: (action: SelectedTextAction) => void
 }
 
 export const ChatSelectedText: FC<ChatSelectedTextProps> = ({
   selectedText,
   onDismiss,
+  onAction,
 }) => {
   const truncated =
     selectedText.text.length > MAX_DISPLAY_LENGTH
@@ -31,14 +34,37 @@ export const ChatSelectedText: FC<ChatSelectedTextProps> = ({
               &ldquo;{truncated}&rdquo;
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="flex-shrink-0 rounded p-0.5 transition-colors hover:bg-background"
-            title="Remove selected text"
-          >
-            <X className="h-3 w-3 text-muted-foreground" />
-          </button>
+          <div className="flex flex-shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onAction('summarize')}
+              className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[10px] text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+              title="Summarize selected text"
+              aria-label="Summarize selected text"
+            >
+              <ListChecks className="h-3 w-3" />
+              <span>Summarize</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onAction('translate')}
+              className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[10px] text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+              title="Translate selected text"
+              aria-label="Translate selected text"
+            >
+              <Languages className="h-3 w-3" />
+              <span>Translate</span>
+            </button>
+            <button
+              type="button"
+              onClick={onDismiss}
+              className="rounded p-0.5 transition-colors hover:bg-background"
+              title="Remove selected text"
+              aria-label="Remove selected text"
+            >
+              <X className="h-3 w-3 text-muted-foreground" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
