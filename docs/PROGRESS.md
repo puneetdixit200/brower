@@ -62,6 +62,12 @@
 - Headed BrowserOS v0.51.0 live check opened a local health endpoint in a second tab, typed `@`, saw that tab in the picker, selected it (`Tabs 1`), and pressed Escape; the mention closed and unfinished `@` text was removed. No external page or provider credential was used.
 - U06 is PARTIAL: current-window web-tab mentions are verified; history and memory mentions are not implemented, and files remain a separate attach action.
 
+### Phase 5 — local mocked page-question stream (partial)
+
+- Started the supervised dev browser in a network-isolated namespace with `BROWSEROS_USE_MOCK_LLM=true`. Added a disposable OpenAI-shaped provider row containing a test-only dummy key, selected it, attached `http://127.0.0.1:<port>/system/health`, and asked for the page title.
+- The real home submit path navigated to the chat surface, sent the selected tab context through the extension/server chat route, and rendered the full canned response. Server logs recorded the chat request and `Agent execution complete`; provider row was deleted before shutdown. No real credential or external model request was used.
+- A01 is PARTIAL: transport and page-context display pass, but the mock response does not establish page comprehension, browser tool execution, approvals, or real provider behavior.
+
 ### Current blockers / limits
 
 - Aster still inherits BrowserOS UI, branding, product identity, and distribution/update wiring. No modified Chromium shell, installer, desktop entry, or release artifact has been produced.
@@ -71,4 +77,4 @@
 
 ### Next action
 
-Finish a matched stock/Aster navigation, startup, tab-switch, and idle CPU/RSS harness; then complete U06 history/file/memory context coverage or accurately narrow the product target. Continue browser-shell regression checks and audit inherited extension identity/updater assumptions before any distribution work.
+Add deterministic local fixture tasks that exercise browser tools and approval boundaries; then complete U06 history/file/memory context coverage or accurately narrow the product target. Finish the matched stock/Aster navigation, startup, tab-switch, and idle CPU/RSS harness, continue shell regressions, and audit inherited extension identity/updater assumptions before distribution work.

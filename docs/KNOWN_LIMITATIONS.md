@@ -2,7 +2,7 @@
 
 ## Aster UI runtime
 
-- A cold launch can briefly block an unpacked extension URL until its service worker registers. Linux manual mode now waits for the worker and opens the home through CDP. The updated runner rendered Aster and passed a headed Search-submit smoke on BrowserOS v0.51.0 in an isolated profile. No provider credentials or external network were used; AI task submission and provider error recovery remain unverified.
+- A cold launch can briefly block an unpacked extension URL until its service worker registers. Linux manual mode now waits for the worker and opens the home through CDP. The updated runner rendered Aster and passed headed Search, provider setup, theme, tab mention, and local mocked page-question smokes on BrowserOS v0.51.0 in isolated profiles. The mock run used a disposable provider row with a dummy test key, deleted before shutdown; no real credential or external model request was used. Semantic page understanding, browser tool execution, approvals, and real-provider error recovery remain unverified.
 
 - This branch is an early Aster hardening and integration effort over pinned BrowserOS source, not yet a distributable Aster Browser. Product identity, UI design, desktop packaging, updater behavior, and a modified Chromium shell remain incomplete.
 - Chromium source build is deferred on this 14 GiB host (upstream guidance calls for at least 16 GiB). The stock BrowserOS AppImage baseline was run in an isolated profile; tests say nothing about a modified Aster engine.

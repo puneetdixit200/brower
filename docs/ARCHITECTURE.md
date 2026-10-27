@@ -28,7 +28,7 @@ The extension calls server routes using typed Hono RPC per `CONTRIBUTING.Browser
 - Page action: browser automation tools are registered from `packages/browser-mcp/src/tools/registry.ts`; `act.ts` dispatches page actions through the BrowserOS browser SDK/CDP backend. The tool is accessible through the server agent/tool orchestration path. Page content remains untrusted input and must not grant new permissions.
 - Locality: Aster now binds the server HTTP API to `127.0.0.1`; the upstream baseline had bound `0.0.0.0`. This change has a passing startup test. CDP and adjacent services remain in the audit queue.
 
-These paths describe inspected source. Only chat startup and extension compilation were covered by the current successful targeted tests; end-to-end model/tool flow has not been exercised with a real provider.
+These paths describe inspected source. A headed Linux smoke has now exercised a local mocked chat stream with an attached loopback page and observed the selected page URL in the transcript. This verifies extension-to-server transport and context display only; it does not establish semantic page understanding, real-provider behavior, browser tool execution, or approval enforcement.
 
 ## Boundaries
 
