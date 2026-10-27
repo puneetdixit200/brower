@@ -49,3 +49,10 @@ The latest source commits address the Aster onboarding Vite favicon ordering, ad
 ## Source-only unpacked debug integration — 2026-10-28
 
 The GitHub branch now contains a gated `--aster-unpacked-dev` source/build-planner path, resource ZIP verification/staging, a GN staging action, an Aster-only asynchronous unpacked loader branch, and product-owned server/icon rules. See [evidence checkpoint](evidence/aster-unpacked-integration-source-only-2026-10-28.md). **These changes have not been compiled, tested or run on Omarchy.** Preserve all previous feature statuses. Run the focused integration and build commands in the checkpoint once local Chromium is accessible, fix actual failures, then continue the 95 implementation subtasks. Release keys/update-service ownership, full browser UI parity, native packaged checks, performance and security gates remain open.
+
+
+## Next checkpoint — source implementation and UX (2026-10-28)
+
+The [master build specification](OMARCHY_ASIDE_INSPIRED_BROWSER_MASTER_BUILD_SPEC.md) now lives in this repository. The latest source-only work adds a dedicated WXT debug build, GN metadata staging, a guarded native build driver, an opt-in Omarchy launcher, an Aster route command palette, and CPU/RSS sampling. See [checkpoint evidence](evidence/aster-source-development-2026-10-28.md). No native binary or runtime parity is verified.
+
+**Next critical blocker:** on the actual Omarchy host, reconcile local working-tree changes without force-resetting. Run the prepared-resource builds, apply native patch mapping, generate GN against the pinned Chromium checkout, and compile with jobs=2; fix any compile/API or packaging errors. Only then can the command palette, extension READY, split view, sandbox/state, sidecar, privacy and performance be validated in an actual Aster binary. Finish remaining UI/agent/security tasks in `IMPLEMENTATION_PLAN.md`. Keep all signing/update resources unclaimed until provisioned.
