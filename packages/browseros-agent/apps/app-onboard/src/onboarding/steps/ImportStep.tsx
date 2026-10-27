@@ -10,6 +10,7 @@ import { useId, useRef, useState } from 'react'
 import type { UseFormReturn } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
 import { FormField, FormItem, FormMessage } from '@/components/ui/form'
+import { ONBOARDING_BRAND } from '../brand'
 import type {
   BrowserOSImportItem,
   BrowserOSImportSource,
@@ -324,7 +325,7 @@ export function ImportStep({
             </div>
             <div className="text-[12.5px] text-ink-2">
               {state.error?.message ??
-                "BrowserOS couldn't finish this import. Try again below, or refresh the profile list."}
+                `${ONBOARDING_BRAND} couldn't finish this import. Try again below, or refresh the profile list.`}
             </div>
           </div>
           <div className="flex flex-wrap gap-2.5">

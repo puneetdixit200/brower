@@ -1,5 +1,6 @@
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ONBOARDING_BRAND } from '../brand'
 import { DisplayHeading, Em, StepCopy } from '../components/DisplayHeading'
 import { StepWrap } from '../components/StepWrap'
 
@@ -13,7 +14,7 @@ export function WelcomeStep({ onPrimary, onSkip }: WelcomeStepProps) {
   return (
     <StepWrap>
       <DisplayHeading>
-        Welcome to <Em>BrowserOS</Em>
+        Welcome to <Em>{ONBOARDING_BRAND}</Em>
       </DisplayHeading>
       <StepCopy>
         Two quick steps to get set up: bring your browser over, then connect

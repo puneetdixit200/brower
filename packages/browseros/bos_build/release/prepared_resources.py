@@ -198,6 +198,8 @@ def _resolve_manifest_extension(xml: str, extension_id: str) -> tuple[str, str]:
 
 def _onboarding_archive_name(component: str) -> str:
     """Archive filename published by one onboarding component's build."""
+    if component == "aster-onboard":
+        return "aster-onboard-resources.zip"
     return f"browseros-{component}-resources.zip"
 
 
@@ -453,12 +455,20 @@ class LocalPreparationOperations:
 
     def build_onboarding(self, destination: Path, component: str) -> None:
         agent_root = self.repo_root / "packages/browseros-agent"
-        manifest = agent_root / f"apps/{component}/package.json"
+        if component == "aster-onboard":
+            package = "app-onboard"
+            build_script = "scripts/build/aster-onboard.ts"
+            output_dir = "dist/local/aster-onboard"
+        else:
+            package = component
+            build_script = f"scripts/build/{component}.ts"
+            output_dir = f"dist/prod/{component}"
+        manifest = agent_root / f"apps/{package}/package.json"
         lockfile = agent_root / "bun.lock"
         before = (manifest.read_bytes(), lockfile.read_bytes())
         environment = {**os.environ, "NODE_ENV": "production"}
         subprocess.run(
-            ["bun", f"scripts/build/{component}.ts", "--no-upload"],
+            ["bun", build_script, "--no-upload"],
             cwd=agent_root,
             env=environment,
             check=True,
@@ -467,7 +477,8 @@ class LocalPreparationOperations:
             raise RuntimeError("Onboarding build changed its committed version files")
         built = (
             agent_root
-            / f"dist/prod/{component}/{_onboarding_archive_name(component)}"
+            / output_dir
+            / _onboarding_archive_name(component)
         )
         if not built.is_file():
             raise FileNotFoundError(f"Onboarding build did not produce {built}")

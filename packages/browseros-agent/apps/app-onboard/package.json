@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:chromium": "tsc --noEmit && vite build --mode chromium && bun scripts/verify-chromium-build.ts",
+    "build:aster-chromium": "tsc --noEmit && vite build --mode aster-chromium && bun scripts/verify-chromium-build.ts",
     "preview": "vite preview",
     "test": "bun run ../../scripts/run-bun-test.ts --cwd=./apps/app-onboard ./apps/app-onboard",
     "typecheck": "tsc --noEmit",

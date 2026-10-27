@@ -284,3 +284,15 @@ Follow the reviewed batches in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md
 - Full Python discovery passes (1,333 tests run, three skipped), with builder Bun checks 7/7, state checks 16/16 and filesystem checks 22/22. The filesystem regression uses an actual compiled fixture and Bubblewrap. Parent workspace typecheck passes. Product-definition doctor reports Aster healthy.
 - Terra independently started the rebuilt artifact against disposable headless Chromium in a loopback-only namespace: health OK, CDP connected, telemetry off, state under ASTER_DIR and the poisoned BROWSEROS_DIR absent. Bun executes JavaScript and its checksum matches the recorded provenance. Processes were stopped. Evidence and limitations are in `evidence/aster-server-development-2026-10-28.json`; usage is documented in `ASTER_SERVER_DEVELOPMENT.md`.
 - No native Aster Chromium binary or end-to-end packaged MCP output is verified. Extension/CRX and onboarding source producers, native sidecar launch integration and release provisioning remain open.
+
+### Native extension development plan — 2026-10-28
+
+- Terra confirmed that the existing source/prepared resource and native installer paths require a signed CRX. No matching private key exists for the fixed public development identity. `ASTER_NATIVE_DEVELOPMENT_PLAN.md` records a separately gated unpacked debug path through resource staging, GN, loader and readiness; it is not implemented or compiled. Release signing/update requirements remain unchanged.
+
+### User-requested pause checkpoint — 2026-10-28
+
+- User explicitly requested pushing all current work and the upcoming plan, then stopping. The overall project remains incomplete and is paused pending a resume request.
+- Includes the local Aster onboarding producer/branding and source-provider wiring as a development checkpoint. Actual native Aster compilation, installer readiness and packaged launch remain unverified. The proposed unpacked debug extension integration is documented in `ASTER_NATIVE_DEVELOPMENT_PLAN.md`; it is not yet implemented.
+
+- Onboarding checkpoint validation: local no-upload Aster archive, workspace typecheck, Biome and focused Bun descriptor checks pass. Component/source-resource tests pass (19). Default BrowserOS build passed before the final favicon plugin adjustment. Known remaining defect: emitted Aster favicon is still BrowserOS despite Aster visual branding. Direct prepared-resource test import encounters a circular import; complete discovery validation is recorded separately below.
+- Final full Python discovery passes: 1,335 tests run, three skipped, including prepared-resource tests in discovery order. The direct-module circular-import limitation remains; native compilation is still unverified.

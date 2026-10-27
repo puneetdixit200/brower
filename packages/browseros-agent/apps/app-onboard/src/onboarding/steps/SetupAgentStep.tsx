@@ -24,6 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { ONBOARDING_BRAND } from '../brand'
 import { Hermes, OpenClaw } from '../components/AgentBrandMarks'
 import { DisplayHeading, Em, StepCopy } from '../components/DisplayHeading'
 import { StepWrap } from '../components/StepWrap'
@@ -100,9 +101,9 @@ export function SetupAgentStep({ onSetup }: SetupAgentStepProps) {
           Set up your <Em>agent</Em>
         </DisplayHeading>
         <StepCopy>
-          BrowserOS runs on the provider you bring. Connect an LLM provider or a
-          coding agent harness you already use, and we will open BrowserOS so
-          you can finish.
+          {ONBOARDING_BRAND} runs on the provider you bring. Connect an LLM
+          provider or a coding agent harness you already use, and we will open{' '}
+          {ONBOARDING_BRAND} so you can finish.
         </StepCopy>
         <div className="mb-6 flex max-w-[480px] flex-col gap-[18px]">
           <div>

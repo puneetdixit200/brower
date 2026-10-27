@@ -1,4 +1,5 @@
 import { ArrowDownToLine, Cpu, ShieldCheck } from 'lucide-react'
+import { ONBOARDING_BRAND, ONBOARDING_LOGO_PATH } from '../brand'
 
 /** Persistent value rail beside the onboarding steps, in the app theme. */
 export function VisualRail() {
@@ -25,10 +26,10 @@ export function VisualRail() {
           alt=""
           aria-hidden
           className="size-[38px] rounded-[11px]"
-          src="/icon/128.png"
+          src={ONBOARDING_LOGO_PATH}
         />
         <div className="font-extrabold text-[17px] tracking-tight">
-          BrowserOS
+          {ONBOARDING_BRAND}
         </div>
       </div>
       <div className="relative">

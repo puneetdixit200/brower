@@ -126,6 +126,16 @@ COMPONENTS: Mapping[str, ComponentSpec] = {
         workspace_path="apps/app-onboard",
         tag_prefix="app-onboard/v",
     ),
+    "aster-onboard": ComponentSpec(
+        id="aster-onboard",
+        display_name="Aster onboarding resources",
+        version_scheme="semver",
+        manifest_path=Path("packages/browseros-agent/apps/app-onboard/package.json"),
+        lockfile_path=Path("packages/browseros-agent/bun.lock"),
+        package_name="@browseros/app-onboard",
+        workspace_path="apps/app-onboard",
+        tag_prefix="aster-onboard/v",
+    ),
 }
 
 _CANDIDATE_COMPONENTS = {

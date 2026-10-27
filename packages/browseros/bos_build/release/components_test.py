@@ -8,6 +8,7 @@ from pathlib import Path
 
 from bos_build.release.components import (
     AllocationRecord,
+    component_by_id,
     read_component_version,
     components_for_candidate,
     resolve_candidate_versions,
@@ -17,6 +18,15 @@ from bos_build.release.components import (
 
 
 class ComponentPlanningTest(unittest.TestCase):
+    def test_aster_onboarding_has_an_independent_local_component_identity(self) -> None:
+        component = component_by_id("aster-onboard")
+        self.assertEqual(component.display_name, "Aster onboarding resources")
+        self.assertEqual(component.tag_prefix, "aster-onboard/v")
+        self.assertEqual(
+            component.manifest_path,
+            Path("packages/browseros-agent/apps/app-onboard/package.json"),
+        )
+
     def test_product_candidates_select_only_versioned_components(self) -> None:
         self.assertEqual(
             tuple(component.id for component in components_for_candidate("browseros")),

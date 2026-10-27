@@ -11,6 +11,7 @@ const iconResourceFiles = [
   'icon/48.png',
   'icon/96.png',
   'icon/128.png',
+  'icon/aster-mark.svg',
   'icon/keychain-prompt.png',
   'icon/hermes.png',
 ]
@@ -87,8 +88,11 @@ function verifyIndexReferences(indexHtml: string) {
 
   if (!hasCss) fail('index.html does not reference ./app.css')
   if (!hasJs) fail('index.html does not reference ./app.js')
-  if (!indexHtml.includes('href="./icon/32.png"')) {
-    fail('index.html does not reference ./icon/32.png')
+  if (
+    !indexHtml.includes('href="./icon/32.png"') &&
+    !indexHtml.includes('href="./icon/aster-mark.svg"')
+  ) {
+    fail('index.html does not reference an allowed onboarding icon')
   }
 }
 

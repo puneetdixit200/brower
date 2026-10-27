@@ -4,11 +4,30 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 export default defineConfig(({ mode }) => {
-  const isChromiumBuild = mode === 'chromium'
+  const isChromiumBuild = mode.endsWith('chromium')
+  const isAsterBuild = mode === 'aster-chromium'
 
   return {
     base: isChromiumBuild ? './' : undefined,
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      {
+        name: 'onboarding-brand-title',
+        transformIndexHtml(html) {
+          const branded = html.replace(
+            '<title>BrowserOS Onboarding</title>',
+            `<title>${isAsterBuild ? 'Aster' : 'BrowserOS'} Onboarding</title>`,
+          )
+          return isAsterBuild
+            ? branded.replace(
+                '<link rel="icon" type="image/png" sizes="32x32" href="/icon/32.png" />',
+                '<link rel="icon" type="image/svg+xml" href="/icon/aster-mark.svg" />',
+              )
+            : branded
+        },
+      },
+    ],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

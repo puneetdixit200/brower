@@ -8,6 +8,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from bos_build.core.products import (
     BROWSEROS_AGENT_EXTENSION_ID,
@@ -15,6 +16,7 @@ from bos_build.core.products import (
 )
 from bos_build.release.prepared_resources import (
     PreparationRequest,
+    LocalPreparationOperations,
     load_prepared_resources,
     prepare_common_resources,
     validate_prepared_resources,
@@ -138,6 +140,32 @@ class PreparedResourcesTest(unittest.TestCase):
             manifest.files["bug_reporter_crx"].version,
             "54.0.0.0",
         )
+
+    def test_aster_onboarding_builder_uses_local_aster_producer(self) -> None:
+        agent_root = self.root / "packages/browseros-agent"
+        (agent_root / "apps/app-onboard").mkdir(parents=True)
+        (agent_root / "apps/app-onboard/package.json").write_text("{}")
+        (agent_root / "bun.lock").write_text("lock")
+        archive = (
+            agent_root
+            / "dist/local/aster-onboard/aster-onboard-resources.zip"
+        )
+        archive.parent.mkdir(parents=True)
+        archive.write_bytes(b"aster archive")
+        destination = self.root / "prepared/aster-onboard-resources.zip"
+        destination.parent.mkdir()
+
+        with patch("bos_build.release.prepared_resources.subprocess.run") as run:
+            LocalPreparationOperations(self.root).build_onboarding(
+                destination, "aster-onboard"
+            )
+
+        self.assertEqual(destination.read_bytes(), b"aster archive")
+        self.assertEqual(
+            run.call_args.args[0],
+            ["bun", "scripts/build/aster-onboard.ts", "--no-upload"],
+        )
+        self.assertEqual(run.call_args.kwargs["cwd"], agent_root)
 
     def test_valid_reuse_performs_no_build_network_or_signing(self) -> None:
         first = FakeOperations()
