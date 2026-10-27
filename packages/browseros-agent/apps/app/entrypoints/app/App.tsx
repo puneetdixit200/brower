@@ -11,6 +11,7 @@ import { FeaturesPage } from '@/screens/features/Features'
 import { SurveyPage } from '@/screens/jtbd-agent/SurveyPage'
 import { LlmHubPage } from '@/screens/llm-hub/LlmHubPage'
 import { MCPSettingsPage } from '@/screens/mcp-settings/MCPSettingsPage'
+import { MemoryPage } from '@/screens/memory/MemoryPage'
 import { NewTabChat } from '@/screens/newtab/index/NewTabChat'
 import { NewTabLayout } from '@/screens/newtab/layout/NewTabLayout'
 import { Personalize } from '@/screens/newtab/personalize/Personalize'
@@ -67,6 +68,7 @@ export const App: FC = () => {
             <Route path="ai" element={<AISettingsPage key="ai" />} />
             <Route path="chat" element={<LlmHubPage />} />
             <Route path="mcp" element={<MCPSettingsPage />} />
+            <Route path="memory" element={<MemoryPage />} />
             <Route path="customization" element={<CustomizationPage />} />
             <Route path="diagnostics" element={<DiagnosticsPage />} />
             <Route

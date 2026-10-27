@@ -24,6 +24,7 @@ import { createHealthRoute } from './health'
 import { createKlavisRoutes } from './klavis'
 import { createMcpRoutes } from './mcp'
 import { createMcpManagerRoutes } from './mcp-manager'
+import { createMemoryRoutes } from './memory'
 import { createOAuthRoutes } from './oauth'
 import { createProviderRoutes } from './provider'
 import { createProvidersRoutes } from './providers'
@@ -92,6 +93,8 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
       .use('/klavis/*', requireTrustedAppOrigin())
       .use('/scheduled-jobs/*', requireTrustedAppOrigin())
       .use('/scheduled-job-runs/*', requireTrustedAppOrigin())
+      .use('/memory', requireTrustedAppOrigin())
+      .use('/memory/*', requireTrustedAppOrigin())
       .route('/system/health', createHealthRoute({ browser }))
       .route('/system/diagnostics', createDiagnosticsRoute(version))
       .route('/system/shutdown', createShutdownRoute({ onShutdown }))
@@ -140,6 +143,7 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
       .route('/refine-prompt', createRefinePromptRoutes({ browserosId }))
       .route('/scheduled-jobs', createScheduledJobRoutes())
       .route('/scheduled-job-runs', createScheduledJobRunRoutes())
+      .route('/memory', createMemoryRoutes())
   )
 }
 

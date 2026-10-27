@@ -5,6 +5,7 @@
  */
 
 export * from './conversations'
+export * from './memories'
 export * from './oauth'
 export * from './providers'
 export * from './scheduled-job-runs'

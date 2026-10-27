@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   BookOpen,
   Bot,
+  Brain,
   Compass,
   MessageSquare,
   Palette,
@@ -75,6 +76,7 @@ const primarySettingsSections: NavSection[] = [
         icon: Palette,
       },
       { name: 'Aster as MCP', to: '/settings/mcp', icon: Server },
+      { name: 'Memory', to: '/settings/memory', icon: Brain },
     ],
   },
 ]

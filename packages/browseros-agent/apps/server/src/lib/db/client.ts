@@ -262,6 +262,21 @@ const currentMigrationHistory = [
     hash: 'bc71831be007936b7d04aa24c4496a06517e204a78d35af93935f3fc97eb49f9',
     createdAt: 1790235209541,
   },
+  {
+    tag: '0015_chilly_fenris',
+    hash: '70d9ce564b793e41b1822e12eade14cb82e8ef6d51106e47ab7b25fa82ac0043',
+    createdAt: 1793092661248,
+  },
+  {
+    tag: '0016_aspiring_squirrel_girl',
+    hash: 'b3382c523175a9c55056e475c871dc76e4e8e30165220fecc55ca6a4c3cb5f13',
+    createdAt: 1793092674395,
+  },
+  {
+    tag: '0017_memory_search',
+    hash: 'e5c20f24a9f1073dc6b026084628a061209d71926c48bd731caa6f9e0dbc6fba',
+    createdAt: 1793092800000,
+  },
 ]
 
 // TODO(nikhil): Remove this fallback once Windows/Linux packaging always includes Drizzle migrations.
@@ -381,6 +396,30 @@ const currentSchemaStatements = [
     CREATE INDEX IF NOT EXISTS conversations_last_messaged_at_idx
     ON conversations (last_messaged_at)
   `,
+  `
+    CREATE TABLE IF NOT EXISTS memories (
+      id text PRIMARY KEY NOT NULL,
+      content text NOT NULL,
+      source text DEFAULT 'user' NOT NULL,
+      source_url text,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL,
+      expires_at integer
+    )
+  `,
+  `CREATE INDEX IF NOT EXISTS memories_updated_at_idx ON memories (updated_at)`,
+  `
+    CREATE TABLE IF NOT EXISTS memory_settings (
+      id integer PRIMARY KEY DEFAULT 1 NOT NULL,
+      enabled integer DEFAULT false NOT NULL,
+      retention_days integer,
+      updated_at integer NOT NULL
+    )
+  `,
+  `CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(memory_id UNINDEXED, content, source_url, tokenize='unicode61')`,
+  `CREATE TRIGGER IF NOT EXISTS memories_fts_insert AFTER INSERT ON memories BEGIN INSERT INTO memories_fts (memory_id, content, source_url) VALUES (new.id, new.content, coalesce(new.source_url, '')); END`,
+  `CREATE TRIGGER IF NOT EXISTS memories_fts_update AFTER UPDATE ON memories BEGIN DELETE FROM memories_fts WHERE memory_id = old.id; INSERT INTO memories_fts (memory_id, content, source_url) VALUES (new.id, new.content, coalesce(new.source_url, '')); END`,
+  `CREATE TRIGGER IF NOT EXISTS memories_fts_delete AFTER DELETE ON memories BEGIN DELETE FROM memories_fts WHERE memory_id = old.id; END`,
   `
     CREATE TABLE IF NOT EXISTS __drizzle_migrations (
       id SERIAL PRIMARY KEY,

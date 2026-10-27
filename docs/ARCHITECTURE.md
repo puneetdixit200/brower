@@ -9,7 +9,7 @@ Chromium / BrowserOS native shell
   ├─ web platform, tabs, profiles, permissions, downloads
   ├─ WXT + React extension (new tab, side panel, settings)
   └─ Bun + TypeScript server (agent, tools, schedules, API)
-       ├─ local-first data store and editable memory (planned)
+       ├─ local SQLite + FTS5 store and generated Markdown mirror (initial user-authored memory)
        └─ explicitly selected local or cloud model provider
 ```
 
@@ -27,6 +27,7 @@ The extension calls server routes using typed Hono RPC per `CONTRIBUTING.Browser
 - Chat submit: `apps/app/screens/sidepanel/index/Chat.tsx` calls the chat-session context; `apps/app/modules/chat/chat-session.hooks.ts` sends the stream request through `conversation-run-client.ts` to the local server's `/chat/:conversationId/stream` route. The server resolves the selected provider and agent mode before streaming model output and tool events back to the extension.
 - Page action: browser automation tools are registered from `packages/browser-mcp/src/tools/registry.ts`; `act.ts` dispatches page actions through the BrowserOS browser SDK/CDP backend. The tool is accessible through the server agent/tool orchestration path. Page content remains untrusted input and must not grant new permissions.
 - Locality: Aster now binds the server HTTP API to `127.0.0.1`; the upstream baseline had bound `0.0.0.0`. This change has a passing startup test. CDP and adjacent services remain in the audit queue.
+- Memory: migration-backed note/settings tables and FTS triggers live in `apps/server/src/lib/db`; the local API requires a trusted app origin. Notes are user-authored, retrieval defaults off, and the Markdown mirror is regenerated after edits/deletes. Chat context integration and browser-history retrieval are not connected yet.
 
 These paths describe inspected source. Headed Linux smokes exercised a local mocked chat stream with attached loopback context, one read-only tab-list tool, and a denied `act.click` approval request. The denial was applied to the matching server-held pending tool call and returned `tool-output-denied`; a forged approval ID returned HTTP 409. This verifies the transport and denial path, not semantic page understanding, successful approved-action execution, real-provider behavior, or the rendered approval buttons.
 

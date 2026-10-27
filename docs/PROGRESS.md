@@ -1,6 +1,6 @@
 # Progress
 
-## Current phase: Phase 7 — approval and external MCP authentication
+## Current phase: Phase 7 — local memory and history retrieval
 
 **Status: PARTIAL.** Phase 0 is complete against the upstream BrowserOS baseline. Phase 1 dependency installation, static checks, and the development extension build are complete; the full upstream test run has failures. Phase 2's Linux supervisor flow is verified end-to-end. Phase 3 has an Aster home visual foundation and a headed Search/Ask smoke. No Aster-branded browser binary or release package exists.
 
@@ -111,9 +111,18 @@
 Run an actual third-party MCP client against the authenticated endpoint, then audit packaged ports, telemetry/updater, and remaining third-party requests. Add explicit approval-rule configuration and Guard/Full modes; verify an approved-action fixture and external send/payment fixture. Continue U06 history/file/memory context, matched browser benchmarks, shell regressions, and inherited extension identity/updater cleanup before distribution work.
 
 
-### Phase 7 follow-up — persistent external MCP authentication (implementation in progress)
+### Phase 7 follow-up — persistent external MCP authentication (implemented; packaged verification pending)
 
 - External `/mcp` POSTs now require a durable bearer token unless they carry a valid server-issued internal conversation lease. Read-only query flags do not bypass authentication. The token is generated once under the BrowserOS state directory with directory mode `0700` and file mode `0600`; comparison uses `timingSafeEqual`.
 - The trusted extension settings endpoint exposes the token for manual client setup through an origin-checked JSON POST. Chrome omits Origin on extension GET requests, so the initial GET implementation was rejected in a headed run; changing to POST fixed the live settings flow. One-click HTTP client installs and boot-time URL reconciliation write the Authorization header. If the proxy URL is unavailable at startup, reconciliation preserves the existing manifest URL while migrating the header. The manual setup panel includes authenticated snippets.
 - Added focused tests for denied external access, continued internal lease behavior, token persistence/permissions, and client config emission. A headed, network-isolated BrowserOS run verified that the settings UI displays the persisted credential, the external-facing `/mcp` endpoint returns 401 without it and 200 with it, and the file is mode 0600 after restart. A third-party MCP client round-trip and packaged updater/runtime behavior remain release checks.
 - Current coverage at this checkpoint: focused MCP/settings tests pass (66/66 across isolated test runs); server and app typechecks pass independently. A single combined Bun invocation is unsuitable because the route test's module mock collides with MCP manager tests. The implementation and live UI/API path are committed; a third-party MCP client and packaged build remain unverified.
+
+### Phase 7 follow-up — explicit local memory (partial)
+
+- Added migrations `0015`–`0017` for user-authored notes, settings, and SQLite FTS5 indexing. Packaged builds without migration resources receive the same current schema from the database bootstrap path. FTS insert/update/delete triggers keep search in sync.
+- The new Memory settings page supports create, edit, search, delete, retention (30 days / 90 days / until deleted), and a separate retrieval enable switch. Retrieval defaults off. Automatic task/chat extraction is not present; browser history is not copied into this store.
+- Notes and provenance are stored in SQLite under the server database location and mirrored to a generated `memory/MEMORY.md` file with mode `0600`; its directory is forced to `0700`. The app rejects common credential-shaped content, credential-bearing source URLs, and non-HTTP(S) links. User data is never submitted by this feature to a model.
+- Focused coverage: memory store tests cover opt-in FTS, update/delete index consistency, database reopen, mirror permissions, expiry, and credential rejection; the API test verifies untrusted origin rejection and trusted-origin CRUD/search. All 4 memory tests pass; database migration tests pass (9/9). Server and app typechecks pass independently.
+- Headed BrowserOS v0.51.0 in the network-isolated dev profile verified the page load, retrieval-off default, and add → search miss/hit → edit → delete through the extension UI and authenticated server API. The test note was deleted; the runner stopped cleanly. `tests/e2e/aster_memory_smoke.py` records the repeatable flow.
+- This is an initial local memory surface, not Phase 7 completion. FTS results are currently available through the Memory settings search only; the composer `@` history/memory picker, context injection into chat, browser-history retrieval, task-derived extraction, full secret redaction, incognito-specific task handling, provenance timeline, and 10k/50k benchmarks remain unimplemented.
