@@ -26,6 +26,15 @@ export function createMemoryRoutes(
 ) {
   const store = options.store ?? dbMemoryStore
   return new Hono<Env>()
+    .use('*', async (c, next) => {
+      if (c.req.header('X-Aster-Incognito') === 'true') {
+        return c.json(
+          { error: 'Aster memory is unavailable in incognito mode' },
+          403,
+        )
+      }
+      return next()
+    })
     .get('/', (c) => c.json(store.list()))
     .put('/settings', zValidator('json', SettingsSchema), (c) =>
       c.json({ settings: store.updateSettings(c.req.valid('json')) }),

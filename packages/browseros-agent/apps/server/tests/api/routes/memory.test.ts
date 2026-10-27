@@ -47,6 +47,21 @@ describe('memory API', () => {
       Host: 'localhost',
       Origin: 'chrome-extension://aster-test',
     }
+    const incognitoSave = await app.request(
+      'http://localhost/memory',
+      {
+        method: 'POST',
+        headers: {
+          ...origin,
+          'Content-Type': 'application/json',
+          'X-Aster-Incognito': 'true',
+        },
+        body: JSON.stringify({ content: 'Must not persist from incognito' }),
+      },
+      localServer,
+    )
+    expect(incognitoSave.status).toBe(403)
+
     const enabled = await app.request(
       'http://localhost/memory/settings',
       {

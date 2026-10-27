@@ -22,7 +22,11 @@ const request = async <T,>(path: string, init?: RequestInit): Promise<T> => {
   const baseUrl = await getAgentServerUrl()
   const response = await fetch(`${baseUrl}/memory${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Aster-Incognito': String(chrome.extension.inIncognitoContext),
+      ...init?.headers,
+    },
   })
   const responseText = await response.text()
   let body: (T & { error?: string }) | null = null
@@ -38,6 +42,7 @@ const request = async <T,>(path: string, init?: RequestInit): Promise<T> => {
 }
 
 export const MemoryPage: FC = () => {
+  const incognito = chrome.extension.inIncognitoContext
   const [memories, setMemories] = useState<MemoryEntry[]>([])
   const [settings, setSettings] = useState<MemorySettings | null>(null)
   const [content, setContent] = useState('')
@@ -57,12 +62,13 @@ export const MemoryPage: FC = () => {
   }, [])
 
   useEffect(() => {
+    if (incognito) return
     refresh().catch((reason: unknown) =>
       setError(
         reason instanceof Error ? reason.message : 'Could not load memory',
       ),
     )
-  }, [refresh])
+  }, [refresh, incognito])
 
   const updateSettings = async (next: Partial<MemorySettings>) => {
     if (!settings) return
@@ -141,6 +147,18 @@ export const MemoryPage: FC = () => {
     } finally {
       setBusy(false)
     }
+  }
+
+  if (incognito) {
+    return (
+      <main className="mx-auto max-w-3xl p-6">
+        <h1 className="font-semibold text-2xl">Aster Memory</h1>
+        <p className="mt-2 text-muted-foreground text-sm">
+          Saved memory is unavailable in incognito mode. Notes are not loaded or
+          stored from this window.
+        </p>
+      </main>
+    )
   }
 
   return (
