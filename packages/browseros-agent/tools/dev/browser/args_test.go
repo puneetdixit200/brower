@@ -21,6 +21,15 @@ func TestBuildArgsUsesDevDockIcon(t *testing.T) {
 	if !strings.Contains(joined, "--browseros-dock-icon=dev") {
 		t.Fatalf("missing dev dock icon arg in\n%s", joined)
 	}
+	for _, want := range []string{
+		"--browseros-mcp-port=9105",
+		"--browseros-server-port=9105",
+		"--browseros-proxy-port=9105",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("missing synchronized BrowserOS API port %q in\n%s", want, joined)
+		}
+	}
 }
 
 func TestBuildArgsCanDeferExtensionHomeUntilCDPIsReady(t *testing.T) {

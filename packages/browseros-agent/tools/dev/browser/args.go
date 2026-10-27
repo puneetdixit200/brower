@@ -129,7 +129,14 @@ func buildArgs(cfg ArgsConfig, resolveBinary func(string) BinaryResolution) []st
 
 	args = append(args,
 		fmt.Sprintf("--remote-debugging-port=%d", cfg.Ports.CDP),
+		// BrowserOS builds have migrated the extension API from the legacy
+		// MCP port preference to the server/proxy preferences. Keep the old
+		// switch in sync for older binaries, and set all three explicitly so
+		// the extension and supervised HTTP server always address the same
+		// loopback listener.
 		fmt.Sprintf("--browseros-mcp-port=%d", cfg.Ports.Server),
+		fmt.Sprintf("--browseros-server-port=%d", cfg.Ports.Server),
+		fmt.Sprintf("--browseros-proxy-port=%d", cfg.Ports.Server),
 		fmt.Sprintf("--browseros-extension-port=%d", cfg.Ports.Extension),
 		fmt.Sprintf("--user-data-dir=%s", cfg.UserDataDir),
 	)
