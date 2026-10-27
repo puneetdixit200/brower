@@ -26,7 +26,7 @@ def main() -> int:
             for item in targets
             if item.get("type") == "page"
             and item.get("url", "").startswith("chrome-extension://")
-            and "#/home" in item.get("url", "")
+            and "app.html" in item.get("url", "")
         ),
         None,
     )
@@ -36,6 +36,9 @@ def main() -> int:
     cdp = CDP(target["webSocketDebuggerUrl"])
     note = f"Aster local memory smoke {uuid.uuid4()}"
     updated = f"Aster edited memory smoke {uuid.uuid4()}"
+    task_id = str(uuid.uuid4())
+    task_title = f"Aster task memory smoke {uuid.uuid4()}"
+    task_result = f"Reviewed task result {uuid.uuid4()}"
     try:
         cdp.call("Runtime.enable")
         cdp.evaluate("location.hash = '#/settings/memory'")
@@ -43,6 +46,62 @@ def main() -> int:
         initially_disabled = cdp.evaluate("document.querySelector('input[type=checkbox]')?.checked === false")
         cdp.evaluate("document.querySelector('input[type=checkbox]')?.click()")
         wait_for(cdp, "document.querySelector('input[type=checkbox]')?.checked === true")
+
+        task_fixture = {
+            "executionHistoryByConversation": {
+                "aster-memory-smoke": {
+                    "conversationId": "aster-memory-smoke",
+                    "updatedAt": int(time.time() * 1000),
+                    "tasks": [
+                        {
+                            "id": task_id,
+                            "conversationId": "aster-memory-smoke",
+                            "promptText": task_title,
+                            "startedAt": "2026-10-27T00:00:00.000Z",
+                            "completedAt": "2026-10-27T00:00:01.000Z",
+                            "status": "completed",
+                            "responseText": task_result,
+                            "actionCount": 0,
+                            "approvalCount": 0,
+                            "deniedCount": 0,
+                            "errorCount": 0,
+                            "steps": [],
+                        }
+                    ],
+                }
+            }
+        }
+        cdp.evaluate(
+            "chrome.storage.local.set(" + json.dumps(task_fixture) + ")"
+        )
+        cdp.evaluate("location.hash = '#/home'")
+        wait_for(cdp, "location.hash.endsWith('/home')")
+        cdp.evaluate("location.hash = '#/settings/memory'")
+        wait_for(cdp, f"document.body.innerText.includes({json.dumps(task_title)})")
+        cdp.evaluate(
+            "[...document.querySelectorAll('article')].find(x=>x.innerText.includes("
+            + json.dumps(task_title)
+            + "))?.querySelector('button')?.click()"
+        )
+        wait_for(
+            cdp,
+            f"document.querySelector('textarea')?.value.includes({json.dumps(task_result)})",
+        )
+        assert not cdp.evaluate(
+            f"document.body.innerText.includes({json.dumps(task_result)}) && "
+            "[...document.querySelectorAll('article')].some(x=>x.innerText.includes('From task:'))"
+        ), "task draft was unexpectedly persisted before explicit save"
+        cdp.evaluate(
+            "[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Save note')?.click()"
+        )
+        wait_for(
+            cdp,
+            f"[...document.querySelectorAll('article')].some(x=>x.innerText.includes({json.dumps(task_title)}) && x.innerText.includes('From task:'))",
+        )
+        task_note = cdp.evaluate(
+            "[...document.querySelectorAll('article')].find(x=>x.innerText.includes('From task:'))?.innerText"
+        )
+        assert task_result in task_note, "saved task note lost its result"
 
         cdp.evaluate(set_value("textarea", note))
         cdp.evaluate("[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Save note')?.click()")
@@ -52,7 +111,10 @@ def main() -> int:
         cdp.evaluate(set_value("input[placeholder='Search saved notes']", missing))
         wait_for(cdp, "![...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Search')?.disabled")
         cdp.evaluate("[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Search')?.click()")
-        wait_for(cdp, "document.querySelectorAll('article').length === 0")
+        wait_for(
+            cdp,
+            f"![...document.querySelectorAll('article')].some(x=>x.innerText.includes({json.dumps(note)}))",
+        )
 
         cdp.evaluate(set_value("input[placeholder='Search saved notes']", note))
         wait_for(cdp, "![...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Search')?.disabled")
@@ -109,10 +171,21 @@ def main() -> int:
         cdp.evaluate("(() => {const card=[...document.querySelectorAll('article')].find(x=>x.innerText.includes('Aster memory picker smoke'));[...card.querySelectorAll('button')].find(x=>x.textContent.trim()==='Delete')?.click()})()")
         wait_for(cdp, f"![...document.querySelectorAll('article')].some(x=>x.innerText.includes({json.dumps(picker_note)}))")
 
+        cdp.evaluate("window.confirm = () => true")
+        cdp.evaluate(
+            "(() => {const card=[...document.querySelectorAll('article')].find(x=>x.innerText.includes('From task:'));"
+            "[...card.querySelectorAll('button')].find(x=>x.textContent.trim()==='Delete')?.click()})()"
+        )
+        wait_for(cdp, "![...document.querySelectorAll('article')].some(x=>x.innerText.includes('From task:'))")
+        cdp.evaluate(
+            "chrome.storage.local.remove('executionHistoryByConversation')"
+        )
+
         result = {
             "memory_page": "loaded",
             "retrieval_default_disabled": initially_disabled,
             "create_search_edit_delete": "passed",
+            "review_and_explicitly_save_task_draft_with_provenance": "passed",
             "explicit_memory_context_select_remove": "passed",
             "explicit_history_context_select_remove": "passed",
             "network": "isolated",

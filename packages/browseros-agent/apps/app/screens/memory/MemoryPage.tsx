@@ -3,11 +3,16 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { getAgentServerUrl } from '@/lib/browseros/helpers'
 import { useIncognitoWindow } from '@/lib/browseros/use-incognito-window'
+import type { ExecutionTaskRecord } from '@/lib/execution-history/types'
+import { createTaskMemoryDraft } from './task-memory-draft'
 
 interface MemoryEntry {
   id: string
   content: string
   sourceUrl: string | null
+  source: 'user' | 'task'
+  sourceId: string | null
+  sourceTitle: string | null
   createdAt: number
   updatedAt: number
   expiresAt: number | null
@@ -52,6 +57,11 @@ export const MemoryPage: FC = () => {
   const [settings, setSettings] = useState<MemorySettings | null>(null)
   const [content, setContent] = useState('')
   const [sourceUrl, setSourceUrl] = useState('')
+  const [sourceId, setSourceId] = useState<string | null>(null)
+  const [sourceTitle, setSourceTitle] = useState<string | null>(null)
+  const [completedTasks, setCompletedTasks] = useState<ExecutionTaskRecord[]>(
+    [],
+  )
   const [editingId, setEditingId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -64,6 +74,29 @@ export const MemoryPage: FC = () => {
     }>('', incognito)
     setMemories(result.memories)
     setSettings(result.settings)
+    if (result.settings.enabled) {
+      const stored = await chrome.storage.local.get(
+        'executionHistoryByConversation',
+      )
+      const histories = stored.executionHistoryByConversation as
+        | Record<string, { tasks?: ExecutionTaskRecord[] }>
+        | undefined
+      const tasks = Object.values(histories ?? {})
+        .flatMap((history) => history.tasks ?? [])
+        .filter(
+          (task) =>
+            task.status === 'completed' &&
+            Boolean(task.responseText?.trim() || task.responsePreview?.trim()),
+        )
+        .sort((left, right) =>
+          (right.completedAt ?? right.startedAt).localeCompare(
+            left.completedAt ?? left.startedAt,
+          ),
+        )
+      setCompletedTasks(tasks.slice(0, 20))
+    } else {
+      setCompletedTasks([])
+    }
   }, [incognito])
 
   useEffect(() => {
@@ -105,10 +138,16 @@ export const MemoryPage: FC = () => {
     try {
       await request(editingId ? `/${editingId}` : '', incognito, {
         method: editingId ? 'PUT' : 'POST',
-        body: JSON.stringify({ content, sourceUrl: sourceUrl.trim() || null }),
+        body: JSON.stringify({
+          content,
+          sourceUrl: sourceUrl.trim() || null,
+          ...(!editingId && sourceId ? { sourceId, sourceTitle } : {}),
+        }),
       })
       setContent('')
       setSourceUrl('')
+      setSourceId(null)
+      setSourceTitle(null)
       setEditingId(null)
       await refresh()
     } catch (reason) {
@@ -180,7 +219,8 @@ export const MemoryPage: FC = () => {
         <h1 className="font-semibold text-2xl">Aster Memory</h1>
         <p className="mt-1 text-muted-foreground text-sm">
           Add and manage local notes that you want Aster to find again. Notes
-          are never extracted from chats automatically.
+          are never saved from chats automatically; completed tasks can become
+          editable drafts for your review.
         </p>
       </header>
 
@@ -205,11 +245,11 @@ export const MemoryPage: FC = () => {
               }
             />
             <span>
-              <strong>Enable memory retrieval</strong>
+              <strong>Enable memory</strong>
               <span className="mt-1 block text-muted-foreground">
                 When enabled, matching saved notes are available in Memory
-                search. Notes join a request only when you select them from the
-                home composer.
+                search and completed tasks can be drafted into notes. Notes join
+                a request only when you select them from the home composer.
               </span>
             </span>
           </label>
@@ -236,8 +276,68 @@ export const MemoryPage: FC = () => {
         </section>
       )}
 
+      {settings?.enabled && completedTasks.length > 0 && (
+        <section className="space-y-3 rounded-lg border p-4">
+          <div>
+            <h2 className="font-medium">Review completed tasks</h2>
+            <p className="mt-1 text-muted-foreground text-sm">
+              Select a task to draft a note on this device. Nothing is saved
+              until you review and press Save.
+            </p>
+          </div>
+          <div className="space-y-2">
+            {completedTasks.map((task) => {
+              const alreadySaved = memories.some(
+                (memory) => memory.sourceId === task.id,
+              )
+              return (
+                <article
+                  key={task.id}
+                  className="flex items-center justify-between gap-3 rounded-md border p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm">{task.promptText}</p>
+                    <p className="text-muted-foreground text-xs">
+                      Completed{' '}
+                      {new Date(
+                        task.completedAt ?? task.startedAt,
+                      ).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={busy || alreadySaved}
+                    onClick={() => {
+                      const draft = createTaskMemoryDraft(task)
+                      if (!draft) return
+                      setEditingId(null)
+                      setContent(draft.content)
+                      setSourceUrl('')
+                      setSourceId(draft.sourceId)
+                      setSourceTitle(draft.sourceTitle)
+                    }}
+                  >
+                    {alreadySaved ? 'Saved' : 'Review draft'}
+                  </Button>
+                </article>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
       <section className="space-y-3 rounded-lg border p-4">
-        <h2 className="font-medium">Add a note</h2>
+        <h2 className="font-medium">
+          {sourceId ? 'Review task memory draft' : 'Add a note'}
+        </h2>
+        {sourceId && (
+          <p className="text-muted-foreground text-sm">
+            From task: {sourceTitle}. Edit the draft and save only details you
+            want Aster to remember.
+          </p>
+        )}
         <Textarea
           value={content}
           onChange={(event) => setContent(event.target.value)}
@@ -262,6 +362,8 @@ export const MemoryPage: FC = () => {
                   setEditingId(null)
                   setContent('')
                   setSourceUrl('')
+                  setSourceId(null)
+                  setSourceTitle(null)
                 }}
               >
                 Cancel edit
@@ -316,7 +418,11 @@ export const MemoryPage: FC = () => {
               <p className="whitespace-pre-wrap text-sm">{memory.content}</p>
               <div className="flex flex-wrap items-center justify-between gap-2 text-muted-foreground text-xs">
                 <span>
-                  {memory.sourceUrl ? (
+                  {memory.source === 'task' ? (
+                    <span>
+                      From task: {memory.sourceTitle ?? 'Completed task'}
+                    </span>
+                  ) : memory.sourceUrl ? (
                     <a
                       className="underline"
                       href={memory.sourceUrl}
@@ -338,6 +444,8 @@ export const MemoryPage: FC = () => {
                     setEditingId(memory.id)
                     setContent(memory.content)
                     setSourceUrl(memory.sourceUrl ?? '')
+                    setSourceId(memory.sourceId)
+                    setSourceTitle(memory.sourceTitle)
                   }}
                 >
                   Edit

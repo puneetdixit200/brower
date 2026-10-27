@@ -51,6 +51,8 @@ describe('database initialization', () => {
       const dbPath = join(mkTempDir(), 'browseros.sqlite')
       const old = initializeDb({ dbPath })
       old.sqlite.exec('ALTER TABLE providers DROP COLUMN headers')
+      old.sqlite.exec('ALTER TABLE memories DROP COLUMN source_title')
+      old.sqlite.exec('ALTER TABLE memories DROP COLUMN source_id')
       // Drizzle replays from the newest recorded marker, so rewinding to
       // before the headers migration means clearing everything from it
       // onwards, not just its own row.
@@ -219,6 +221,7 @@ describe('database initialization', () => {
               'scheduled_jobs',
               'scheduled_job_runs',
               'oauth_tokens',
+              'memories',
               '__drizzle_migrations'
             )
           ORDER BY name
@@ -233,11 +236,18 @@ describe('database initialization', () => {
     // is here to catch.
     expect(tables).toEqual([
       '__drizzle_migrations',
+      'memories',
       'oauth_tokens',
       'providers',
       'scheduled_job_runs',
       'scheduled_jobs',
     ])
+    const memoryColumns = handle.sqlite
+      .query<{ name: string }, []>('PRAGMA table_info(memories)')
+      .all()
+      .map((row) => row.name)
+    expect(memoryColumns).toContain('source_id')
+    expect(memoryColumns).toContain('source_title')
     const migrations = handle.sqlite
       .query<{ hash: string; createdAt: number }, []>(
         `
@@ -262,6 +272,8 @@ describe('database initialization', () => {
   it('drops the retired hosted provider and unassigns the jobs that used it', () => {
     const dbPath = join(mkTempDir(), 'browseros.sqlite')
     const old = initializeDb({ dbPath })
+    old.sqlite.exec('ALTER TABLE memories DROP COLUMN source_title')
+    old.sqlite.exec('ALTER TABLE memories DROP COLUMN source_id')
     // Stand the database up as it was before the hosted provider was retired,
     // by undoing the migration that removes it and re-inserting the row.
     old.sqlite

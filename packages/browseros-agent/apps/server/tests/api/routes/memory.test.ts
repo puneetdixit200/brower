@@ -62,6 +62,22 @@ describe('memory API', () => {
     )
     expect(incognitoSave.status).toBe(403)
 
+    const taskProvenance = {
+      content: 'The deployment uses the stable release branch.',
+      sourceId: crypto.randomUUID(),
+      sourceTitle: 'Check the project deployment branch',
+    }
+    const disabledTaskSave = await app.request(
+      'http://localhost/memory',
+      {
+        method: 'POST',
+        headers: { ...origin, 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskProvenance),
+      },
+      localServer,
+    )
+    expect(disabledTaskSave.status).toBe(403)
+
     const enabled = await app.request(
       'http://localhost/memory/settings',
       {
@@ -72,6 +88,21 @@ describe('memory API', () => {
       localServer,
     )
     expect(enabled.status).toBe(200)
+
+    const taskSaved = await app.request(
+      'http://localhost/memory',
+      {
+        method: 'POST',
+        headers: { ...origin, 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskProvenance),
+      },
+      localServer,
+    )
+    expect(taskSaved.status).toBe(201)
+    const taskMemory = (await taskSaved.json()).memory
+    expect(taskMemory.source).toBe('task')
+    expect(taskMemory.sourceId).toBe(taskProvenance.sourceId)
+    expect(taskMemory.sourceTitle).toBe(taskProvenance.sourceTitle)
 
     const savedResponse = await app.request(
       'http://localhost/memory',

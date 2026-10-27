@@ -14,6 +14,8 @@ const IdSchema = z.object({ memoryId: z.string().uuid() })
 const SaveSchema = z.object({
   content: z.string().trim().min(1).max(20_000),
   sourceUrl: z.string().url().max(2_000).nullable().optional(),
+  sourceId: z.string().uuid().nullable().optional(),
+  sourceTitle: z.string().trim().max(300).nullable().optional(),
 })
 const SettingsSchema = z.object({
   enabled: z.boolean(),
@@ -44,7 +46,14 @@ export function createMemoryRoutes(
     )
     .post('/', zValidator('json', SaveSchema), (c) => {
       try {
-        return c.json({ memory: store.save(c.req.valid('json')) }, 201)
+        const input = c.req.valid('json')
+        if (input.sourceId && !store.settings().enabled) {
+          return c.json(
+            { error: 'Enable memory before saving a task-derived note' },
+            403,
+          )
+        }
+        return c.json({ memory: store.save(input) }, 201)
       } catch (error) {
         return c.json(
           {
@@ -61,9 +70,16 @@ export function createMemoryRoutes(
       zValidator('json', SaveSchema),
       (c) => {
         try {
+          const input = c.req.valid('json')
+          if (input.sourceId && !store.settings().enabled) {
+            return c.json(
+              { error: 'Enable memory before saving a task-derived note' },
+              403,
+            )
+          }
           return c.json({
             memory: store.save({
-              ...c.req.valid('json'),
+              ...input,
               id: c.req.valid('param').memoryId,
             }),
           })

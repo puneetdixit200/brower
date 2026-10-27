@@ -6,7 +6,7 @@
 
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
-/** Explicitly user-authored local memory. Automatic extraction is not enabled. */
+/** User-authored notes or task notes explicitly reviewed before saving. */
 export const memories = sqliteTable(
   'memories',
   {
@@ -14,6 +14,8 @@ export const memories = sqliteTable(
     content: text('content').notNull(),
     source: text('source').notNull().default('user'),
     sourceUrl: text('source_url'),
+    sourceId: text('source_id'),
+    sourceTitle: text('source_title'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
     expiresAt: integer('expires_at'),

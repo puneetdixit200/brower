@@ -164,6 +164,15 @@ function bootstrapCurrentSchema(sqlite: BunDatabase): void {
     if (!providerColumns.some((column) => column.name === 'headers')) {
       sqlite.exec('ALTER TABLE providers ADD COLUMN headers text')
     }
+    const memoryColumns = sqlite
+      .query<{ name: string }, []>('PRAGMA table_info(memories)')
+      .all()
+    if (!memoryColumns.some((column) => column.name === 'source_id')) {
+      sqlite.exec('ALTER TABLE memories ADD COLUMN source_id text')
+    }
+    if (!memoryColumns.some((column) => column.name === 'source_title')) {
+      sqlite.exec('ALTER TABLE memories ADD COLUMN source_title text')
+    }
     const insertMigration = sqlite.prepare(`
       INSERT INTO __drizzle_migrations ("hash", "created_at")
       SELECT ?, ?
@@ -276,6 +285,11 @@ const currentMigrationHistory = [
     tag: '0017_memory_search',
     hash: 'e5c20f24a9f1073dc6b026084628a061209d71926c48bd731caa6f9e0dbc6fba',
     createdAt: 1793092800000,
+  },
+  {
+    tag: '0018_memory_task_provenance',
+    hash: 'a81b3155883222281a811ea4184289084722cfe60985c7ea69330064cf8f288d',
+    createdAt: 1793101052721,
   },
 ]
 
@@ -402,6 +416,8 @@ const currentSchemaStatements = [
       content text NOT NULL,
       source text DEFAULT 'user' NOT NULL,
       source_url text,
+      source_id text,
+      source_title text,
       created_at integer NOT NULL,
       updated_at integer NOT NULL,
       expires_at integer
