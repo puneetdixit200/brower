@@ -96,7 +96,8 @@
 
 - Route review found `/mcp-manager/*` connector install/uninstall and `/oauth/*` state-changing start/token paths were mounted before any trusted-app guard. Hono applies middleware in registration order, so these guards now register before the routes; OAuth additionally requires an explicit trusted app origin even for GET because `/start` creates OAuth state.
 - Route tests cover originless connector install/OAuth rejection and extension-origin success. Workspace typecheck passed.
-- `/system/shutdown` keeps its originless localhost compatibility route for shipped BrowserOS restart flows. Cross-origin browser requests are rejected, but another local process can still request server shutdown. The broader CDP/MCP surface, production ports, telemetry/updater, and third-party requests remain to audit.
+- A second review found chat submissions could use caller-supplied provider credentials without app-origin auth, while conversation state/stream and stop routes were unauthenticated. The entire `/chat/*` surface now requires an explicit trusted extension origin. Originless tests verify state, stream, stop, and submission requests fail; extension-origin chat and stream tests pass.
+- `/mcp` internal agent calls use a server-issued lease, but external MCP clients currently connect without a bearer token and receive the full tool surface. Do not expose external MCP until authenticated client setup is implemented. `/system/shutdown` also keeps its originless localhost compatibility route for shipped BrowserOS restart flows, so another local process can request server shutdown. Packaged ports, telemetry/updater, and third-party requests remain to audit.
 
 ### Current blockers / limits
 
@@ -107,4 +108,4 @@
 
 ### Next action
 
-Continue the local control-route and third-party network audit, then add explicit approval-rule configuration and Guard/Full modes. Verify an approved-action fixture and an external send/payment fixture. Continue U06 history/file/memory context, matched browser benchmarks, shell regressions, and inherited extension identity/updater cleanup before any distribution work.
+Add a persistent bearer token and trusted setup flow for external MCP clients without weakening internal conversation leases. Then audit packaged ports, telemetry/updater, and remaining third-party requests. Add explicit approval-rule configuration and Guard/Full modes; verify an approved-action fixture and external send/payment fixture. Continue U06 history/file/memory context, matched browser benchmarks, shell regressions, and inherited extension identity/updater cleanup before distribution work.
