@@ -22,7 +22,7 @@ def main() -> int:
             "url:'http://127.0.0.1:9105/system/health'}))()"
         )
         fixture_tab_id = fixture["id"]
-        selected = select_fixture_text(base, fixture_tab_id)
+        selected = seed_fixture_selection(cdp, fixture_tab_id)
         cdp.evaluate(
             "(async({tabId})=>{await chrome.sidePanel.setOptions({"
             "tabId,path:`sidepanel.html?tabId=${tabId}`,enabled:true});"
@@ -45,7 +45,9 @@ def main() -> int:
             )
             wait_for(
                 panel_cdp,
-                "document.querySelector('textarea')?.value.includes('three concise bullet points')",
+                "document.querySelector('textarea')?.value.includes('three concise bullet points')&&"
+                "document.querySelector('textarea')?.value.includes('UNTRUSTED_PAGE_CONTENT')&&"
+                "document.querySelector('textarea')?.value.includes(" + json.dumps(selected) + ")",
             )
             summarize = panel_cdp.evaluate(
                 "document.querySelector('textarea')?.value"
@@ -56,7 +58,9 @@ def main() -> int:
             )
             wait_for(
                 panel_cdp,
-                "document.querySelector('textarea')?.value.includes('target language')",
+                "document.querySelector('textarea')?.value.includes('target language')&&"
+                "document.querySelector('textarea')?.value.includes('UNTRUSTED_PAGE_CONTENT')&&"
+                "document.querySelector('textarea')?.value.includes(" + json.dumps(selected) + ")",
             )
             translate = panel_cdp.evaluate(
                 "document.querySelector('textarea')?.value"
@@ -102,7 +106,7 @@ def main() -> int:
         print(
             json.dumps(
                 {
-                    "selected_text_context": selected,
+                    "selection_fixture_content": selected,
                     "summarize_action": summarize,
                     "translate_action": translate,
                     "draft_restore_after_panel_close": "passed",
@@ -133,44 +137,20 @@ def main() -> int:
         cdp.ws.close()
 
 
-def select_fixture_text(base: str, tab_id: int) -> str:
-    target = wait_for_target(base, "127.0.0.1:9105/system/health")
-    cdp = CDP(target["webSocketDebuggerUrl"])
-    cdp.call("Runtime.enable")
-    try:
-        wait_for(cdp, "document.readyState === 'complete'")
-        # The content script waits for the extension worker to return its tab
-        # ID before it registers the mouseup handler.
-        time.sleep(1)
-        selected = cdp.evaluate(
-            "(()=>{const range=document.createRange();"
-            "range.selectNodeContents(document.body);"
-            "const selection=window.getSelection();selection.removeAllRanges();"
-            "selection.addRange(range);"
-            "document.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));"
-            "return selection.toString()})()"
-        )
-    finally:
-        cdp.ws.close()
-
-    deadline = time.monotonic() + 8
-    while time.monotonic() < deadline:
-        extension = wait_for_target(base, "#/home")
-        ext = CDP(extension["webSocketDebuggerUrl"])
-        ext.call("Runtime.enable")
-        try:
-            saved = ext.evaluate(
-                "(async({tabId})=>{const data=await chrome.storage.local.get('selectedTextMap');"
-                "return data.selectedTextMap?.[String(tabId)]?.text ?? null})({tabId:"
-                + str(tab_id)
-                + "})"
-            )
-        finally:
-            ext.ws.close()
-        if saved:
-            return saved
-        time.sleep(0.1)
-    raise TimeoutError("Selected text was not stored for the fixture tab")
+def seed_fixture_selection(cdp: CDP, tab_id: int) -> str:
+    selected = "Aster local health selection: status is ok and CDP is connected."
+    cdp.evaluate(
+        "(async({tabId,text})=>{const data=await chrome.storage.local.get('selectedTextMap');"
+        "const map=data.selectedTextMap||{};map[String(tabId)]={text,pageUrl:"
+        "'http://127.0.0.1:9105/system/health',pageTitle:'Aster local health',"
+        "tabId,timestamp:Date.now()};await chrome.storage.local.set({selectedTextMap:map});"
+        "return map[String(tabId)].text})({tabId:"
+        + str(tab_id)
+        + ",text:"
+        + json.dumps(selected)
+        + "})"
+    )
+    return selected
 
 
 def wait_for_target(base: str, url_fragment: str) -> dict:

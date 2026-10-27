@@ -109,7 +109,13 @@ export const ChatFooter: FC<ChatFooterProps> = ({
         <ChatSelectedText
           selectedText={visibleSelectedText}
           onAction={(action) => {
-            onInputChange(getSelectedTextActionPrompt(action))
+            const random = crypto.getRandomValues(new Uint8Array(8))
+            const nonce = Array.from(random, (byte) =>
+              byte.toString(16).padStart(2, '0'),
+            ).join('')
+            onInputChange(
+              getSelectedTextActionPrompt(action, visibleSelectedText, nonce),
+            )
             chatInputRef.current?.focus()
           }}
           onDismiss={() => {

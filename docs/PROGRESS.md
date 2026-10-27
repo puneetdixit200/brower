@@ -86,8 +86,8 @@
 ### Phase 6 — split tabs and selection actions (partial)
 
 - Source review found BrowserOS Chromium patch integration for the native split-view new-tab URL and a default-pinned Split Tab toolbar action. Aster does not currently own split-state UI or controls; two live panes and resize/swap/close/restart behavior have not been verified. Native Chromium compilation remains deferred on this 14 GiB host against the project's 16 GiB guidance.
-- Existing selection capture is per tab and selected text can be attached to chat. Added explicit Summarize and Translate prompt buttons to the selected-text card; they only populate the composer, so no provider request occurs until the user submits. Translation asks for a target language when one is missing.
-- The selection prompt tests pass (2/2), app typecheck passes, and targeted Biome passes. A headed isolated BrowserOS smoke selected text from the local health page, opened the side panel for that tab, and verified the selection appeared there and both Summarize and Translate populated the composer without sending a provider request. A streamed answer is still untested. U11, U12, and U14 remain PARTIAL; screenshot/lasso tools (U13) are not implemented.
+- Existing selection capture is per tab. Summarize and Translate now insert the selected text itself into an editable composer draft inside a per-action nonce-matched untrusted-content fence; the page origin is included while path/query data is excluded. No provider request occurs until the user submits. Translation asks for a target language when one is missing.
+- Helper tests cover selected-text inclusion, the origin-only metadata, and a hostile fake closing marker. A headed isolated BrowserOS smoke seeds a local selection fixture and verifies both prompts preserve its content in the fenced draft. A prior headed run exercised content-script selection capture, but the current smoke intentionally isolates the composer behavior; the model response path remains untested. U11, U12, and U14 remain PARTIAL; screenshot/lasso tools (U13) are not implemented.
 
 ### Phase 7 — approval gate and response path (partial)
 
