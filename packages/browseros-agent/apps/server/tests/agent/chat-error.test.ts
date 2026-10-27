@@ -96,6 +96,21 @@ describe('toChatError', () => {
     expect(error.retryable).toBe(true)
   })
 
+  it('classifies retryable provider API errors without an HTTP response as connection failures', () => {
+    const error = toChatError(
+      apiCallError({
+        message: 'Cannot connect to API: Connection refused',
+        isRetryable: true,
+      }),
+      { provider: 'openai-compatible' },
+    )
+
+    expect(error.code).toBe('connection_failed')
+    expect(error.title).toBe('Connection failed')
+    expect(error.message).toContain('Could not reach the model provider')
+    expect(error.retryable).toBe(true)
+  })
+
   it('falls back to unknown while still carrying the real message', () => {
     const error = toChatError(new Error('something exotic broke'))
 

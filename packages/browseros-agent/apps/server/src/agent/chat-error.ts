@@ -198,6 +198,23 @@ function fromApiCallError(
     }
   }
 
+  // AI SDK provider adapters wrap socket/DNS failures in APICallError rather
+  // than preserving the plain fetch TypeError handled below. A retryable error
+  // with no HTTP response is a transport failure: give the user the same
+  // actionable connection guidance instead of the generic "Something went
+  // wrong" card.
+  if (error.statusCode === undefined && error.isRetryable) {
+    return {
+      ...base,
+      code: 'connection_failed',
+      title: 'Connection failed',
+      message:
+        'Could not reach the model provider. Check your network connection and any local provider URL.',
+      retryable: true,
+      docsUrl: CONNECTION_DOCS_URL,
+    }
+  }
+
   return {
     ...base,
     code: 'unknown',
