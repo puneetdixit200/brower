@@ -16,9 +16,34 @@ export interface ToolApprovalDecision {
 }
 
 const EXTERNAL_SIDE_EFFECT =
-  /\b(send|submit|post|purchase|payment|pay|transfer|delete|remove|write|upload|publish|share|shell|command|execute)\b/i
+  /\b(send|submit|post|purchase|payment|pay|transfer|delete|remove|write|upload|publish|share|shell|command|execute|create|edit|update|modify|move|archive|cancel|book|schedule|invite|refund|deploy|commit|push|revoke|grant)\b/i
 
-/** Fail closed for ambiguous, code-execution and external-side-effect tools. */
+const READ_ONLY_FILESYSTEM_TOOLS = new Set([
+  'filesystem_read',
+  'filesystem_ls',
+  'filesystem_grep',
+  'filesystem_find',
+])
+
+const READ_ONLY_BROWSER_TOOLS = new Set([
+  'tabs',
+  'history',
+  'navigate',
+  'snapshot',
+  'diff',
+  'read',
+  'grep',
+  'screenshot',
+  'pdf',
+  'wait',
+])
+
+const APPROVAL_UI_SENTINEL_TOOLS = new Set([
+  'suggest_schedule',
+  'suggest_app_connection',
+])
+
+/** Ask before mutation, code execution, and tools outside the read-only allowlist. */
 export function decideToolApproval(
   candidate: ToolApprovalCandidate,
 ): ToolApprovalDecision {
@@ -41,9 +66,23 @@ export function decideToolApproval(
     }
   }
 
+  if (APPROVAL_UI_SENTINEL_TOOLS.has(lowerName)) {
+    return { required: false }
+  }
+
+  if (lowerName === 'tab_groups' || lowerName === 'windows') {
+    const action = isRecord(candidate.input) ? candidate.input.action : 'list'
+    if (action === 'list') return { required: false }
+    return {
+      required: true,
+      reason:
+        'This changes browser organization or window state. Review the change before it runs.',
+    }
+  }
+
   if (
-    lowerName.startsWith('filesystem_write') ||
-    lowerName.startsWith('filesystem_delete') ||
+    (lowerName.startsWith('filesystem_') &&
+      !READ_ONLY_FILESYSTEM_TOOLS.has(lowerName)) ||
     lowerName === 'upload' ||
     lowerName === 'download'
   ) {
@@ -77,7 +116,18 @@ export function decideToolApproval(
     }
   }
 
-  return { required: false }
+  if (
+    READ_ONLY_BROWSER_TOOLS.has(lowerName) ||
+    READ_ONLY_FILESYSTEM_TOOLS.has(lowerName)
+  ) {
+    return { required: false }
+  }
+
+  return {
+    required: true,
+    reason:
+      'This tool is not in the read-only allowlist. Review the proposed action before it runs.',
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

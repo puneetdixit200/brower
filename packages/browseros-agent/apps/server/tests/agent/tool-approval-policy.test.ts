@@ -15,6 +15,21 @@ describe('tool approval policy', () => {
         input: { url: 'https://example.com' },
       }),
     ).toEqual({ required: false })
+    expect(
+      decideToolApproval({ toolName: 'history', input: { maxResults: 10 } }),
+    ).toEqual({ required: false })
+    expect(
+      decideToolApproval({ toolName: 'tab_groups', input: { action: 'list' } }),
+    ).toEqual({ required: false })
+    expect(
+      decideToolApproval({ toolName: 'windows', input: { action: 'list' } }),
+    ).toEqual({ required: false })
+    expect(
+      decideToolApproval({
+        toolName: 'suggest_schedule',
+        description: 'Suggest scheduling a task',
+      }),
+    ).toEqual({ required: false })
   })
 
   it('requires review before browser interaction, code execution and file mutation', () => {
@@ -33,6 +48,16 @@ describe('tool approval policy', () => {
     ).toBe(true)
     expect(
       decideToolApproval({
+        toolName: 'tab_groups',
+        input: { action: 'create' },
+      }).required,
+    ).toBe(true)
+    expect(
+      decideToolApproval({ toolName: 'windows', input: { action: 'close' } })
+        .required,
+    ).toBe(true)
+    expect(
+      decideToolApproval({
         toolName: 'gmail_send_email',
         input: { to: 'fixture@example.test' },
       }).required,
@@ -44,5 +69,32 @@ describe('tool approval policy', () => {
         input: {},
       }).required,
     ).toBe(true)
+    expect(
+      decideToolApproval({ toolName: 'unclassified_external_tool' }),
+    ).toMatchObject({
+      required: true,
+    })
+    for (const toolName of [
+      'calendar_create_event',
+      'slack_post_message',
+      'filesystem_edit',
+      'filesystem_bash',
+    ]) {
+      expect(
+        decideToolApproval({ toolName, input: {} }).required,
+        `${toolName} should require approval`,
+      ).toBe(true)
+    }
+    for (const toolName of [
+      'filesystem_read',
+      'filesystem_ls',
+      'filesystem_grep',
+      'filesystem_find',
+    ]) {
+      expect(
+        decideToolApproval({ toolName, input: {} }).required,
+        `${toolName} should stay read-only`,
+      ).toBe(false)
+    }
   })
 })
