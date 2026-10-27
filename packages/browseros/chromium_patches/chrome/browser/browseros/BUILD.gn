@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..0c2aebd24fb48c01b0280a162c32cc9d237d4fff
 --- /dev/null
 +++ b/chrome/browser/browseros/BUILD.gn
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,40 @@
 +# Copyright 2024 The Chromium Authors
 +# Use of this source code is governed by a BSD-style license that can be
 +# found in the LICENSE file.
@@ -34,6 +34,7 @@ index 0000000000000000000000000000000000000000..0c2aebd24fb48c01b0280a162c32cc9d
 +  flags = [
 +    "BROWSEROS_PRODUCT_BROWSEROS=$browseros_product_browseros",
 +    "BROWSEROS_PRODUCT_BROWSERCLAW=$browseros_product_browserclaw",
++    "BROWSEROS_PRODUCT_ASTER=$browseros_product_aster",
 +    "BROWSEROS_ALLOW_RUNTIME_PRODUCT_OVERRIDE=$browseros_allow_runtime_product_override",
 +  ]
 +}

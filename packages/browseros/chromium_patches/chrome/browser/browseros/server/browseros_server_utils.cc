@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000..dbd7e166bb02c
 --- /dev/null
 +++ b/chrome/browser/browseros/server/browseros_server_utils.cc
-@@ -0,0 +1,518 @@
+@@ -0,0 +1,519 @@
 +// Copyright 2024 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -178,8 +178,9 @@ index 0000000000000..dbd7e166bb02c
 +    return base::FilePath();
 +  }
 +
-+  base::FilePath exec_dir =
-+      user_data_dir.Append(FILE_PATH_LITERAL(".browseros"));
++  base::FilePath exec_dir = user_data_dir.Append(
++      IsAsterProduct() ? FILE_PATH_LITERAL(".aster-server")
++                       : FILE_PATH_LITERAL(".browseros"));
 +
 +  if (!base::PathExists(exec_dir)) {
 +    if (!base::CreateDirectory(exec_dir)) {

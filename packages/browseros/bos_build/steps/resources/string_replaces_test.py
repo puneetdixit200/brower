@@ -96,6 +96,26 @@ class ApplyStringReplacementsTest(unittest.TestCase):
         self.assertIn("BrowserOS neo", content)
         self.assertNotIn("BrowserClaw", content)
 
+    def test_aster_rebrands_product_strings_without_rewriting_attribution(self):
+        self.chromium.with_branding_files()
+        ctx = make_context(self.chromium, self.root, product="aster")
+
+        self.assertTrue(apply_string_replacements_impl(ctx))
+
+        content = (
+            self.chromium.src / "chrome" / "app" / "chromium_strings.grd"
+        ).read_text()
+        self.assertIn(
+            "Copyright 2024 The Chromium Authors. All rights reserved.", content
+        )
+        self.assertIn(
+            '<message name="IDS_PRODUCT_NAME">Aster Browser</message>', content
+        )
+        self.assertIn(
+            '<message name="IDS_SHORT_NAME">Aster Browser</message>', content
+        )
+        self.assertIn("Get it on Google Play", content)
+
 
 class StringReplacesModuleValidateTest(unittest.TestCase):
     def test_missing_chromium_src_raises_validation_error(self):

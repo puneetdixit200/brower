@@ -28,7 +28,11 @@ import { loadOrCreateMcpAccessToken } from './lib/mcp-access-token'
 import { selfHealMcpLinks } from './lib/mcp-manager'
 import { metrics } from './lib/metrics'
 import { isPortInUseError } from './lib/port-binding'
-import { Sentry } from './lib/sentry'
+import {
+  initializeTelemetryConsent,
+  isTelemetryEnabled,
+} from './lib/privacy/telemetry-consent'
+import { enableTelemetrySentry, Sentry } from './lib/sentry'
 import { VERSION } from './version'
 
 export class Application {
@@ -146,6 +150,9 @@ export class Application {
   private async initCoreServices(): Promise<void> {
     this.configureLogDirectory()
     await ensureBrowserosDir()
+    // The actual state directory can be resolved only after configuration; load
+    // consent before initializing either telemetry SDK.
+    const telemetryConsent = await initializeTelemetryConsent(getBrowserosDir())
     this.mcpAccessToken = await loadOrCreateMcpAccessToken()
     await cleanOldSessions()
 
@@ -176,14 +183,23 @@ export class Application {
       durable: !!installationId,
     })
 
-    metrics.initialize({
-      install_id: installationId,
-      browseros_version: this.config.instanceBrowserosVersion,
-      chromium_version: this.config.instanceChromiumVersion,
-      server_version: VERSION,
-    })
+    metrics.initialize(
+      {
+        install_id: installationId,
+        browseros_version: this.config.instanceBrowserosVersion,
+        chromium_version: this.config.instanceChromiumVersion,
+        server_version: VERSION,
+      },
+      telemetryConsent.revision,
+    )
 
-    if (!metrics.isEnabled()) {
+    if (telemetryConsent.enabled) {
+      enableTelemetrySentry(telemetryConsent.revision)
+    }
+
+    if (!isTelemetryEnabled()) {
+      logger.info('Telemetry disabled: user consent is off')
+    } else if (!metrics.isEnabled()) {
       logger.warn('Metrics disabled: missing POSTHOG_API_KEY')
     } else if (!installationId) {
       logger.warn(
@@ -194,18 +210,6 @@ export class Application {
     if (!INLINED_ENV.SENTRY_DSN) {
       logger.debug('Sentry disabled: missing SENTRY_DSN')
     }
-
-    if (installationId) {
-      Sentry.setUser({ id: installationId })
-    }
-    Sentry.setContext('browseros', {
-      install_id: installationId,
-      product: 'browseros',
-      surface: 'server',
-      browseros_version: this.config.instanceBrowserosVersion,
-      chromium_version: this.config.instanceChromiumVersion,
-      server_version: VERSION,
-    })
   }
 
   private configureLogDirectory(): void {

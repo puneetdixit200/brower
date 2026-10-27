@@ -23,7 +23,8 @@
 - Installed user-local Bun 1.4.2 and `bunx` alias from checksum-verified official release; frozen dependency install succeeded (1,858 packages).
 - `bun run check`: exit 0; upstream Biome schema-version warnings and fallow report remain.
 - Raw `bun test` before the Linux integration fixes: exit 1, 3,105 tests: 2,838 pass, 157 skip, 110 fail, 9 error. Failures included a hard-coded macOS BrowserOS path, timeout/resource-sensitive tests, and live catalogue/provider expectations. These were pinned-upstream baseline results, not Aster regression results.
-- `NODE_OPTIONS=--max-old-space-size=4096 bun run build:agent:dev`: exit 0 in 72.84 s at initial baseline. WXT emitted unresolved font-reference and upstream Rollup annotation warnings. The current dev manifest carries Aster display name/icons, but still inherits BrowserOS extension identity and updater assumptions.
+- `NODE_OPTIONS=--max-old-space-size=4096 bun run build:agent:dev`: exit 0 in 72.84 s at initial baseline. WXT emitted unresolved font-reference and upstream Rollup annotation warnings. At that baseline the dev manifest still inherited BrowserOS extension identity and updater assumptions.
+- S05 follow-up: WXT uses a stable Aster-specific development public key (ID `oifdmombnijnaiocijiacjhajbnpdlhb`) with no updater URL, configured reporter extension ID, compatibility peer, or product-site web access by default. External extension connections are explicitly denied by the default manifest (`externally_connectable.ids: []`). Explicit release key and updater values must be paired; DER SPKI keys are parsed and rejected if their derived ID matches BrowserOS. Product-site origins reject BrowserOS, localhost, and IP literals. A 4 GB heap development build passed, and inspection confirmed the manifest contains the Aster dev key while omitting update and product-site resource fields. A subsequent review found that omitting `externally_connectable` allows extension callers in Chrome; the default is now explicitly empty; the 2026-10-28 fresh-profile runtime gates below verify default denial and configured reporter access. App typecheck and targeted Biome passed. Aster release infrastructure is not available, so S05 remains PARTIAL / BLOCKED.
 
 ### Aster implementation changes
 
@@ -127,7 +128,7 @@
 
 ### Next action
 
-Continue with the S05 extension identity/update ownership blocker, beginning with a safe design and identity migration plan. Release blockers remain S05 ownership, telemetry and outbound-traffic audit, external send/payment classification, Guard/Full policy configuration, native packaging, and matched stock/Aster browser performance.
+Follow the reviewed batches in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md), starting with S05 diagnostics identity and emitted-manifest regression gates. Release blockers remain S05 ownership, telemetry and outbound-traffic audit, external send/payment classification, Guard/Full policy configuration, native packaging, and matched stock/Aster browser performance.
 
 
 ### Phase 7 follow-up — persistent external MCP authentication (implemented; packaged verification pending)
@@ -179,7 +180,7 @@ Continue with the S05 extension identity/update ownership blocker, beginning wit
 ### Security follow-up — injection boundaries and secret redaction (partial)
 
 - Review confirmed the BrowserOS agent prompt treats tool output as untrusted, browser tool text is wrapped in per-call nonce fences, and side-effectful calls use the approval policy. Prompt, approval-policy, and snapshot-fence tests pass (40/40). No headed hostile-page attempt against a protected action has been run; S01 stays PARTIAL.
-- Common key, bearer, JWT, credential-URL and sensitive JSON patterns are scrubbed from user-visible provider error details; Sentry captured headers are sanitized. The focused chat-error and Sentry tests pass (26/26). Full provider/telemetry outbound review, first-use disclosure and log-sink scans remain open; S04 stays PARTIAL.
+- Common key, bearer, JWT, credential-URL and sensitive JSON patterns are scrubbed from user-visible provider error details; Sentry sanitizers redact selected sensitive-key values in traversed event data. Both app and server Sentry initializers now pass `sendDefaultPii: false`, preserving their existing `beforeSend` sanitizers. Focused tests assert this option is passed to each SDK. These tests confirm local configuration only; receipt, processing, and retention at the remote Sentry DSN are unverified. The focused chat-error and Sentry redaction tests pass (26/26). Full provider/telemetry outbound review, first-use disclosure and log-sink scans remain open; S04 stays PARTIAL.
 
 ### Phase 5 follow-up — stop an active tool run (partial)
 
@@ -210,3 +211,53 @@ Continue with the S05 extension identity/update ownership blocker, beginning wit
 - Focused resolver and tool tests pass (134/134) across `utils.test.ts`, `read.test.ts`, `write.test.ts`, `edit.test.ts`, `ls.test.ts`, `find.test.ts`, and `grep.test.ts`.
 - Linux `filesystem_bash` now requires Bubblewrap and runs with user/PID namespaces, a writable bind of only the selected canonical workspace, read-only system runtime mounts, a minimal `/etc` set, a private `/tmp`, and an allowlisted environment. The host home and unrelated `/tmp` files are hidden. If Bubblewrap is missing or the selected root is unsafe, execution fails closed. Windows and macOS do not yet have equivalent confinement.
 - Focused filesystem coverage now passes 151/151 (134 path/tool checks plus 17 Linux Bash checks), including outside-workspace read/write isolation, host environment isolation, Bun runtime availability for the service user, `/etc/shadow` concealment, fail-closed behavior without Bubblewrap, and rejection of filesystem-root workspaces; server typecheck and Biome pass. Filesystem helpers still have validation-to-use races, so S02 remains PARTIAL pending race handling and cross-platform policy review.
+
+### Goal workflow update — 2026-10-27
+
+- Read the full available specification/tracking Markdown before task breakdown. The full matrix, progress log, and supporting project docs were reviewed; the referenced master-spec source is absent locally.
+- Follow [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md): many bounded subtasks covering all 72 matrix IDs, multiple GPT Luna medium agents as primary coding workers, and GPT Sol planning and independent review. Preserve dirty work, assign disjoint paths, verify each batch, and keep the overall Aster goal open.
+- First dispatched tasks: T02a diagnostics reporter identity and T02b emitted-manifest regression/configuration documentation. Existing S05/Sentry changes remain uncommitted.
+
+### S04 follow-up — source audit and next privacy boundary (partial)
+
+- Source review found key-gated rather than consent-gated startup: app PostHog and Sentry initialize when their build values are present; server metrics and Sentry likewise initialize from inlined keys. Disabling default Sentry PII does not make this opt-in.
+- App `track()` crosses into Chromium through `chrome.browserOS.logMetric`; chat feedback events can include prompt, response, and comment text. Native metrics have an independent sender, so app/server consent alone cannot establish a browser-wide telemetry opt-out. No real task data, credentials, or telemetry endpoint was used in this source review.
+- The next implementation is a persisted default-off telemetry consent boundary, a visible privacy control, gating at app/server sender entrypoints, and removal of raw conversational content from analytics. Sol is defining disjoint app/server assignments. Network payload inspection, independent native telemetry controls, remote handling, and packaged behavior remain open; S04 remains PARTIAL.
+
+### T20a follow-up — native build feasibility and product bootstrap (in progress)
+
+- Rechecked this host: 14 GiB physical RAM, 29 GiB swap, 12 CPUs, and about 288 GiB free on the project filesystem. There is no Chromium source checkout. Physical RAM below the upstream recommendation is a resource risk rather than proof that a low-concurrency build is impossible; pinned build tooling supports `BROWSEROS_NINJA_JOBS=2` for a future supervised trial.
+- Luna is implementing an Aster-owned build product and fail-closed resource selection, after Sol reviewed the native build code. GN/C++ currently accepts BrowserOS and BrowserClaw only and still needs an Aster branch. Product plumbing and a dry-run plan will not be reported as a built Aster binary. No source download, native build, installation, release key, or published feed has been created in this step.
+
+### S05 follow-up — explicit reporter boundary and live identity checks (partial)
+
+- Aster's default manifest explicitly declares `externally_connectable.ids: []`: omitting that field permits extension callers in Chrome. A configured, validated reporter ID is injected into both the manifest and the runtime diagnostics gate. The shared diagnostics package no longer trusts or probes the BrowserOS reporter implicitly; BrowserOS neo retains its explicit app-local reporter configuration.
+- The server's default origin allowlist now contains only the stable Aster development identity. BrowserOS compatibility requires an explicit `BROWSEROS_TRUSTED_ORIGINS` entry. Tests use real Aster-origin fixtures; the composed API/CORS suites pass 31/31, diagnostics tests pass 10/10, identity helper tests pass 7/7, and the isolated emitted-manifest build gate passes 2/2. The full workspace typecheck passed at this checkpoint before the subsequent privacy integration.
+- Headed BrowserOS v0.51.0 runs in fresh disposable profiles and a loopback-only namespace verified both default reporter denial and an explicitly configured fixture's successful diagnostics request, including `cached: false` and its exact fixture version. The runtime manifest/key-derived ID, rendered Aster home, extension API access, rejected BrowserOS/unknown origins, and rejected originless protected POST all passed. The existing A05 Task History recovery smoke passed under the new Aster identity, retaining the original running task record and a separate recovery marker; this was not another process-crash test.
+- A rebuilt unpacked extension can retain an old active service worker in an existing profile: CDP's loaded script source lacked the configured ID while the rebuilt file contained it. Fresh profiles resolved the mismatch. The repeatable smoke checks the active configured worker and rejects cached diagnostics rather than accepting a stale result. The fixture and smoke live under `packages/browseros-agent/scripts/dev/`.
+- [Recorded evidence](evidence/aster-identity-2026-10-28.json) contains only test IDs, booleans, and status codes, not system snapshots, provider data or credentials. The default bundle was restored, the final browser and supervisor exited normally, and the exact test processes were stopped. Release key custody, update infrastructure, product/reporter ownership and a native Aster package remain open; S05 stays PARTIAL / BLOCKED.
+
+### T20a follow-up — Aster Linux product plumbing (partial)
+
+- Added a distinct Aster product descriptor, registry entry, Linux package/launcher/desktop/icon paths, original Aster icon assets, and product-specific overlay. Product resource selection uses Aster-only names and has no implicit BrowserOS reporter or component fallback. Chromium attribution is preserved during product-name replacements.
+- Aster supports Linux only in this descriptor. Guards cover direct configuration, ordinary planning and universal planning; a Sol review found that the initial universal branch bypassed the platform guard, and Luna added a regression fix. BrowserOS/BrowserClaw universal planning remains supported. Non-Linux Aster identifiers are explicitly unsupported placeholders, not provisioned release identities.
+- Installed the build tool's exact frozen `uv.lock` dependencies into a private task-work virtual environment. The actual, unstubbed focused suite passes 106 tests across planner, products, resource sources, doctor and string replacements. Product listing succeeds. Aster's Linux source-mode dry run lists 13 steps with signing/upload disabled; `product doctor aster` intentionally fails with `no server bundle registered`.
+- No native Aster binary, Chromium checkout/download, installer or release artifact exists. GN/C++ Aster support, native telemetry policy, server bundle, source CRX/onboarding providers and resource staging remain open. The dry run and descriptor tests do not prove that native compilation or packaging works.
+
+### Execution policy update — 2026-10-28
+
+- User approved Luna medium for routine implementation, Terra medium for difficult integration, and Sol for planning and independent batch/security review. Use compact task-specific handoffs, bounded ownership, and escalate repeated failures rather than repeating equivalent attempts. This supersedes the earlier Luna-only implementation rule; the full goal remains active and incomplete.
+- Current batch closes privacy UI/state and real Bun route-boundary regressions, and fixes native product registry/debug-extension test regressions. Earlier headed UI evidence is provisional: changing route composition exposed a real socket-identity failure on sidecar restart, so a complete latest-build smoke is still required before recording the privacy milestone.
+
+### T20a native patch batch — source validation only (2026-10-28)
+
+- Added baked Linux Aster product flags, identity/profile/executable/state paths, Aster extension filtering, and gates preventing BrowserOS updater, remote extension config, reporter, sidecar resources/listeners, native custom metrics and crash upload from being used by baked Aster. These are source changes; no native browser binary was built.
+- Sol reviewed the 19 changed patch mappings and found a blocking three-Boolean product assertion. Luna replaced it with an exactly-one sum check. An independent standalone C++ check extracted the actual assertion from the patch and verified all eight flag combinations: the three one-hot selections compile, all others fail. This validates that assertion only.
+- Native patch doctor passes (422 patches / 38 features). Luna fixed the Python debug extension selector so BrowserOS/BrowserClaw retain their runtime-switchable union while Aster includes only its own extension, and updated the release registry expectations. The actual frozen-environment suite ran 1,330 tests successfully, with three skipped.
+- Aster source CRX, onboarding resource provider, registered server bundle, Chromium checkout/build, packaged runtime and release identity/service provisioning remain open. The product doctor still deliberately fails closed for the missing Aster server bundle.
+
+### GitHub source checkpoint — 2026-10-28
+
+- Recorded the cost-conscious model policy and next execution order in `NEXT_STEPS.md`. All current Aster source and Markdown changes are included in the requested source checkpoint. This is not a complete/release-ready browser.
+- T04 normal headed consent, cross-tab revoke, page reload and origin-denial checks pass with explicit isolated server/browser state and valid dummy telemetry configuration; state permissions are 0600. Workspace typecheck passes. Latest advanced harness still timed out waiting for initial OFF, so error/retry and sidecar restart gates remain open.
+- The test harness initially omitted `BROWSEROS_DIR`; that run was stopped and its test-created consent file removed from the default directory. Subsequent evidence uses an explicit disposable override. No personal profiles or credentials were used for the headed browser fixtures.

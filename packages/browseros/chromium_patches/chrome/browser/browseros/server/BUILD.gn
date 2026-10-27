@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..f291703753d8a98bc66727e28b6175193514301d
 --- /dev/null
 +++ b/chrome/browser/browseros/server/BUILD.gn
-@@ -0,0 +1,182 @@
+@@ -0,0 +1,184 @@
 +# Copyright 2024 The Chromium Authors
 +# Use of this source code is governed by a BSD-style license that can be
 +# found in the LICENSE file.
@@ -169,19 +169,21 @@ index 0000000000000000000000000000000000000000..f291703753d8a98bc66727e28b617519
 +  deps = []
 +
 +  if (is_mac) {
-+    if (browseros_product_browseros || browseros_package_all_server_resources) {
++    if (browseros_product_browseros ||
++        (browseros_package_all_server_resources && !browseros_product_aster)) {
 +      deps += [ ":browseros_server_resources_bundle" ]
 +    }
 +    if (browseros_product_browserclaw ||
-+        browseros_package_all_server_resources) {
++        (browseros_package_all_server_resources && !browseros_product_aster)) {
 +      deps += [ ":browserclaw_server_resources_bundle" ]
 +    }
 +  } else {
-+    if (browseros_product_browseros || browseros_package_all_server_resources) {
++    if (browseros_product_browseros ||
++        (browseros_package_all_server_resources && !browseros_product_aster)) {
 +      deps += [ ":browseros_server_resources_copy" ]
 +    }
 +    if (browseros_product_browserclaw ||
-+        browseros_package_all_server_resources) {
++        (browseros_package_all_server_resources && !browseros_product_aster)) {
 +      deps += [ ":browserclaw_server_resources_copy" ]
 +    }
 +  }

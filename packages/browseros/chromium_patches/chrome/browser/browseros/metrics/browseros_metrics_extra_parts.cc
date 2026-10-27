@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..c2c5dd301d6f957a6581ad0d19b233ed7edaa2c9
 --- /dev/null
 +++ b/chrome/browser/browseros/metrics/browseros_metrics_extra_parts.cc
-@@ -0,0 +1,63 @@
+@@ -0,0 +1,68 @@
 +// Copyright 2026 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -13,6 +13,7 @@ index 0000000000000000000000000000000000000000..c2c5dd301d6f957a6581ad0d19b233ed
 +#include <memory>
 +
 +#include "base/check.h"
++#include "base/logging.h"
 +#include "chrome/browser/browser_process.h"
 +#include "chrome/browser/browseros/core/browseros_product.h"
 +#include "chrome/browser/browseros/core/browseros_product_state.h"
@@ -63,6 +64,10 @@ index 0000000000000000000000000000000000000000..c2c5dd301d6f957a6581ad0d19b233ed
 +
 +void AddBrowserOSMetricsExtraParts(ChromeBrowserMainParts* main_parts) {
 +  CHECK(main_parts);
++  if (!browseros::IsNativeTelemetryEnabled()) {
++    LOG(INFO) << "aster: native BrowserOS metrics disabled pending consent support";
++    return;
++  }
 +  main_parts->AddParts(std::make_unique<BrowserOSMetricsExtraParts>());
 +}
 +

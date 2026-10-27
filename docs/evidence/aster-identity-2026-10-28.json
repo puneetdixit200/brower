@@ -1,0 +1,66 @@
+{
+  "date": "2026-10-28",
+  "scope": "Aster development extension in BrowserOS v0.51.0; not a native Aster release",
+  "network": "isolated user/network namespace with loopback only",
+  "allow": {
+    "ok": true,
+    "extension_id": "oifdmombnijnaiocijiacjhajbnpdlhb",
+    "derived_id_matches": true,
+    "home_rendered": true,
+    "diagnostics_received": true,
+    "diagnostics_fresh": true,
+    "reporter_version_expected": true,
+    "extension_api_status": 200,
+    "origin_statuses": {
+      "aster": 200,
+      "browseros_primary": 403,
+      "browseros_reporter": 403,
+      "unknown": 403
+    },
+    "originless_protected_post_status": 403,
+    "external_reporter": {
+      "denied": false,
+      "allowed": true,
+      "fresh": true
+    }
+  },
+  "deny": {
+    "ok": true,
+    "extension_id": "oifdmombnijnaiocijiacjhajbnpdlhb",
+    "derived_id_matches": true,
+    "home_rendered": true,
+    "diagnostics_received": true,
+    "diagnostics_fresh": true,
+    "reporter_version_expected": true,
+    "extension_api_status": 200,
+    "origin_statuses": {
+      "aster": 200,
+      "browseros_primary": 403,
+      "browseros_reporter": 403,
+      "unknown": 403
+    },
+    "originless_protected_post_status": 403,
+    "external_reporter": {
+      "denied": true,
+      "allowed": false
+    }
+  },
+  "task_recovery_regression": {
+    "task_history_missing_run_recovery_ui": "passed",
+    "underlying_task_record_remains_running": true,
+    "separate_recovery_marker_persists_after_reload": true,
+    "network": "localhost only",
+    "fixture_content_retained": false,
+    "process_crash_simulated": false
+  },
+  "cleanup": {
+    "default_bundle_restored": true,
+    "test_browser_exit": 0,
+    "test_supervisor_exit": 0
+  },
+  "limits": [
+    "No release signing key, update service or owned reporter deployment was provisioned.",
+    "A new profile was used per bundle to avoid a stale unpacked service worker.",
+    "Headerless loopback reads are not authentication against hostile local processes."
+  ]
+}

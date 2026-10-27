@@ -115,6 +115,9 @@ def plan(switches: Switches, arch: str, platform: Optional[str] = None) -> List[
         raise ValueError("universal is planned as multiple runs; use plan_runs()")
     platform = platform or get_platform()
     switches = switches.resolved()
+    from .products import get_product_descriptor
+
+    get_product_descriptor(switches.product).require_platform(platform)
 
     if switches.preset == "debug":
         steps = _plan_debug(switches, platform)
@@ -134,6 +137,11 @@ def plan_runs(
     """
     platform = platform or get_platform()
     switches = switches.resolved()
+    # Universal planning bypasses plan(), so enforce product platform support
+    # here before it can construct platform-specific signing/package steps.
+    from .products import get_product_descriptor
+
+    get_product_descriptor(switches.product).require_platform(platform)
     if "universal" in switches.architectures:
         if len(switches.architectures) > 1:
             raise ValueError("universal cannot be combined with other architectures")

@@ -14,6 +14,9 @@ from typing import Any, Dict, Optional, Tuple
 BROWSEROS_AGENT_EXTENSION_ID = "bflpfmnmnokmjhmgnolecpppdbdophmk"
 BROWSEROS_BUG_REPORTER_EXTENSION_ID = "adlpneommgkgeanpaekgoaolcpncohkf"
 BROWSERCLAW_EXTENSION_ID = "pjimfkbpehlcllblajnpfamdfjhhlgkc"
+# Stable development identity for the Aster extension. Release signing and
+# publication are intentionally not configured in this build repository.
+ASTER_EXTENSION_ID = "oifdmombnijnaiocijiacjhajbnpdlhb"
 # Packaged to the CDN but neither bundled nor in the update feeds.
 BROWSEROS_CONTROLLER_EXTENSION_ID = "nlnihljpboknmfagkikhkdblbedophja"
 
@@ -71,6 +74,16 @@ class ProductDescriptor:
     mac: MacProductIdentity
     linux: LinuxProductIdentity
     windows: WindowsProductIdentity
+    supported_platforms: tuple[str, ...] = ("linux", "macos", "windows")
+
+    def require_platform(self, platform: str) -> None:
+        """Fail before planning a build for an unsupported target platform."""
+        if platform not in self.supported_platforms:
+            supported = ", ".join(self.supported_platforms)
+            raise ValueError(
+                f"Product '{self.id}' supports {supported} only; "
+                f"cannot build for {platform}"
+            )
 
     def app_name(self, build_type: str) -> str:
         """Return the display app name for a release or debug build."""
@@ -185,6 +198,7 @@ class ProductDescriptor:
                 app_user_model_id=f"{company}.{base}",
                 installer_app_id=windows_installer_guid,
             ),
+            supported_platforms=("linux", "macos", "windows"),
         )
 
         valid_fields = {f.name for f in fields(cls)}

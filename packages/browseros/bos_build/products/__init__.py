@@ -10,11 +10,12 @@ from typing import Dict
 from ..core.products import ProductDescriptor
 from .browseros.product import BROWSEROS_PRODUCT, BROWSEROS_SERVER_BUNDLE
 from .browserclaw.product import BROWSERCLAW_PRODUCT, BROWSERCLAW_SERVER_BUNDLE
+from .aster.product import ASTER_PRODUCT
 
 DEFAULT_PRODUCT_ID = BROWSEROS_PRODUCT.id
 
 PRODUCTS: Dict[str, ProductDescriptor] = {}
-for _product in (BROWSEROS_PRODUCT, BROWSERCLAW_PRODUCT):
+for _product in (BROWSEROS_PRODUCT, BROWSERCLAW_PRODUCT, ASTER_PRODUCT):
     if _product.id in PRODUCTS:
         raise ValueError(f"Duplicate product id: {_product.id}")
     PRODUCTS[_product.id] = _product
@@ -28,4 +29,5 @@ __all__ = [
     "BROWSEROS_PRODUCT",
     "BROWSERCLAW_PRODUCT",
     "BROWSERCLAW_SERVER_BUNDLE",
+    "ASTER_PRODUCT",
 ]

@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..2e72060f85302d065b2baa91d620fa1296052b31
 --- /dev/null
 +++ b/chrome/browser/browseros/core/browseros_product_state.cc
-@@ -0,0 +1,66 @@
+@@ -0,0 +1,75 @@
 +// Copyright 2026 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -26,17 +26,26 @@ index 0000000000000000000000000000000000000000..2e72060f85302d065b2baa91d620fa12
 +constexpr base::cstring_view kBrowserOSDirectoryEnvironment = "BROWSEROS_DIR";
 +constexpr base::cstring_view kBrowserClawDirectoryEnvironment =
 +    "BROWSERCLAW_DIR";
++constexpr base::cstring_view kAsterDirectoryEnvironment = "ASTER_DIR";
 +constexpr base::FilePath::StringViewType kBrowserOSDirectoryName =
 +    FILE_PATH_LITERAL(".browseros");
 +constexpr base::FilePath::StringViewType kBrowserClawDirectoryName =
 +    FILE_PATH_LITERAL(".browserclaw");
++constexpr base::FilePath::StringViewType kAsterDirectoryName =
++    FILE_PATH_LITERAL(".aster");
 +
 +base::cstring_view GetDirectoryEnvironmentName(Product product) {
++  if (product == Product::kAster) {
++    return kAsterDirectoryEnvironment;
++  }
 +  return product == Product::kBrowserClaw ? kBrowserClawDirectoryEnvironment
 +                                          : kBrowserOSDirectoryEnvironment;
 +}
 +
 +base::FilePath::StringViewType GetDefaultDirectoryName(Product product) {
++  if (product == Product::kAster) {
++    return kAsterDirectoryName;
++  }
 +  return product == Product::kBrowserClaw ? kBrowserClawDirectoryName
 +                                          : kBrowserOSDirectoryName;
 +}

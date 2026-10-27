@@ -22,7 +22,7 @@ index 0000000000000000000000000000000000000000..f09b13c6c45676dc7ed83f51ff28aaa8
 +namespace browseros {
 +
 +void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
-+  const bool show_toolbar_controls_by_default = !IsBrowserClawProduct();
++  const bool show_toolbar_controls_by_default = IsBrowserOSProduct();
 +
 +  registry->RegisterBooleanPref(prefs::kShowLLMChat,
 +                                show_toolbar_controls_by_default);

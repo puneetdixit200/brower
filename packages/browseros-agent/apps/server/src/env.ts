@@ -19,7 +19,5 @@ export const INLINED_ENV = {
   POSTHOG_API_KEY: process.env.POSTHOG_API_KEY,
 } as const
 
-export const REQUIRED_FOR_PRODUCTION = [
-  'SENTRY_DSN',
-  'POSTHOG_API_KEY',
-] as const satisfies readonly (keyof typeof INLINED_ENV)[]
+export const REQUIRED_FOR_PRODUCTION =
+  [] as const satisfies readonly (keyof typeof INLINED_ENV)[]

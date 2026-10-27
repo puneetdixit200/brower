@@ -110,28 +110,6 @@ const getApprovalAwareMessage = (
   approvalResponse: ReturnType<typeof getToolApprovalResponse>,
 ) => (approvalResponse ? '' : getLastMessageText(messages))
 
-const getResponseAndQueryFromMessageId = (
-  messages: UIMessage[],
-  messageId: string,
-) => {
-  const messageIndex = messages.findIndex((each) => each.id === messageId)
-  const response = messages?.[messageIndex] ?? []
-  const query = messages?.[messageIndex - 1] ?? []
-  const responseText = response.parts
-    .filter((each) => each.type === 'text')
-    .map((each) => each.text)
-    .join('\n\n')
-  const queryText = query.parts
-    .filter((each) => each.type === 'text')
-    .map((each) => each.text)
-    .join('\n')
-
-  return {
-    responseText,
-    queryText,
-  }
-}
-
 export type ChatOrigin = 'sidepanel' | 'newtab'
 
 export interface ChatSessionOptions {
@@ -323,12 +301,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   } = useExecutionHistoryTracker({ enabled: persistHistory })
 
   const onClickLike = (messageId: string) => {
-    const { responseText, queryText } = getResponseAndQueryFromMessageId(
-      messages,
-      messageId,
-    )
-
-    track(MESSAGE_LIKE_EVENT, { responseText, queryText, messageId })
+    track(MESSAGE_LIKE_EVENT)
 
     setLiked((prev) => ({
       ...prev,
@@ -336,18 +309,8 @@ export const useChatSession = (options?: ChatSessionOptions) => {
     }))
   }
 
-  const onClickDislike = (messageId: string, comment?: string) => {
-    const { responseText, queryText } = getResponseAndQueryFromMessageId(
-      messages,
-      messageId,
-    )
-
-    track(MESSAGE_DISLIKE_EVENT, {
-      responseText,
-      queryText,
-      messageId,
-      comment,
-    })
+  const onClickDislike = (messageId: string, _comment?: string) => {
+    track(MESSAGE_DISLIKE_EVENT)
 
     setDisliked((prev) => ({
       ...prev,

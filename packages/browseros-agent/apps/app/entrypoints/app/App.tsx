@@ -16,6 +16,7 @@ import { NewTabChat } from '@/screens/newtab/index/NewTabChat'
 import { NewTabLayout } from '@/screens/newtab/layout/NewTabLayout'
 import { Personalize } from '@/screens/newtab/personalize/Personalize'
 import { OnboardingAiPage } from '@/screens/onboarding-ai/OnboardingAiPage'
+import { PrivacySettingsPage } from '@/screens/privacy/PrivacySettingsPage'
 import { ScheduledTasksPage } from '@/screens/scheduled-tasks/ScheduledTasksPage'
 import { TaskHistoryPage } from '@/screens/task-history/TaskHistoryPage'
 
@@ -72,6 +73,7 @@ export const App: FC = () => {
             <Route path="chat" element={<LlmHubPage />} />
             <Route path="mcp" element={<MCPSettingsPage />} />
             <Route path="memory" element={<MemoryPage />} />
+            <Route path="privacy" element={<PrivacySettingsPage />} />
             <Route path="customization" element={<CustomizationPage />} />
             <Route path="diagnostics" element={<DiagnosticsPage />} />
             <Route

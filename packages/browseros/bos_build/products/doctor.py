@@ -39,6 +39,11 @@ _UNIQUE_FIELDS = {
     "windows installer_app_id": lambda p: p.windows.installer_app_id,
     "windows app_user_model_id": lambda p: p.windows.app_user_model_id,
     "linux package_name": lambda p: p.linux.package_name,
+    "linux launcher_name": lambda p: p.linux.launcher_name,
+    "linux desktop_id": lambda p: p.linux.desktop_id,
+    "linux icon_name": lambda p: p.linux.icon_name,
+    "linux apparmor_profile_name": lambda p: p.linux.apparmor_profile_name,
+    "linux metainfo_id": lambda p: p.linux.metainfo_id,
 }
 
 

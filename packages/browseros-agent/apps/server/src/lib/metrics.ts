@@ -6,6 +6,15 @@ import { EXTERNAL_URLS } from '@browseros/shared/constants/urls'
 import { PostHog } from 'posthog-node'
 
 import { INLINED_ENV } from '../env'
+import { sanitizeMetricsEvent } from './privacy/metrics-event'
+import {
+  discardPostHogQueue,
+  PostHogTransportLease,
+} from './privacy/posthog-transport'
+import {
+  isTelemetryEnabled,
+  reloadTelemetryConsent,
+} from './privacy/telemetry-consent'
 
 const POSTHOG_API_KEY = INLINED_ENV.POSTHOG_API_KEY
 const EVENT_PREFIX = 'browseros.server.'
@@ -34,27 +43,16 @@ const ROLLUP_INTERVAL_MS = 30 * 60 * 1000
  * future code path passes dynamic / user-supplied names through.
  * Overflow names roll into `__other__`.
  */
-const MAX_TOOL_NAME_KEYS = 200
-
-/** PostHog property keys can't safely contain dots — they collide with
- *  nested-prop access syntax in HogQL. */
-function sanitizeToolName(name: string): string {
-  return name.replace(/\./g, '_').slice(0, 80)
-}
-
 interface MetricsConfig {
   install_id?: string
   browseros_version?: string
   chromium_version?: string
   server_version?: string
-  [key: string]: string | undefined
 }
 
 interface ToolExecCounters {
   total: number
   failed: number
-  by_source: Record<string, number>
-  by_tool: Record<string, number>
 }
 
 interface RollupBucket {
@@ -80,19 +78,6 @@ class RollupBuffer {
     const counters = this.ensureCurrent().tool_executions
     counters.total += 1
     if (props.success === false) counters.failed += 1
-    const source = props.source ?? 'unknown'
-    counters.by_source[source] = (counters.by_source[source] ?? 0) + 1
-    if (props.tool_name) {
-      const name = sanitizeToolName(props.tool_name)
-      if (
-        counters.by_tool[name] !== undefined ||
-        Object.keys(counters.by_tool).length < MAX_TOOL_NAME_KEYS
-      ) {
-        counters.by_tool[name] = (counters.by_tool[name] ?? 0) + 1
-      } else {
-        counters.by_tool.__other__ = (counters.by_tool.__other__ ?? 0) + 1
-      }
-    }
   }
 
   /**
@@ -126,8 +111,6 @@ class RollupBuffer {
         tool_executions: {
           total: 0,
           failed: 0,
-          by_source: {},
-          by_tool: {},
         },
       }
     }
@@ -146,20 +129,65 @@ function normalizeSampling(sampling: number): number {
 
 class MetricsService {
   private client: PostHog | null = null
+  private lease: PostHogTransportLease | null = null
   private config: MetricsConfig | null = null
+  private consentRevision: string | null = null
   private rollup = new RollupBuffer()
   private flushTimer: ReturnType<typeof setTimeout> | null = null
 
-  initialize(config: MetricsConfig): void {
+  initialize(config: MetricsConfig, revision?: string): void {
     this.config = { ...this.config, ...config }
+    if (isTelemetryEnabled()) this.enable(revision)
+  }
 
-    if (!this.client && POSTHOG_API_KEY) {
-      this.client = new PostHog(POSTHOG_API_KEY, {
-        host: EXTERNAL_URLS.POSTHOG_DEFAULT,
-      })
-    }
-
+  enable(revision?: string): void {
+    if (
+      !isTelemetryEnabled() ||
+      this.client ||
+      !this.config ||
+      !POSTHOG_API_KEY
+    )
+      return
+    this.consentRevision = revision ?? null
+    if (!this.consentRevision) return
+    this.lease = new PostHogTransportLease(
+      EXTERNAL_URLS.POSTHOG_DEFAULT,
+      globalThis.fetch,
+      async () => {
+        const current = await reloadTelemetryConsent()
+        return current.enabled && current.revision === this.consentRevision
+      },
+    )
+    this.client = new PostHog(POSTHOG_API_KEY, {
+      host: EXTERNAL_URLS.POSTHOG_DEFAULT,
+      fetch: this.lease.fetch,
+      disableGeoip: true,
+      disableRemoteConfig: true,
+      preloadFeatureFlags: false,
+      enableExceptionAutocapture: false,
+    })
     this.scheduleNextFlush()
+  }
+
+  async disable(): Promise<void> {
+    if (this.flushTimer) clearTimeout(this.flushTimer)
+    this.flushTimer = null
+    this.rollup = new RollupBuffer()
+    const client = this.client
+    this.client = null
+    this.lease?.revoke()
+    this.lease = null
+    this.consentRevision = null
+    if (client) {
+      try {
+        discardPostHogQueue(client)
+      } catch {
+        // A client without a verified queue discard is never flushed.
+      }
+      // SDK shutdown flushes internally; with a permanently revoked transport
+      // it can only drain into the local denied response.
+      await client.shutdown()
+    }
   }
 
   isEnabled(): boolean {
@@ -172,7 +200,7 @@ class MetricsService {
     properties: Record<string, unknown> = {},
     sampling = DEFAULT_METRICS_SAMPLE_RATE,
   ): void {
-    if (!this.client || !this.config) {
+    if (!isTelemetryEnabled() || !this.client || !this.config) {
       return
     }
 
@@ -195,10 +223,11 @@ class MetricsService {
     if (sampleRate <= 0) return
     if (sampleRate < 1 && Math.random() >= sampleRate) return
 
-    this.captureNow(
+    const safe = sanitizeMetricsEvent(
       eventName,
       sampleRate < 1 ? { ...properties, sample_rate: sampleRate } : properties,
     )
+    if (safe) this.captureNow(safe.eventName, safe.properties)
   }
 
   async shutdown(): Promise<void> {
@@ -208,7 +237,7 @@ class MetricsService {
     }
     // Drain whatever's buffered into the PostHog SDK before asking it
     // to flush its own send queue.
-    this.flushRollup()
+    if (isTelemetryEnabled()) this.flushRollup()
     if (this.client) {
       await this.client.shutdown()
       this.client = null
@@ -243,8 +272,6 @@ class MetricsService {
       mcp_requests_count: bucket.mcp_requests,
       tool_executions_count: bucket.tool_executions.total,
       tool_executions_failed: bucket.tool_executions.failed,
-      tool_executions_by_source: bucket.tool_executions.by_source,
-      tool_executions_by_tool: bucket.tool_executions.by_tool,
     })
   }
 
@@ -252,15 +279,10 @@ class MetricsService {
     eventName: string,
     properties: Record<string, unknown>,
   ): void {
-    if (!this.client || !this.config) return
+    if (!isTelemetryEnabled() || !this.client || !this.config) return
 
-    const {
-      install_id,
-      browseros_version,
-      chromium_version,
-      server_version,
-      ...defaultProperties
-    } = this.config
+    const { install_id, browseros_version, chromium_version, server_version } =
+      this.config
 
     if (!install_id) return
 
@@ -268,7 +290,6 @@ class MetricsService {
       distinctId: install_id,
       event: EVENT_PREFIX + eventName,
       properties: {
-        ...defaultProperties,
         ...properties,
         // These identify the process boundary and must not be replaceable by
         // caller-supplied event properties.
@@ -286,10 +307,20 @@ class MetricsService {
 
 export const metrics = new MetricsService()
 
+export async function updateMetricsConsent(
+  enabled: boolean,
+  revision: string,
+): Promise<void> {
+  await metrics.disable()
+  if (!enabled) return
+  const current = await reloadTelemetryConsent()
+  if (current.enabled && current.revision === revision) {
+    metrics.enable(revision)
+  }
+}
+
 // Re-exported for tests; do not depend on these in product code.
 export const __internal__ = {
   ROLLUP_INTERVAL_MS,
-  MAX_TOOL_NAME_KEYS,
-  sanitizeToolName,
   RollupBuffer,
 }

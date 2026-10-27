@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Aster Diagnostics Reporter Test Fixture",
+  "version": "1.0.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApTsMmB+e+L0YXREkg/y6t2wH264JXTKzdCLrevJiPkOHK2jJ7iSOpg5vjE3mfmdyrRj5OfrVPWybrfKd4CRyPU80eUE8R14ZYgJNnDH402W+cewoaLROGjAYMLP1b273bs4SllKqzv5rvK9tsfVRlkFB0i2k9+Ax66Wnlctj7qL8o4pOVdKcDmfpGck/NkXKJandpgKL+YeGs0+lhrGvVFzHpRpGvZ7CDZI5D0KpoZymRolAZx5+2+mssdhp0PKkJci865Slamg8N9tMzm+bbiNbHibV26Y/K5ZYts/Yy6fShQhw+JkeXy3DfpeAQn2bUqAk8nlvNM+o7vnGt3kquQIDAQAB",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "externally_connectable": {
+    "ids": ["oifdmombnijnaiocijiacjhajbnpdlhb"]
+  }
+}

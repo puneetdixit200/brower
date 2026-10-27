@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000..a98e3b74de45e
 --- /dev/null
 +++ b/chrome/browser/browseros/server/browseros_server_config.h
-@@ -0,0 +1,147 @@
+@@ -0,0 +1,150 @@
 +// Copyright 2024 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -47,6 +47,8 @@ index 0000000000000..a98e3b74de45e
 +  base::FilePath::StringViewType binary_name;
 +  base::FilePath::StringViewType config_file_name;
 +  std::string_view health_path;
++  // Whether the manager starts any sidecar or local control listeners.
++  bool enable_server;
 +  // Whether the manager starts an updater for this product at all.
 +  bool enable_updater;
 +  UpdaterConfig updater;
@@ -54,6 +56,7 @@ index 0000000000000..a98e3b74de45e
 +
 +const ManagedServerDescriptor& GetBrowserOSServerDescriptor();
 +const ManagedServerDescriptor& GetBrowserClawServerDescriptor();
++const ManagedServerDescriptor& GetAsterServerDescriptor();
 +
 +// Returns the descriptor selected by browseros::GetProduct().
 +const ManagedServerDescriptor& GetManagedServerDescriptor();

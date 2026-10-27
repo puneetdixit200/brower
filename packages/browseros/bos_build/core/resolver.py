@@ -15,7 +15,7 @@ from typing import Optional, List, Dict, Any, Tuple
 from .context import Context
 from ..lib.env import EnvConfig
 from .products import get_product_descriptor
-from ..lib.utils import get_platform_arch, log_info
+from ..lib.utils import get_platform, get_platform_arch, log_info
 
 VALID_ARCHITECTURES = {"x64", "arm64", "universal"}
 
@@ -71,6 +71,7 @@ def resolve_config(cli_args: Dict[str, Any]) -> List[Context]:
     build_type = cli_args.get("build_type") or "debug"
 
     product = get_product_descriptor(cli_args.get("product"))
+    product.require_platform(get_platform())
 
     extra_gn_args = tuple(cli_args.get("extra_gn_args") or ())
 

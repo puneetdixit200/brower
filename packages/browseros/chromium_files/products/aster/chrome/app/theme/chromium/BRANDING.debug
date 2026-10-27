@@ -1,0 +1,10 @@
+COMPANY_FULLNAME=Aster Development
+COMPANY_SHORTNAME=Aster Dev
+PRODUCT_FULLNAME=Aster Browser Dev
+PRODUCT_SHORTNAME=Aster Browser Dev
+PRODUCT_INSTALLER_FULLNAME=Aster Browser Dev Installer
+PRODUCT_INSTALLER_SHORTNAME=Aster Browser Dev Installer
+COPYRIGHT=Copyright @2026@ Aster Development. All rights reserved.
+MAC_BUNDLE_ID=org.aster.dev.AsterBrowser
+MAC_CREATOR_CODE=Cr24
+MAC_TEAM_ID=

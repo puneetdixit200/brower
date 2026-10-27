@@ -7,7 +7,8 @@
 - Require explicit approvals for external sends, posts, purchases, destructive changes, and sensitive file writes.
 - No credentials, real user tasks, or existing browser profiles in tests.
 - Model calls, analytics, sync, and update traffic must be disclosed and user controlled.
-- The built Aster-named extension currently retains BrowserOS's manifest key, update URL, and reporter extension ID. This identity/update mismatch is a release blocker; do not distribute the current manifest as Aster.
+- S04: app and server Sentry initializers disable default PII collection (`sendDefaultPii: false`) and keep their existing event sanitizers. This verifies local SDK options only; remote DSN receipt, processing, and retention are unverified, and the broader telemetry and log-sink audit remains open.
+- S05 is PARTIAL / BLOCKED. WXT uses a stable Aster-specific development public key (ID `oifdmombnijnaiocijiacjhajbnpdlhb`) without an updater URL; `externally_connectable.ids` is explicitly empty by default to deny extension callers, while `web_accessible_resources` is absent. Fresh headed development runs verified default external denial and configured reporter access with a fresh diagnostics response; release packaging remains unverified. Explicit release key and updater values must be paired. Public keys are parsed as DER SPKI and rejected if they derive to a BrowserOS extension ID. Product-site and update URLs are checked for HTTPS and disallowed hosts, but these checks do not establish domain ownership. The current emitted development manifest was inspected. Release key custody, update service, verified domain ownership, release-origin configuration, and reporter deployment ownership remain release prerequisites.
 - Preserve AGPL-3.0-or-later and third-party license notices.
 
 ## Verified Aster controls

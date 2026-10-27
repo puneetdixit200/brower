@@ -93,6 +93,22 @@ describe('loadServerConfig', () => {
     assert.strictEqual(result.value.cdpPort, 9000)
   })
 
+  it('does not require telemetry credentials for a production config', () => {
+    process.env.NODE_ENV = 'production'
+    delete process.env.SENTRY_DSN
+    delete process.env.POSTHOG_API_KEY
+    const configPath = writeSidecarConfig()
+
+    const result = loadServerConfig([
+      'bun',
+      'src/index.ts',
+      '--config',
+      configPath,
+    ])
+
+    assert.strictEqual(result.ok, true)
+  })
+
   it('requires --config instead of falling back to defaults or env', () => {
     process.env.BROWSEROS_CDP_PORT = '9222'
     process.env.BROWSEROS_SERVER_PORT = '9223'

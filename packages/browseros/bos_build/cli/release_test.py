@@ -88,7 +88,7 @@ class ReleaseListInvocationTest(unittest.TestCase):
         self.assertIsNone(module.limit)
         self.assertEqual(
             [product.id for product in module.products],
-            ["browseros", "browserclaw"],
+            ["browseros", "browserclaw", "aster"],
         )
 
     def test_limit_and_product_filter(self):
@@ -121,6 +121,7 @@ class ReleaseListInvocationTest(unittest.TestCase):
 
         self.assertNotEqual(result.exit_code, 0)
         self.assertIn("browserclaw", combined(result))
+        self.assertIn("aster", combined(result))
 
 
 class ReleaseVersionRequiredTest(unittest.TestCase):

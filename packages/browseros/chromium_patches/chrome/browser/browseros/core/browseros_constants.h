@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000..e7b9a3a608cde
 --- /dev/null
 +++ b/chrome/browser/browseros/core/browseros_constants.h
-@@ -0,0 +1,242 @@
+@@ -0,0 +1,259 @@
 +// Copyright 2024 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -39,6 +39,8 @@ index 0000000000000..e7b9a3a608cde
 +
 +inline constexpr char kBrowserClawExtensionId[] =
 +    "pjimfkbpehlcllblajnpfamdfjhhlgkc";
++inline constexpr char kAsterAgentExtensionId[] =
++    "oifdmombnijnaiocijiacjhajbnpdlhb";
 +
 +inline constexpr char kBrowserOSUpdateUrl[] =
 +    "https://cdn.browseros.com/extensions/update-manifest.xml";
@@ -57,7 +59,8 @@ index 0000000000000..e7b9a3a608cde
 +enum class BrowserOSExtensionProduct {
 +  kBrowserOS,
 +  kBrowserClaw,
-+  kAll,
++  kAster,
++  kBrowserOSAndClaw,
 +};
 +
 +struct BrowserOSExtensionInfo {
@@ -69,9 +72,11 @@ index 0000000000000..e7b9a3a608cde
 +
 +inline constexpr BrowserOSExtensionInfo kBrowserOSExtensions[] = {
 +    {kAgentExtensionId, false, false, BrowserOSExtensionProduct::kBrowserOS},
-+    {kBugReporterExtensionId, true, false, BrowserOSExtensionProduct::kAll},
++    {kBugReporterExtensionId, true, false,
++     BrowserOSExtensionProduct::kBrowserOSAndClaw},
 +    {kBrowserClawExtensionId, false, false,
 +     BrowserOSExtensionProduct::kBrowserClaw},
++    {kAsterAgentExtensionId, false, false, BrowserOSExtensionProduct::kAster},
 +};
 +
 +inline constexpr size_t kBrowserOSExtensionsCount =
@@ -84,10 +89,19 @@ index 0000000000000..e7b9a3a608cde
 +      return IsBrowserOSProduct();
 +    case BrowserOSExtensionProduct::kBrowserClaw:
 +      return IsBrowserClawProduct();
-+    case BrowserOSExtensionProduct::kAll:
-+      return true;
++    case BrowserOSExtensionProduct::kAster:
++      return IsAsterProduct();
++    case BrowserOSExtensionProduct::kBrowserOSAndClaw:
++      return IsBrowserOSProduct() || IsBrowserClawProduct();
 +  }
 +  return false;
++}
++
++inline const char* GetPrimaryBrowserOSExtensionId() {
++  if (IsAsterProduct()) {
++    return kAsterAgentExtensionId;
++  }
++  return IsBrowserClawProduct() ? kBrowserClawExtensionId : kAgentExtensionId;
 +}
 +
 +inline const BrowserOSExtensionInfo* FindBrowserOSExtensionInfo(
@@ -137,6 +151,9 @@ index 0000000000000..e7b9a3a608cde
 +    {"/settings", kAgentExtensionId, "app.html", "/settings"},
 +    {"/mcp", kAgentExtensionId, "app.html", "/mcp"},
 +    {"/onboarding", kAgentExtensionId, "app.html", "/onboarding"},
++    {"/settings", kAsterAgentExtensionId, "app.html", "/settings"},
++    {"/mcp", kAsterAgentExtensionId, "app.html", "/mcp"},
++    {"/onboarding", kAsterAgentExtensionId, "app.html", "/onboarding"},
 +    {"/claw", kBrowserClawExtensionId, "newtab.html", ""},
 +};
 +

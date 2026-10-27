@@ -317,10 +317,17 @@ class Context:
         if self.build_type != "debug":
             return self.product.required_extension_ids
 
-        from ..products import PRODUCTS
+        # BrowserOS debug builds support switching between the two existing
+        # BrowserOS products at runtime. Standalone products such as Aster do
+        # not participate in that switch and must keep their own extension
+        # requirements isolated.
+        from ..products import BROWSERCLAW_PRODUCT, BROWSEROS_PRODUCT
+
+        if self.product.id not in (BROWSEROS_PRODUCT.id, BROWSERCLAW_PRODUCT.id):
+            return self.product.required_extension_ids
 
         required: Dict[str, str] = {}
-        for product in PRODUCTS.values():
+        for product in (BROWSEROS_PRODUCT, BROWSERCLAW_PRODUCT):
             for extension_id, name in product.required_extension_ids:
                 required.setdefault(extension_id, name)
         return tuple(required.items())

@@ -10,10 +10,12 @@ index 5575c049b222f..800d48d3c798d 100644
  #include "chrome/common/channel_info.h"
  #include "chrome/common/chrome_paths_internal.h"
  
-@@ -94,8 +95,10 @@ bool GetDefaultUserDataDirectory(base::FilePath* result) {
+@@ -94,8 +95,12 @@ bool GetDefaultUserDataDirectory(base::FilePath* result) {
    std::string data_dir_basename = "google-chrome-for-testing";
  #elif BUILDFLAG(GOOGLE_CHROME_BRANDING)
    std::string data_dir_basename = "google-chrome";
++#elif BUILDFLAG(BROWSEROS_PRODUCT_ASTER)
++  std::string data_dir_basename = "aster-browser";
 +#elif BUILDFLAG(BROWSEROS_PRODUCT_BROWSERCLAW)
 +  std::string data_dir_basename = "browser-claw";
  #else

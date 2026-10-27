@@ -10,6 +10,7 @@ from unittest import mock
 from . import context as context_mod
 from .context import Context
 from .products import (
+    ASTER_EXTENSION_ID,
     BROWSEROS_AGENT_EXTENSION_ID,
     BROWSEROS_BUG_REPORTER_EXTENSION_ID,
     BROWSERCLAW_EXTENSION_ID,
@@ -217,6 +218,19 @@ class GetAppPathTest(unittest.TestCase):
                 )
 
                 self.assertEqual(ctx.required_extension_ids, expected)
+
+    def test_aster_debug_requires_only_aster_extensions(self):
+        ctx = Context(
+            chromium_src=Path("/nonexistent-src"),
+            architecture="arm64",
+            build_type="debug",
+            product=get_product_descriptor("aster"),
+        )
+
+        self.assertEqual(
+            ctx.required_extension_ids,
+            ((ASTER_EXTENSION_ID, "Aster app"),),
+        )
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..19919de8931b03b7ae7cf772f9e98b0d907259cd
 --- /dev/null
 +++ b/chrome/browser/browseros/server/browseros_server_manager.cc
-@@ -0,0 +1,1558 @@
+@@ -0,0 +1,1565 @@
 +// Copyright 2024 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -512,6 +512,12 @@ index 0000000000000000000000000000000000000000..19919de8931b03b7ae7cf772f9e98b0d
 +  if (started_ || stopping_ || is_running_) {
 +    LOG(INFO) << "browseros: " << GetManagedServerDescriptor().log_name
 +              << " already running";
++    return;
++  }
++
++  if (!GetManagedServerDescriptor().enable_server) {
++    LOG(ERROR) << "aster: native server is unavailable; sidecar and local "
++                  "control listeners remain disabled";
 +    return;
 +  }
 +
@@ -1531,8 +1537,9 @@ index 0000000000000000000000000000000000000000..19919de8931b03b7ae7cf772f9e98b0d
 +    return base::FilePath();
 +  }
 +
-+  base::FilePath exec_dir =
-+      user_data_dir.Append(FILE_PATH_LITERAL(".browseros"));
++  base::FilePath exec_dir = user_data_dir.Append(
++      IsAsterProduct() ? FILE_PATH_LITERAL(".aster-server")
++                       : FILE_PATH_LITERAL(".browseros"));
 +
 +  base::ScopedAllowBlocking allow_blocking;
 +  if (!base::PathExists(exec_dir)) {

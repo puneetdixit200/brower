@@ -16,22 +16,33 @@ describe('isAllowedOrigin', () => {
     resetAllowedOriginsForTesting()
   })
   afterEach(() => {
-    process.env.BROWSEROS_TRUSTED_ORIGINS = previousEnv
+    if (previousEnv === undefined) {
+      delete process.env.BROWSEROS_TRUSTED_ORIGINS
+    } else {
+      process.env.BROWSEROS_TRUSTED_ORIGINS = previousEnv
+    }
     resetAllowedOriginsForTesting()
   })
 
-  it('accepts the pinned published extension origin even when env is empty', () => {
+  it('rejects the BrowserOS extension origin by default', () => {
     process.env.BROWSEROS_TRUSTED_ORIGINS = ''
     expect(
       isAllowedOrigin('chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk'),
+    ).toBe(false)
+  })
+
+  it('accepts the stable Aster development extension origin by default', () => {
+    process.env.BROWSEROS_TRUSTED_ORIGINS = ''
+    expect(
+      isAllowedOrigin('chrome-extension://oifdmombnijnaiocijiacjhajbnpdlhb'),
     ).toBe(true)
   })
 
-  it('accepts the pinned published extension origin when env is unset', () => {
+  it('rejects the BrowserOS extension origin when env is unset', () => {
     delete process.env.BROWSEROS_TRUSTED_ORIGINS
     expect(
       isAllowedOrigin('chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk'),
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it('rejects unknown origins when env is empty', () => {
@@ -45,6 +56,15 @@ describe('isAllowedOrigin', () => {
     process.env.BROWSEROS_TRUSTED_ORIGINS = 'chrome-extension://abcdef'
     expect(isAllowedOrigin('chrome-extension://abcdef')).toBe(true)
     expect(isAllowedOrigin('chrome-extension://other')).toBe(false)
+  })
+
+  it('accepts BrowserOS only when explicitly included in the trusted origins', () => {
+    process.env.BROWSEROS_TRUSTED_ORIGINS =
+      'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk'
+    expect(
+      isAllowedOrigin('chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk'),
+    ).toBe(true)
+    expect(isAllowedOrigin('chrome-extension://unknown')).toBe(false)
   })
 
   it('accepts multiple comma-separated origins and trims whitespace', () => {

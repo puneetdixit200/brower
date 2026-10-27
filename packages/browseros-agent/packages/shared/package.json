@@ -89,6 +89,10 @@
     "./sentry/sanitize": {
       "types": "./src/sentry/sanitize.ts",
       "default": "./src/sentry/sanitize.ts"
+    },
+    "./sentry/telemetry-event": {
+      "types": "./src/sentry/telemetry-event.ts",
+      "default": "./src/sentry/telemetry-event.ts"
     }
   }
 }

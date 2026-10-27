@@ -69,9 +69,14 @@ class CheckProductTest(unittest.TestCase):
         self.assertTrue(any("malformed extension id" in f for f in findings))
         self.assertTrue(any("malformed windows installer GUID" in f for f in findings))
 
-    def test_repo_products_pass_against_real_tree(self):
-        # The shipped products must stay healthy against the actual repo.
-        self.assertEqual(diagnose(get_package_root()), [])
+    def test_existing_products_pass_against_real_tree(self):
+        root = get_package_root()
+        self.assertEqual(diagnose(root, "browseros"), [])
+        self.assertEqual(diagnose(root, "browserclaw"), [])
+
+    def test_aster_is_reported_incomplete_until_its_server_exists(self):
+        findings = diagnose(get_package_root(), "aster")
+        self.assertEqual(findings, ["aster: no server bundle registered"])
 
 
 class UniquenessTest(unittest.TestCase):

@@ -71,6 +71,23 @@ func TestBuildArgsCanDeferExtensionHomeUntilCDPIsReady(t *testing.T) {
 	}
 }
 
+func TestDevExtensionHomeURLUsesAsterDevelopmentIdentity(t *testing.T) {
+	root := t.TempDir()
+	extensionDir := filepath.Join(root, "apps/app/dist/chrome-mv3-dev")
+	if err := os.MkdirAll(extensionDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `{"key":"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2gIwa9N2/RqO1TGyeOHS0uS9xDkYnnFIuDym99e8uFA6lc1t6JLeWTmi6GxpKqFejoTA1/4Wiuh1A3v/3FOqCCjDzaEFmhb0H2Z7FdvfEOpBtmMBmQDfTcPk1gdxn1cviHjTwOStoSSnQAy/NhJ6J5uvUjK74C/8FoGQ5HzPzrNWMdsKxsGK/8knXwif5gK1zAppGzdh0wmfbqD2xPKTD89XE6so+vIP1bvGSUIWVfxqZisa7zfW3wLKw+AX4IA6SOTx/vhI0HxQeZkjlLPyF3PEVA4uMdItbpsVRPySgQz2zkqwPnRcG+QCTiQxTeXqlnXsHxHi3G00wJDqCIZoLwIDAQAB","chrome_url_overrides":{"newtab":"app.html"}}`
+	if err := os.WriteFile(filepath.Join(extensionDir, "manifest.json"), []byte(manifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	want := "chrome-extension://oifdmombnijnaiocijiacjhajbnpdlhb/app.html#/home"
+	if got := devExtensionHomeURL(extensionDir); got != want {
+		t.Fatalf("devExtensionHomeURL() = %q, want %q", got, want)
+	}
+}
+
 func TestResolveInstalledBinaryUsesLinuxOverride(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("Linux binary resolution")

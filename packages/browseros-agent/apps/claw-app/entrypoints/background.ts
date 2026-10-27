@@ -1,4 +1,5 @@
 import { registerDiagnostics } from '@browseros/diagnostics/extension'
+import { BROWSEROS_REPORTER_EXTENSION_ID } from '@/modules/diagnostics/reporter'
 /**
  * @license
  * Copyright 2025 BrowserOS
@@ -16,7 +17,11 @@ import { registerExtensionUpdates } from '@/modules/updates/register'
 /** Supplies Chrome's trusted tab/document identity to the durable recorder relay. */
 export default defineBackground(() => {
   registerExtensionUpdates()
-  registerDiagnostics('browseros-neo', resolveBrowserOSServerBaseUrl)
+  registerDiagnostics(
+    'browseros-neo',
+    resolveBrowserOSServerBaseUrl,
+    BROWSEROS_REPORTER_EXTENSION_ID,
+  )
   const relay = createRecordingsRelay({
     resolveServerBaseUrl: resolveBrowserOSServerBaseUrl,
   })

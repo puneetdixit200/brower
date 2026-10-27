@@ -26,6 +26,8 @@ import { selectedTextStorage } from '@/lib/selected-text/selectedTextStorage'
 import { stopAgentStorage } from '@/lib/stop-agent/stop-agent-storage'
 import { scheduledJobRuns } from './scheduledJobRuns'
 
+declare const __ASTER_REPORTER_EXTENSION_ID__: string
+
 const RETIRED_STORAGE_KEYS = [
   // The unshipped Tool Approvals feature.
   'local:tool-approval-config',
@@ -42,7 +44,11 @@ const cleanupRetiredStorage = async () => {
 }
 
 export default defineBackground(() => {
-  registerDiagnostics('browseros', getAgentServerUrl)
+  registerDiagnostics(
+    'browseros',
+    getAgentServerUrl,
+    __ASTER_REPORTER_EXTENSION_ID__,
+  )
   // One background broker owns the long-lived server subscription and all
   // panel-routing effects; individual React panels can come and go freely.
   const conversationPanelBroker = createConversationPanelBroker()

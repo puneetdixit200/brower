@@ -85,7 +85,7 @@ index 661831f8e98d65b9e2b4767f3424b49701be4665..d5964284f8c649152a271de1915bc1a9
  #if BUILDFLAG(IS_CHROMEOS)
  // Returns the app id of the kiosk app associated with the current user session.
  // Returns nullopt for non-kiosk user sessions and for ARCVM kiosk sessions,
-@@ -732,6 +801,26 @@ void StartupBrowserCreator::LaunchBrowser(
+@@ -732,6 +801,27 @@ void StartupBrowserCreator::LaunchBrowser(
        command_line, {profile, StartupProfileMode::kBrowserWindow});
  
    if (!IsSilentLaunchEnabled(command_line, profile)) {
@@ -94,7 +94,8 @@ index 661831f8e98d65b9e2b4767f3424b49701be4665..d5964284f8c649152a271de1915bc1a9
 +      browseros::onboarding::NeutralizeUpstreamFirstRun();
 +    }
 +
-+    if (!command_line.HasSwitch(switches::kNoFirstRun) &&
++    if ((browseros::IsBrowserOSProduct() || browseros::IsBrowserClawProduct()) &&
++        !command_line.HasSwitch(switches::kNoFirstRun) &&
 +        browseros::onboarding::ShouldShow(profile)) {
 +      // BrowserOS onboarding is now the first-run experience. Stand down
 +      // Chromium's DICE first-run so it does not re-intercept the browser

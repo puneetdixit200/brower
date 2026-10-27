@@ -31,6 +31,18 @@ SOURCE_RESOURCES = {
         extension_name="browserclaw",
         onboarding_component="claw-onboard",
     ),
+    # These names are deliberately Aster-owned. The repository does not yet
+    # publish/build an Aster CRX, onboarding bundle, or native server, so
+    # source mode fails closed at the missing extension provider rather than
+    # silently selecting BrowserOS resources.
+    "aster": SourceResources(
+        product_id="aster",
+        server_component="aster-server",
+        extension_component="aster-app",
+        extension_name="aster",
+        onboarding_component="aster-onboard",
+        external_extension_names=(),
+    ),
 }
 
 

@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..c383a4374cc5a7bd4c4408c4efbdeb7d96acdc23
 --- /dev/null
 +++ b/chrome/browser/browseros/server/browseros_server_config.cc
-@@ -0,0 +1,178 @@
+@@ -0,0 +1,204 @@
 +// Copyright 2024 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -24,6 +24,7 @@ index 0000000000000000000000000000000000000000..c383a4374cc5a7bd4c4408c4efbdeb7d
 +    FILE_PATH_LITERAL("config.json"),
 +    "/system/health",
 +    true,
++    true,
 +    {
 +        // Empty state dir keeps the legacy .browseros/current_version layout.
 +        FILE_PATH_LITERAL(""),
@@ -41,6 +42,7 @@ index 0000000000000000000000000000000000000000..c383a4374cc5a7bd4c4408c4efbdeb7d
 +    FILE_PATH_LITERAL("config.json"),
 +    "/system/health",
 +    true,
++    true,
 +    {
 +        // Isolate Claw OTA state under .browseros/BrowserClawServer/.
 +        FILE_PATH_LITERAL("BrowserClawServer"),
@@ -54,6 +56,23 @@ index 0000000000000000000000000000000000000000..c383a4374cc5a7bd4c4408c4efbdeb7d
 +
 +}  // namespace
 +
++constexpr ManagedServerDescriptor kAsterServerDescriptor = {
++    Product::kAster,
++    "Aster server (resources not integrated)",
++    FILE_PATH_LITERAL("AsterServer"),
++    FILE_PATH_LITERAL("aster_server"),
++    FILE_PATH_LITERAL("config.json"),
++    "/system/health",
++    false,  // No Aster server binary/resources are registered yet.
++    false,  // Never query BrowserOS/BrowserClaw release feeds.
++    {
++        FILE_PATH_LITERAL("AsterServer"),
++        "",
++        "",
++        "",
++    },
++};
++
 +const ManagedServerDescriptor& GetBrowserOSServerDescriptor() {
 +  return kBrowserOSServerDescriptor;
 +}
@@ -62,7 +81,14 @@ index 0000000000000000000000000000000000000000..c383a4374cc5a7bd4c4408c4efbdeb7d
 +  return kBrowserClawServerDescriptor;
 +}
 +
++const ManagedServerDescriptor& GetAsterServerDescriptor() {
++  return kAsterServerDescriptor;
++}
++
 +const ManagedServerDescriptor& GetManagedServerDescriptor() {
++  if (IsAsterProduct()) {
++    return GetAsterServerDescriptor();
++  }
 +  if (IsBrowserClawProduct()) {
 +    return GetBrowserClawServerDescriptor();
 +  }

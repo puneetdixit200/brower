@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000..e35cbdaf72a25
 --- /dev/null
 +++ b/chrome/browser/browseros/core/browseros_product.h
-@@ -0,0 +1,89 @@
+@@ -0,0 +1,110 @@
 +// Copyright 2024 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -25,14 +25,19 @@ index 0000000000000..e35cbdaf72a25
 +enum class Product {
 +  kBrowserOS,
 +  kBrowserClaw,
++  kAster,
 +};
 +
-+static_assert(BUILDFLAG(BROWSEROS_PRODUCT_BROWSEROS) !=
-+                  BUILDFLAG(BROWSEROS_PRODUCT_BROWSERCLAW),
++static_assert(BUILDFLAG(BROWSEROS_PRODUCT_BROWSEROS) +
++                  BUILDFLAG(BROWSEROS_PRODUCT_BROWSERCLAW) +
++                  BUILDFLAG(BROWSEROS_PRODUCT_ASTER) ==
++              1,
 +              "Exactly one BrowserOS product must be selected");
 +
 +inline Product GetBakedProduct() {
-+#if BUILDFLAG(BROWSEROS_PRODUCT_BROWSERCLAW)
++#if BUILDFLAG(BROWSEROS_PRODUCT_ASTER)
++  return Product::kAster;
++#elif BUILDFLAG(BROWSEROS_PRODUCT_BROWSERCLAW)
 +  return Product::kBrowserClaw;
 +#else
 +  return Product::kBrowserOS;
@@ -57,7 +62,12 @@ index 0000000000000..e35cbdaf72a25
 +inline Product GetProduct() {
 +  const Product baked_product = GetBakedProduct();
 +
-+#if BUILDFLAG(BROWSEROS_ALLOW_RUNTIME_PRODUCT_OVERRIDE)
++#if BUILDFLAG(BROWSEROS_PRODUCT_ASTER)
++  // Aster has no foreign product resource, server, or telemetry fallback.
++  // Keep it bound to its baked identity even if a launcher supplies the
++  // BrowserOS-only development override switch.
++  return baked_product;
++#elif BUILDFLAG(BROWSEROS_ALLOW_RUNTIME_PRODUCT_OVERRIDE)
 +  if (!base::CommandLine::InitializedForCurrentProcess()) {
 +    return baked_product;
 +  }
@@ -88,6 +98,15 @@ index 0000000000000..e35cbdaf72a25
 +
 +inline bool IsBrowserClawProduct() {
 +  return GetProduct() == Product::kBrowserClaw;
++}
++
++inline bool IsAsterProduct() {
++  return GetProduct() == Product::kAster;
++}
++
++// Native BrowserOS/PostHog event upload has no Aster consent flow yet.
++inline bool IsNativeTelemetryEnabled() {
++  return !IsAsterProduct();
 +}
 +
 +}  // namespace browseros

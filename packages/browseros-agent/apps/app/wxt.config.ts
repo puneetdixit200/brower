@@ -1,16 +1,21 @@
-import { REPORTER_EXTENSION_ID } from '@browseros/diagnostics/contract'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'wxt'
 import { archiveSourceMaps } from './lib/build/archive-source-maps'
-import { LEGACY_AGENT_EXTENSION_ID } from './lib/constants/legacyAgentExtensionId'
-import { PRODUCT_WEB_HOST } from './lib/constants/productWebHost'
+import {
+  getAsterCompatibilityExtensionIds,
+  getAsterManifestIdentity,
+  getAsterProductWebMatches,
+} from './lib/build/aster-manifest-identity'
 
 // biome-ignore lint/style/noProcessEnv: build config file needs env access
 const env = process.env
+const manifestIdentity = getAsterManifestIdentity(env)
+const compatibilityExtensionIds = getAsterCompatibilityExtensionIds(env)
+const productWebMatches = getAsterProductWebMatches(env)
 
 // See https://wxt.dev/api/config.html
-// Extension ID will be bflpfmnmnokmjhmgnolecpppdbdophmk
+// Extension IDs are derived from the explicitly configured Aster public key.
 export default defineConfig({
   outDir: 'dist',
   modules: ['@wxt-dev/module-react'],
@@ -22,24 +27,20 @@ export default defineConfig({
   manifest: {
     name: 'Aster Browser',
     description: 'Aster Browser with a built-in AI workspace.',
-    key: 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvBDAaDRvv61NpBeLR8etBRw82lv9VJO3sz/mA26gDzWKtVuzW4DXCl8Zfj5oWmoXLTfv3aiTigUXo/LHOoGpSucEVroMmAc7cgu2KuQ1fZPpMvYa0npD/m4h89360q8Oz0oKKaZGS905IJ04M2IkF4CuU3YEHFJBWb+cUyK9H8YVugelYbPD0IVs63T1SkGbh/t/Tfb2DpkinduSO8+x26sKydm30SRt+iZ2+7Nolcdum3LExInUiX2Pgb65Jb+mVw8NqyTVJyCEp8uq0cSHomWFQirSJ80tsDhISp4btwaRKHrXqovQx9XHQv4hCd+3LuB830eUEVMUNuCO+OyPxQIDAQAB',
-    update_url: 'https://cdn.browseros.com/extensions/update-manifest.xml',
-    // update_url: 'https://cdn.browseros.com/extensions/update-manifest.alpha.xml',
-    // The bug reporter is the only thing that connects in. The account site
-    // used to as well, to hand its sign-in result back to the extension.
-    externally_connectable: {
-      ids: [REPORTER_EXTENSION_ID],
-    },
-    web_accessible_resources: [
-      {
-        resources: ['app.html'],
-        matches: [
-          `https://${PRODUCT_WEB_HOST}/*`,
-          `https://*.${PRODUCT_WEB_HOST}/*`,
-        ],
-        extension_ids: [LEGACY_AGENT_EXTENSION_ID],
-      },
-    ],
+    ...manifestIdentity,
+    ...(productWebMatches.length
+      ? {
+          web_accessible_resources: [
+            {
+              resources: ['app.html'],
+              matches: productWebMatches,
+              ...(compatibilityExtensionIds.length
+                ? { extension_ids: compatibilityExtensionIds }
+                : {}),
+            },
+          ],
+        }
+      : {}),
     chrome_url_overrides: {
       newtab: 'app.html',
     },
@@ -76,6 +77,11 @@ export default defineConfig({
     host_permissions: ['http://127.0.0.1/*'],
   },
   vite: () => ({
+    define: {
+      __ASTER_REPORTER_EXTENSION_ID__: JSON.stringify(
+        manifestIdentity.externally_connectable.ids[0] ?? '',
+      ),
+    },
     build: {
       sourcemap: 'hidden',
     },

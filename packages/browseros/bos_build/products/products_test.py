@@ -4,6 +4,7 @@
 import unittest
 
 from bos_build.core.products import (
+    ASTER_EXTENSION_ID,
     LinuxProductIdentity,
     MacProductIdentity,
     ProductDescriptor,
@@ -63,6 +64,7 @@ EXPECTED_BROWSEROS = ProductDescriptor(
         app_user_model_id="BrowserOS.BrowserOS",
         installer_app_id="{5d8d08af-2df9-4da2-86c1-eac353a0ca32}",
     ),
+    supported_platforms=("linux", "macos", "windows"),
 )
 
 EXPECTED_BROWSERCLAW = ProductDescriptor(
@@ -111,6 +113,7 @@ EXPECTED_BROWSERCLAW = ProductDescriptor(
         app_user_model_id="BrowserOS.BrowserClaw",
         installer_app_id="{FA2AFFF8-647B-477C-A5D2-905BA8DB9B82}",
     ),
+    supported_platforms=("linux", "macos", "windows"),
 )
 
 
@@ -156,9 +159,38 @@ class DefineBehaviorTest(unittest.TestCase):
 
 
 class RegistryTest(unittest.TestCase):
-    def test_registry_has_both_products_and_default(self):
-        self.assertEqual(set(PRODUCTS), {"browseros", "browserclaw"})
+    def test_registry_has_all_products_and_default(self):
+        self.assertEqual(set(PRODUCTS), {"browseros", "browserclaw", "aster"})
         self.assertEqual(DEFAULT_PRODUCT_ID, "browseros")
+
+    def test_aster_has_distinct_linux_identity_and_no_browseros_reporter(self):
+        product = get_product_descriptor("aster")
+
+        self.assertEqual(product.id, "aster")
+        self.assertEqual(product.display_name, "Aster Browser")
+        self.assertEqual(product.linux.package_name, "aster")
+        self.assertEqual(product.linux.launcher_name, "aster")
+        self.assertEqual(product.linux.desktop_id, "aster.desktop")
+        self.assertEqual(product.linux.icon_name, "aster")
+        self.assertEqual(product.linux.lib_dir, "/usr/lib/aster")
+        self.assertEqual(product.linux.appimage_dir, "/opt/aster")
+        self.assertEqual(product.linux.apparmor_profile_name, "aster")
+        self.assertEqual(product.linux.metainfo_id, "aster.desktop")
+        self.assertEqual(
+            product.required_extension_ids, ((ASTER_EXTENSION_ID, "Aster app"),)
+        )
+        self.assertEqual(product.server_bundle_ids, ())
+        self.assertEqual(product.homepage_url, "")
+        self.assertEqual(product.support_url, "")
+        self.assertEqual(product.bugtracker_url, "")
+        self.assertEqual(product.supported_platforms, ("linux",))
+        self.assertEqual(product.mac.bundle_id, "org.aster.invalid.AsterBrowser")
+        self.assertEqual(
+            product.windows.installer_app_id,
+            "{00000000-0000-0000-0000-000000000000}",
+        )
+        with self.assertRaisesRegex(ValueError, "supports linux only"):
+            product.require_platform("macos")
 
     def test_unknown_product_raises(self):
         with self.assertRaisesRegex(ValueError, "Unknown build.product"):

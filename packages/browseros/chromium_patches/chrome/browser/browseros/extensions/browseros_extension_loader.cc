@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..c7fb41d2ca313acc489b49396a4116659ae3eb7e
 --- /dev/null
 +++ b/chrome/browser/browseros/extensions/browseros_extension_loader.cc
-@@ -0,0 +1,645 @@
+@@ -0,0 +1,654 @@
 +// Copyright 2024 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -65,11 +65,12 @@ index 0000000000000000000000000000000000000000..c7fb41d2ca313acc489b49396a411665
 +BrowserOSExtensionLoader::BrowserOSExtensionLoader(Profile* profile)
 +    : profile_(profile),
 +      config_url_(
-+          base::FeatureList::IsEnabled(features::kBrowserOsAlphaFeatures)
-+              ? kBrowserOSAlphaConfigUrl
-+              : kBrowserOSConfigUrl),
-+      primary_id_(IsBrowserClawProduct() ? kBrowserClawExtensionId
-+                                         : kAgentExtensionId),
++          IsAsterProduct()
++              ? GURL()
++              : (base::FeatureList::IsEnabled(features::kBrowserOsAlphaFeatures)
++                     ? kBrowserOSAlphaConfigUrl
++                     : kBrowserOSConfigUrl)),
++      primary_id_(GetPrimaryBrowserOSExtensionId()),
 +      installer_(std::make_unique<BrowserOSExtensionInstaller>()),
 +      maintainer_(std::make_unique<BrowserOSExtensionMaintainer>(profile)) {
 +  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
@@ -403,11 +404,13 @@ index 0000000000000000000000000000000000000000..c7fb41d2ca313acc489b49396a411665
 +      // Omitting them would make external-provider orphan cleanup uninstall
 +      // them. Chromium skips URL installs for an already installed extension.
 +      base::DictValue retained;
-+      retained.Set(
-+          extensions::ExternalProviderImpl::kExternalUpdateUrl,
-+          base::FeatureList::IsEnabled(features::kBrowserOsAlphaFeatures)
-+              ? kBrowserOSAlphaUpdateUrl
-+              : kBrowserOSUpdateUrl);
++      if (!IsAsterProduct()) {
++        retained.Set(
++            extensions::ExternalProviderImpl::kExternalUpdateUrl,
++            base::FeatureList::IsEnabled(features::kBrowserOsAlphaFeatures)
++                ? kBrowserOSAlphaUpdateUrl
++                : kBrowserOSUpdateUrl);
++      }
 +      prefs.Set(id, std::move(retained));
 +    }
 +  }
@@ -479,6 +482,12 @@ index 0000000000000000000000000000000000000000..c7fb41d2ca313acc489b49396a411665
 +    FinishReadiness(true);
 +    return;
 +  }
++  if (!HasUsableLocalPrimary() && IsAsterProduct()) {
++    LOG(ERROR) << "aster: required bundled extension is unavailable; "
++                  "remote recovery is disabled";
++    FinishReadiness(false);
++    return;
++  }
 +  if (!HasUsableLocalPrimary() && !remote_requested_) {
 +    // Config fetches never delay LoadFinished. Only the absence of a usable
 +    // local primary permits recovery before READY; all other network work is
@@ -497,8 +506,8 @@ index 0000000000000000000000000000000000000000..c7fb41d2ca313acc489b49396a411665
 +
 +void BrowserOSExtensionLoader::CheckForUpdates() {
 +  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-+  if (!profile_ || !local_discovery_complete_ || remote_requested_ ||
-+      (!maintenance_started_ && !waiting_for_ready_) ||
++  if (IsAsterProduct() || !profile_ || !local_discovery_complete_ ||
++      remote_requested_ || (!maintenance_started_ && !waiting_for_ready_) ||
 +      (waiting_for_ready_ && HasUsableLocalPrimary())) {
 +    return;
 +  }

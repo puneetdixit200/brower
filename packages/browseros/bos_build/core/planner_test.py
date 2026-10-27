@@ -23,6 +23,23 @@ UNIVERSAL = Switches(preset="release", architectures=("universal",))
 
 
 class ReleaseGoldenTest(unittest.TestCase):
+    def test_aster_rejects_non_linux_planning(self):
+        with self.assertRaisesRegex(ValueError, "supports linux only"):
+            plan(
+                Switches(preset="release", product="aster"), "x64", "macos"
+            )
+
+    def test_aster_rejects_non_linux_universal_planning(self):
+        with self.assertRaisesRegex(ValueError, "supports linux only"):
+            plan_runs(
+                Switches(
+                    preset="release",
+                    product="aster",
+                    architectures=("universal",),
+                ),
+                "macos",
+            )
+
     def test_macos_arm64_signed(self):
         # release.browseros.macos.arm64.yaml / release.macos.arm64.yaml
         self.assertEqual(
@@ -754,6 +771,22 @@ class DownloadSwitchTest(unittest.TestCase):
 
 
 class UniversalRunsTest(unittest.TestCase):
+    def test_supported_products_keep_universal_planning(self):
+        for product in ("browseros", "browserclaw"):
+            with self.subTest(product=product):
+                runs = plan_runs(
+                    Switches(
+                        preset="release",
+                        product=product,
+                        architectures=("universal",),
+                    ),
+                    "macos",
+                )
+                self.assertEqual(
+                    [arch for arch, _ in runs], ["arm64", "x64", "universal"]
+                )
+                self.assertIn("merge_universal", runs[-1][1])
+
     def test_flat_plan_rejects_universal(self):
         with self.assertRaisesRegex(ValueError, "plan_runs"):
             plan(RELEASE, "universal", "macos")

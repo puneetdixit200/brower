@@ -794,6 +794,7 @@ def _resolve_modules_profile(
     steps = list(prof.modules or ())
     validate_pipeline(steps, AVAILABLE_MODULES)
     eff_product = product or prof.switches.product
+    get_product_descriptor(eff_product).require_platform(get_platform())
     profile_arch = (
         prof.switches.architectures[0] if prof.switches.architectures else None
     )

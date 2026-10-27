@@ -1,0 +1,18 @@
+# Aster does not configure enterprise companion crash reporting or telemetry.
+import("//build/config/chrome_build.gni")
+
+enterprise_companion_crash_product_name = "Aster_Enterprise_Companion"
+enterprise_companion_crash_upload_url = ""
+enterprise_companion_appid = "{A57E2000-0000-4000-8000-000000000002}"
+enterprise_companion_company_short_name = "Aster"
+enterprise_companion_company_short_name_lowercase = "aster"
+enterprise_companion_company_short_name_uppercase = "ASTER"
+enterprise_companion_product_full_name = "AsterEnterpriseCompanion"
+enterprise_companion_product_full_name_dashed_lowercase = "aster-enterprise-companion"
+enterprise_companion_keystone_app_name = "AsterSoftwareUpdate"
+mac_enterprise_companion_bundle_identifier = "org.aster.AsterEnterpriseCompanion"
+
+enterprise_companion_device_management_server_url = ""
+enterprise_companion_device_management_realtime_reporting_url = ""
+enterprise_companion_device_management_encrypted_reporting_url = ""
+enterprise_companion_event_logging_url = ""

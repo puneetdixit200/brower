@@ -71,7 +71,7 @@ describe('createApiRoutes', () => {
         method: 'POST',
         headers: {
           Host: 'localhost',
-          Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+          Origin: 'chrome-extension://oifdmombnijnaiocijiacjhajbnpdlhb',
         },
       },
       localServer,
@@ -88,6 +88,34 @@ describe('createApiRoutes', () => {
       status: 'ok',
       cdpConnected: false,
     })
+  })
+
+  it('mounts privacy consent routes and advertises trusted PUT preflight', async () => {
+    const app = createTestApp()
+    const blocked = await app.request(
+      '/privacy/telemetry/state',
+      { method: 'POST', headers: { Host: 'localhost' } },
+      localServer,
+    )
+    expect(blocked.status).toBe(403)
+
+    const preflight = await app.request(
+      '/privacy/telemetry',
+      {
+        method: 'OPTIONS',
+        headers: {
+          Host: 'localhost',
+          Origin: 'chrome-extension://oifdmombnijnaiocijiacjhajbnpdlhb',
+          'Access-Control-Request-Method': 'PUT',
+          'Access-Control-Request-Headers': 'content-type',
+        },
+      },
+      localServer,
+    )
+    expect(preflight.status).toBe(204)
+    expect(preflight.headers.get('Access-Control-Allow-Methods')).toContain(
+      'PUT',
+    )
   })
 
   it('keeps the health compatibility route', async () => {
@@ -140,7 +168,7 @@ describe('createApiRoutes', () => {
       {
         headers: {
           Host: 'localhost',
-          Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+          Origin: 'chrome-extension://oifdmombnijnaiocijiacjhajbnpdlhb',
         },
       },
       localServer,
@@ -158,7 +186,7 @@ describe('createApiRoutes', () => {
       {
         headers: {
           Host: 'localhost',
-          Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+          Origin: 'chrome-extension://oifdmombnijnaiocijiacjhajbnpdlhb',
         },
       },
       localServer,
@@ -183,7 +211,7 @@ describe('createApiRoutes', () => {
         method: 'POST',
         headers: {
           Host: 'localhost',
-          Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+          Origin: 'chrome-extension://oifdmombnijnaiocijiacjhajbnpdlhb',
         },
       },
       localServer,
@@ -200,7 +228,7 @@ describe('createApiRoutes', () => {
       {
         headers: {
           Host: 'localhost',
-          Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+          Origin: 'chrome-extension://oifdmombnijnaiocijiacjhajbnpdlhb',
         },
       },
       localServer,
@@ -233,7 +261,7 @@ describe('createApiRoutes', () => {
         method: 'POST',
         headers: {
           Host: 'localhost',
-          Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+          Origin: 'chrome-extension://oifdmombnijnaiocijiacjhajbnpdlhb',
         },
       },
       localServer,
@@ -268,7 +296,7 @@ describe('createApiRoutes', () => {
       {
         headers: {
           Host: 'localhost',
-          Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+          Origin: 'chrome-extension://oifdmombnijnaiocijiacjhajbnpdlhb',
         },
       },
       localServer,
@@ -294,7 +322,7 @@ describe('createApiRoutes', () => {
         method: 'POST',
         headers: {
           Host: 'localhost',
-          Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+          Origin: 'chrome-extension://oifdmombnijnaiocijiacjhajbnpdlhb',
         },
       },
       localServer,
@@ -327,7 +355,7 @@ describe('createApiRoutes', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+          Origin: 'chrome-extension://oifdmombnijnaiocijiacjhajbnpdlhb',
         },
         body,
       },
@@ -402,7 +430,7 @@ describe('createApiRoutes', () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+            Origin: 'chrome-extension://oifdmombnijnaiocijiacjhajbnpdlhb',
           },
           body,
         },

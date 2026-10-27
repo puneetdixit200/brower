@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..3e6c8d9cbb478e9d3dc59fa2e63ba93482b95080
 --- /dev/null
 +++ b/chrome/browser/browseros/server/browseros_server_config_unittest.cc
-@@ -0,0 +1,228 @@
+@@ -0,0 +1,257 @@
 +// Copyright 2024 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -14,6 +14,7 @@ index 0000000000000000000000000000000000000000..3e6c8d9cbb478e9d3dc59fa2e63ba934
 +
 +#include "base/test/scoped_command_line.h"
 +#include "chrome/browser/browseros/buildflags.h"
++#include "chrome/browser/browseros/core/browseros_constants.h"
 +#include "chrome/browser/browseros/core/browseros_switches.h"
 +#include "testing/gtest/include/gtest/gtest.h"
 +
@@ -25,7 +26,9 @@ index 0000000000000000000000000000000000000000..3e6c8d9cbb478e9d3dc59fa2e63ba934
 +}
 +
 +Product BakedProduct() {
-+#if BUILDFLAG(BROWSEROS_PRODUCT_BROWSERCLAW)
++#if BUILDFLAG(BROWSEROS_PRODUCT_ASTER)
++  return Product::kAster;
++#elif BUILDFLAG(BROWSEROS_PRODUCT_BROWSERCLAW)
 +  return Product::kBrowserClaw;
 +#else
 +  return Product::kBrowserOS;
@@ -72,6 +75,20 @@ index 0000000000000000000000000000000000000000..3e6c8d9cbb478e9d3dc59fa2e63ba934
 +  EXPECT_EQ(BakedProduct(), GetProduct());
 +}
 +
++#if BUILDFLAG(BROWSEROS_PRODUCT_ASTER)
++TEST(BrowserOSProductTest, AsterIgnoresForeignProductSwitch) {
++  base::test::ScopedCommandLine scoped_command_line;
++  scoped_command_line.GetProcessCommandLine()->AppendSwitchASCII(
++      kBrowserOSProduct, "browseros");
++
++  EXPECT_EQ(Product::kAster, GetProduct());
++  EXPECT_FALSE(IsNativeTelemetryEnabled());
++  EXPECT_TRUE(IsActiveBrowserOSExtension(kAsterAgentExtensionId));
++  EXPECT_FALSE(IsActiveBrowserOSExtension(kAgentExtensionId));
++  EXPECT_FALSE(IsActiveBrowserOSExtension(kBugReporterExtensionId));
++}
++#endif
++
 +#if !BUILDFLAG(BROWSEROS_ALLOW_RUNTIME_PRODUCT_OVERRIDE)
 +TEST(BrowserOSProductTest, IgnoresProductSwitchWhenOverrideDisabled) {
 +  base::test::ScopedCommandLine scoped_command_line;
@@ -112,6 +129,7 @@ index 0000000000000000000000000000000000000000..3e6c8d9cbb478e9d3dc59fa2e63ba934
 +  EXPECT_EQ(base::FilePath::StringType(FILE_PATH_LITERAL("config.json")),
 +            ToPathString(descriptor.config_file_name));
 +  EXPECT_EQ(std::string_view("/system/health"), descriptor.health_path);
++  EXPECT_TRUE(descriptor.enable_server);
 +  EXPECT_TRUE(descriptor.enable_updater);
 +
 +  // Empty state dir preserves the legacy .browseros/current_version layout.
@@ -137,6 +155,7 @@ index 0000000000000000000000000000000000000000..3e6c8d9cbb478e9d3dc59fa2e63ba934
 +  EXPECT_EQ(base::FilePath::StringType(FILE_PATH_LITERAL("config.json")),
 +            ToPathString(descriptor.config_file_name));
 +  EXPECT_EQ(std::string_view("/system/health"), descriptor.health_path);
++  EXPECT_TRUE(descriptor.enable_server);
 +  EXPECT_TRUE(descriptor.enable_updater);
 +
 +  // Claw isolates OTA state under .browseros/BrowserClawServer/ and fetches its
@@ -158,6 +177,20 @@ index 0000000000000000000000000000000000000000..3e6c8d9cbb478e9d3dc59fa2e63ba934
 +
 +  EXPECT_EQ(GetProduct(), descriptor.product);
 +}
++
++#if BUILDFLAG(BROWSEROS_PRODUCT_ASTER)
++TEST(BrowserOSServerConfigTest, AsterHasNoForeignServerOrUpdaterFallback) {
++  const ManagedServerDescriptor& descriptor = GetManagedServerDescriptor();
++
++  EXPECT_EQ(Product::kAster, descriptor.product);
++  EXPECT_FALSE(descriptor.enable_server);
++  EXPECT_FALSE(descriptor.enable_updater);
++  EXPECT_EQ(std::string_view("aster_server"), descriptor.binary_name);
++  EXPECT_TRUE(descriptor.updater.appcast_url.empty());
++  EXPECT_TRUE(descriptor.updater.alpha_appcast_url.empty());
++  EXPECT_TRUE(descriptor.updater.readiness_path.empty());
++}
++#endif
 +
 +#if BUILDFLAG(BROWSEROS_ALLOW_RUNTIME_PRODUCT_OVERRIDE)
 +TEST(BrowserOSServerConfigTest, ManagedDescriptorFollowsRuntimeOverride) {

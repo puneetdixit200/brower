@@ -5,9 +5,11 @@ import {
 
 export const SERVER_BUNDLE_ENTRYPOINT = 'apps/server/src/compiled-bootstrap.ts'
 
-const REQUIRED_PROD_VARS = ['POSTHOG_API_KEY', 'SENTRY_DSN']
+// Telemetry is opt-in at runtime; production binaries must build without keys.
+const REQUIRED_PROD_VARS: string[] = []
 const INLINED_ENV_VARS = [
-  ...REQUIRED_PROD_VARS,
+  'POSTHOG_API_KEY',
+  'SENTRY_DSN',
   'NODE_ENV',
   'LOG_LEVEL',
 ] as const

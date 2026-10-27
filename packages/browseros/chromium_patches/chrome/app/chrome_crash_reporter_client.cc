@@ -10,7 +10,7 @@ index 64912e538f3b0b4acfbb21e0cd94a27b4329c7a2..fecf93d66ea720a3c4dab020e89037e1
  #include "chrome/common/channel_info.h"
  #include "chrome/common/chrome_paths.h"
  #include "chrome/common/chrome_paths_internal.h"
-@@ -134,19 +135,19 @@ void ChromeCrashReporterClient::GetProductInfo(ProductInfo* product_info) {
+@@ -134,18 +135,21 @@ void ChromeCrashReporterClient::GetProductInfo(ProductInfo* product_info) {
  
    const char* product_name = "";
  #if BUILDFLAG(IS_ANDROID)
@@ -20,8 +20,10 @@ index 64912e538f3b0b4acfbb21e0cd94a27b4329c7a2..fecf93d66ea720a3c4dab020e89037e1
 -  product_name = "Chrome_ChromeOS";
 +  product_name = "BrowserOS_ChromeOS";
  #elif BUILDFLAG(IS_LINUX)
- #if defined(ADDRESS_SANITIZER)
--  product_name = "Chrome_Linux_ASan";
+-#if defined(ADDRESS_SANITIZER)
++#if BUILDFLAG(BROWSEROS_PRODUCT_ASTER)
++  product_name = "Aster_Linux";
++#elif defined(ADDRESS_SANITIZER)
 +  product_name = "BrowserOS_Linux_ASan";
  #else
 -  product_name = "Chrome_Linux";
@@ -36,7 +38,7 @@ index 64912e538f3b0b4acfbb21e0cd94a27b4329c7a2..fecf93d66ea720a3c4dab020e89037e1
  #else
    NOTREACHED();
  #endif
-@@ -172,42 +173,8 @@ bool ChromeCrashReporterClient::IsRunningUnattended() {
+@@ -172,42 +176,10 @@ bool ChromeCrashReporterClient::IsRunningUnattended() {
  }
  
  bool ChromeCrashReporterClient::GetCollectStatsConsent() {
@@ -77,15 +79,20 @@ index 64912e538f3b0b4acfbb21e0cd94a27b4329c7a2..fecf93d66ea720a3c4dab020e89037e1
 -  return settings_consent;
 -#endif  // BUILDFLAG(IS_ANDROID)
 +  // Enable crash reporting.
-+  return true;
++  // Aster has no native crash-reporting consent flow yet. BrowserOS and
++  // BrowserClaw preserve their existing behavior.
++  return !browseros::IsAsterProduct();
  }
  
  #if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
-@@ -250,3 +217,7 @@ ChromeCrashReporterClient::GetUserStreamSharedMemoryRegions() {
+@@ -250,3 +222,10 @@ ChromeCrashReporterClient::GetUserStreamSharedMemoryRegions() {
  
    return streams;
  }
 +
 +std::string ChromeCrashReporterClient::GetUploadUrl() {
++  if (browseros::IsAsterProduct()) {
++    return std::string();
++  }
 +  return browseros::kSentryMinidumpUrl;
 +}

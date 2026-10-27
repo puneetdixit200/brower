@@ -10,7 +10,9 @@ import { logger } from '../../lib/logger'
 export type CorsOptions = Parameters<typeof cors>[0]
 
 const STATIC_ALLOWED_ORIGINS = new Set<string>([
-  'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+  // Aster's stable development extension origin. BrowserOS origins are only
+  // trusted when a deployment explicitly lists them in BROWSEROS_TRUSTED_ORIGINS.
+  'chrome-extension://oifdmombnijnaiocijiacjhajbnpdlhb',
 ])
 const EXTENSION_PROTOCOLS = new Set(['chrome-extension:', 'moz-extension:'])
 
@@ -79,7 +81,7 @@ export const defaultCorsConfig: CorsOptions = {
     if (origin && isAllowedOrigin(origin)) return origin
     return null
   },
-  allowMethods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'Accept'],
   credentials: true,
 }

@@ -9,6 +9,12 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { AcpAgentRuntime } from '../../lib/agents/acp/acp-agent-runtime'
 import type { OAuthTokenManager } from '../../lib/clients/oauth/token-manager'
+import { updateMetricsConsent } from '../../lib/metrics'
+import {
+  reloadTelemetryConsent,
+  setTelemetryConsent,
+} from '../../lib/privacy/telemetry-consent'
+import { disableTelemetrySentry, enableTelemetrySentry } from '../../lib/sentry'
 import { requireTrustedOrigin } from '../middleware/require-trusted-origin'
 import { ConversationRuns } from '../services/conversation-runs'
 import type { KlavisService } from '../services/klavis'
@@ -26,6 +32,7 @@ import { createMcpRoutes } from './mcp'
 import { createMcpManagerRoutes } from './mcp-manager'
 import { createMemoryRoutes } from './memory'
 import { createOAuthRoutes } from './oauth'
+import { createPrivacyHandlers, type PrivacyRouteDependencies } from './privacy'
 import { createProviderRoutes } from './provider'
 import { createProvidersRoutes } from './providers'
 import { createRefinePromptRoutes } from './refine-prompt'
@@ -39,6 +46,7 @@ interface CreateApiRoutesDeps {
   config: HttpServerConfig
   klavis: KlavisService
   onShutdown: () => void
+  privacy?: PrivacyRouteDependencies
   tokenManager: OAuthTokenManager | null
 }
 
@@ -71,30 +79,58 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
           discardPersistentState: true,
         }),
     })
+  const privacyHandlers = createPrivacyHandlers(
+    deps.privacy ?? {
+      readConsent: reloadTelemetryConsent,
+      setConsent: setTelemetryConsent,
+      applyConsent: async ({ enabled, revision }) => {
+        await disableTelemetrySentry()
+        if (enabled) {
+          const current = await reloadTelemetryConsent()
+          if (current.enabled && current.revision === revision) {
+            enableTelemetrySentry(revision)
+          }
+        }
+        await updateMetricsConsent(enabled, revision)
+      },
+    },
+  )
+
+  const app = new Hono<Env>()
+  app.use('/*', cors(defaultCorsConfig))
+  app.use('/*', requireTrustedOrigin())
+  app.use('/privacy/*', async (c, next) => {
+    if (c.req.method === 'POST' && c.req.path === '/privacy/telemetry/state') {
+      return privacyHandlers.read(c, next)
+    }
+    if (c.req.method === 'PUT' && c.req.path === '/privacy/telemetry') {
+      return privacyHandlers.write(c, next)
+    }
+    return next()
+  })
+
+  // Register path guards before mounting routes; Hono middleware is
+  // evaluated in registration order.
+  app.use('/acpx/probe/*', requireTrustedAppOrigin())
+  app.use('/agents/*', requireTrustedAppOrigin())
+  app.use('/conversations/*', requireTrustedAppOrigin())
+  app.use('/mcp-manager/*', requireTrustedAppOrigin())
+  app.use(
+    '/mcp-manager/access',
+    requireTrustedAppOrigin({ requireOrigin: true }),
+  )
+  app.use('/oauth/*', requireTrustedAppOrigin({ requireOrigin: true }))
+  app.use('/providers/*', requireTrustedAppOrigin())
+  app.use('/test-provider/*', requireTrustedAppOrigin())
+  app.use('/refine-prompt/*', requireTrustedAppOrigin())
+  app.use('/klavis/*', requireTrustedAppOrigin())
+  app.use('/scheduled-jobs/*', requireTrustedAppOrigin())
+  app.use('/scheduled-job-runs/*', requireTrustedAppOrigin())
+  app.use('/memory', requireTrustedAppOrigin())
+  app.use('/memory/*', requireTrustedAppOrigin())
 
   return (
-    new Hono<Env>()
-      .use('/*', cors(defaultCorsConfig))
-      .use('/*', requireTrustedOrigin())
-      // Register path guards before mounting routes; Hono middleware is
-      // evaluated in registration order.
-      .use('/acpx/probe/*', requireTrustedAppOrigin())
-      .use('/agents/*', requireTrustedAppOrigin())
-      .use('/conversations/*', requireTrustedAppOrigin())
-      .use('/mcp-manager/*', requireTrustedAppOrigin())
-      .use(
-        '/mcp-manager/access',
-        requireTrustedAppOrigin({ requireOrigin: true }),
-      )
-      .use('/oauth/*', requireTrustedAppOrigin({ requireOrigin: true }))
-      .use('/providers/*', requireTrustedAppOrigin())
-      .use('/test-provider/*', requireTrustedAppOrigin())
-      .use('/refine-prompt/*', requireTrustedAppOrigin())
-      .use('/klavis/*', requireTrustedAppOrigin())
-      .use('/scheduled-jobs/*', requireTrustedAppOrigin())
-      .use('/scheduled-job-runs/*', requireTrustedAppOrigin())
-      .use('/memory', requireTrustedAppOrigin())
-      .use('/memory/*', requireTrustedAppOrigin())
+    app
       .route('/system/health', createHealthRoute({ browser }))
       .route('/system/diagnostics', createDiagnosticsRoute(version))
       .route('/system/shutdown', createShutdownRoute({ onShutdown }))

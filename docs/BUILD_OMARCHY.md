@@ -8,7 +8,7 @@
 - Bubblewrap 0.13.1 is available at `/usr/bin/bwrap`; Linux `filesystem_bash` now fails closed without it and confines shell access to the selected workspace.
 - Go 1.27.3 installed user-locally; `go test ./...` passes for the dev supervisor. The Linux runner accepts `ASTER_BROWSER_BINARY` or `BROWSEROS_BINARY`, with `browseros` on PATH as fallback.
 - WXT development extension build passed with `NODE_OPTIONS=--max-old-space-size=4096`; output is `packages/browseros-agent/apps/app/dist/chrome-mv3-dev`.
-- Full Chromium build is intentionally deferred on this host because its RAM is below upstream guidance. No `--no-sandbox` workaround is permitted.
+- No full Chromium build has run. Rechecked resources are 14 GiB physical RAM, 29 GiB swap, 12 CPUs and about 288 GiB free disk. Below-recommended RAM is a resource risk rather than an automatic impossibility: the pinned compile step supports `BROWSEROS_NINJA_JOBS=2` for a supervised future trial. Aster GN/C++, server and extension resource integration must be ready first. Keep Chromium sandboxing enabled; no `--no-sandbox` workaround is permitted.
 
 ## Current local development commands
 

@@ -1,0 +1,23 @@
+{
+  "scope": "BrowserOS development extension only; explicit disposable BROWSEROS_DIR and browser profile; loopback-only namespace; valid dummy telemetry keys",
+  "normal_headed": {
+    "scope": "headed BrowserOS development extension; not native Aster package",
+    "checks": {
+      "initial_off": true,
+      "initial_receiver_count": 0,
+      "enabled_persisted": true,
+      "second_tab_reads_grant": true,
+      "cross_tab_revoke": true,
+      "page_reload_persistence": true,
+      "final_off": true,
+      "originless_denied": true,
+      "foreign_denied": true,
+      "idle_receiver_count": 0
+    }
+  },
+  "state_file_mode": "0600",
+  "workspace_typecheck": "passed",
+  "independent_review": "Latest app peer-revoke delta cleared; 11 targeted tests passed",
+  "advanced_headed": "Incomplete: timeout waiting for initial OFF in advanced harness. Offline/retry and sidecar restart gates remain open.",
+  "native_package_verified": false
+}

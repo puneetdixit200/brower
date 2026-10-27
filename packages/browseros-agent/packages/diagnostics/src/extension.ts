@@ -9,7 +9,6 @@ import {
   DIAGNOSTICS_TIMEOUT_MS,
   type DiagnosticsSnapshot,
   parseDiagnostics,
-  REPORTER_EXTENSION_ID,
   REPORTER_VERSION_REQUEST,
 } from './contract'
 
@@ -63,6 +62,7 @@ async function readServer(
 export async function collectBrowserDiagnostics(
   product: Product,
   resolveServerUrl: () => Promise<string>,
+  reporterExtensionId = '',
 ): Promise<DiagnosticsSnapshot> {
   const api = (chrome as unknown as { browserOS?: NativeVersions }).browserOS
   const safe = <T>(task: () => Promise<T>) =>
@@ -75,11 +75,13 @@ export async function collectBrowserDiagnostics(
       safe(() => chrome.system.cpu.getInfo()),
       safe(() => chrome.system.memory.getInfo()),
       safe(() => readServer(resolveServerUrl)),
-      safe(() =>
-        chrome.runtime.sendMessage(REPORTER_EXTENSION_ID, {
+      safe(() => {
+        if (!isConfiguredReporterId(reporterExtensionId))
+          return Promise.resolve(null)
+        return chrome.runtime.sendMessage(reporterExtensionId, {
           type: REPORTER_VERSION_REQUEST,
-        }),
-      ),
+        })
+      }),
     ])
   const osNames: Record<string, string> = {
     mac: 'macOS',
@@ -121,12 +123,21 @@ export function canReadDiagnostics(
   sender: { id?: string; url?: string },
   ownId: string,
   external: boolean,
+  reporterExtensionId = '',
 ): boolean {
-  if (external) return sender.id === REPORTER_EXTENSION_ID
+  if (external)
+    return (
+      isConfiguredReporterId(reporterExtensionId) &&
+      sender.id === reporterExtensionId
+    )
   return (
     sender.id === ownId &&
     !!sender.url?.startsWith(`chrome-extension://${ownId}/`)
   )
+}
+
+function isConfiguredReporterId(value: string): boolean {
+  return /^[a-p]{32}$/.test(value)
 }
 
 /**
@@ -136,9 +147,11 @@ export function canReadDiagnostics(
 export function registerDiagnostics(
   product: Product,
   resolveServerUrl: () => Promise<string>,
+  reporterExtensionId = '',
 ): void {
   const collector = createDiagnosticsCollector({
-    read: () => collectBrowserDiagnostics(product, resolveServerUrl),
+    read: () =>
+      collectBrowserDiagnostics(product, resolveServerUrl, reporterExtensionId),
     load: async () => (await chrome.storage.local.get(CACHE_KEY))[CACHE_KEY],
     save: async (snapshot) => {
       await chrome.storage.local.set({ [CACHE_KEY]: snapshot })
@@ -158,7 +171,15 @@ export function registerDiagnostics(
         request.type !== DIAGNOSTICS_REQUEST
       )
         return false
-      if (!canReadDiagnostics(sender, chrome.runtime.id, external)) return false
+      if (
+        !canReadDiagnostics(
+          sender,
+          chrome.runtime.id,
+          external,
+          reporterExtensionId,
+        )
+      )
+        return false
       const age =
         'maxAgeMs' in request &&
         typeof request.maxAgeMs === 'number' &&
