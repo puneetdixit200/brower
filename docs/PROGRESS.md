@@ -148,6 +148,7 @@ Reconcile the feature matrix with completed history/memory and approval work, th
 ### Phase 7 follow-up — editable Markdown mirror (partial)
 
 - The local Markdown mirror now accepts content-only edits and reconciles them into SQLite on memory reads/writes/searches. Existing FTS triggers update search immediately; the canonical file is then regenerated with refreshed timestamps.
+- Expired entries are removed from SQLite, FTS, and the Markdown mirror when pruning runs. Tests cover expiry persistence across database reopen and repeated reads after pruning.
 - Reconciliation is conservative: malformed structure, missing/duplicate/unknown IDs, source metadata changes, empty/oversized content, and credential-shaped content abort without importing edits. Note creation, deletion, reordering, and metadata changes remain in Aster settings. The store tests verify FTS reflects a Markdown edit and preserves database content after rejected edits.
 - Focused DB, memory-store, route, and task-draft tests pass (22/22); workspace typecheck and targeted Biome pass. Store tests also verify expiry pruning after a database reopen. Headed network-isolated BrowserOS smoke passed for task draft review/save/provenance and the existing note/history selection flows. Markdown edits were validated at the store/API layer, not through a filesystem editor in the headed browser.
 

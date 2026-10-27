@@ -222,6 +222,11 @@ describe('DbMemoryStore', () => {
 
     expect(store.list().memories).toEqual([])
     expect(store.search('library migration')).toEqual([])
+    const markdownPath = join(tempDirs[0], 'memory', 'MEMORY.md')
+    expect(readFileSync(markdownPath, 'utf8')).not.toContain(
+      'Temporary project note about library migration',
+    )
+    expect(store.list().memories).toEqual([])
   })
 
   test('retention expiry is enforced after reopening the database', () => {
@@ -240,6 +245,11 @@ describe('DbMemoryStore', () => {
 
     expect(reopenedStore.list().memories).toEqual([])
     expect(reopenedStore.search('database reopen retention')).toEqual([])
+    const markdownPath = join(tempDirs[0], 'memory', 'MEMORY.md')
+    expect(readFileSync(markdownPath, 'utf8')).not.toContain(
+      'Temporary note about database reopen retention',
+    )
+    expect(reopenedStore.list().memories).toEqual([])
   })
 
   function createStore() {
