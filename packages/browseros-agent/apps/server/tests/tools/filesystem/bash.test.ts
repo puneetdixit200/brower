@@ -133,4 +133,31 @@ describe('filesystem_bash', () => {
     const result = await exec({ command: 'test ! -e /etc/shadow' })
     expect(result.isError).toBeUndefined()
   })
+
+  it('fails closed when Bubblewrap is unavailable', async () => {
+    if (process.platform !== 'linux') return
+    const previous = process.env.BWRAP_PATH
+    process.env.BWRAP_PATH = '/aster-test/missing-bwrap'
+    try {
+      const result = await exec({ command: 'echo must-not-run' })
+      expect(result.isError).toBe(true)
+      expect(result.text).toContain('refusing to run unsandboxed')
+      expect(result.text).not.toContain('must-not-run')
+    } finally {
+      if (previous === undefined) delete process.env.BWRAP_PATH
+      else process.env.BWRAP_PATH = previous
+    }
+  })
+
+  it('rejects a filesystem-root workspace', async () => {
+    if (process.platform !== 'linux') return
+    const rootTool = createBashTool('/')
+    // biome-ignore lint/suspicious/noExplicitAny: test helper
+    const result = await (rootTool as any).execute({
+      command: 'echo must-not-run',
+    })
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('filesystem root')
+    expect(result.text).not.toContain('must-not-run')
+  })
 })
