@@ -17,6 +17,7 @@ import {
   useState,
 } from 'react'
 import { useLocation, useNavigate } from 'react-router'
+import { useIsMac } from '@/lib/useIsMac'
 import {
   Dialog,
   DialogContent,
@@ -89,6 +90,7 @@ const DESTINATIONS: readonly PaletteDestination[] = [
  */
 export function AsterCommandPalette() {
   const navigate = useNavigate()
+  const isMac = useIsMac()
   const location = useLocation()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -227,7 +229,7 @@ export function AsterCommandPalette() {
           )}
         </div>
         <p className="text-right text-muted-foreground text-xs">
-          Ctrl+Alt+K to toggle · Enter to open · Esc to close
+          {isMac ? '⌘+Option+K' : 'Ctrl+Alt+K'} to toggle · Enter to open · Esc to close
         </p>
       </DialogContent>
     </Dialog>
