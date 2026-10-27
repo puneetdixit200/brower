@@ -78,16 +78,30 @@ def main() -> int:
 
         cdp.evaluate("location.hash = '#/home'")
         wait_for(cdp, "[...document.querySelectorAll('button')].some(x=>x.getAttribute('aria-label')==='Attach saved memory')")
+        cdp.evaluate("(async()=>{await chrome.tabs.create({url:'http://127.0.0.1:9105/system/health'});await new Promise(r=>setTimeout(r,500));return true})()")
         cdp.evaluate("document.querySelector('button[aria-label=\"Attach saved memory\"]')?.click()")
         wait_for(cdp, "document.querySelector('input[aria-label=\"Search saved memory\"]')")
         cdp.evaluate(set_value("input[aria-label='Search saved memory']", "Aster memory picker smoke"))
         wait_for(cdp, "![...document.querySelectorAll('button')].find(x=>x.getAttribute('aria-label')==='Search memory')?.disabled")
         cdp.evaluate("document.querySelector('button[aria-label=\"Search memory\"]')?.click()")
         wait_for(cdp, f"document.body.innerText.includes({json.dumps(picker_note)})")
-        cdp.evaluate("[...document.querySelectorAll('button')].find(x=>x.textContent.includes('Add to request'))?.click()")
+        cdp.evaluate("[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Add to request' && x.closest('div.rounded-md.border')?.innerText.includes('Aster memory picker smoke'))?.click()")
         wait_for(cdp, f"[...document.querySelectorAll('span')].some(x=>x.innerText.includes({json.dumps(picker_note)}))")
         cdp.evaluate("document.querySelector('button[aria-label=\"Remove saved memory\"]')?.click()")
         wait_for(cdp, "!document.querySelector('button[aria-label=\"Remove saved memory\"]')")
+        cdp.evaluate("document.querySelector('button[aria-label=\"Attach saved memory\"]')?.click()")
+
+        cdp.evaluate("document.querySelector('button[aria-label=\"Attach browser history\"]')?.click()")
+        wait_for(cdp, "document.querySelector('input[aria-label=\"Search browser history\"]')")
+        cdp.evaluate(set_value("input[aria-label='Search browser history']", "system/health"))
+        wait_for(cdp, "![...document.querySelectorAll('button')].find(x=>x.getAttribute('aria-label')==='Search history')?.disabled")
+        cdp.evaluate("document.querySelector('button[aria-label=\"Search history\"]')?.click()")
+        wait_for(cdp, "document.body.innerText.includes('127.0.0.1:9105')")
+        cdp.evaluate("[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Add to request' && x.closest('div.rounded-md.border')?.innerText.includes('127.0.0.1:9105'))?.click()")
+        wait_for(cdp, "document.querySelector('button[aria-label=\"Remove browser history\"]')")
+        cdp.evaluate("document.querySelector('button[aria-label=\"Remove browser history\"]')?.click()")
+        wait_for(cdp, "!document.querySelector('button[aria-label=\"Remove browser history\"]')")
+        cdp.evaluate("chrome.history.deleteUrl({url:'http://127.0.0.1:9105/system/health'})")
 
         cdp.evaluate("location.hash = '#/settings/memory'")
         wait_for(cdp, f"[...document.querySelectorAll('article')].some(x=>x.innerText.includes({json.dumps(picker_note)}))")
@@ -100,6 +114,7 @@ def main() -> int:
             "retrieval_default_disabled": initially_disabled,
             "create_search_edit_delete": "passed",
             "explicit_memory_context_select_remove": "passed",
+            "explicit_history_context_select_remove": "passed",
             "network": "isolated",
             "fixture_content_retained": False,
         }

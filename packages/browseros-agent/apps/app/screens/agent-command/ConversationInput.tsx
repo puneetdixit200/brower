@@ -34,6 +34,8 @@ import type { ProviderType } from '@/lib/llm-providers/types'
 import { useMcpServers } from '@/lib/mcp/mcpServerStorage'
 import { cn } from '@/lib/utils'
 import { useWorkspace } from '@/modules/workspace/workspace.hooks'
+import { HistoryPickerPopover } from './HistoryPickerPopover'
+import type { SelectedHistoryContext } from './history-context'
 import { MemoryPickerPopover } from './MemoryPickerPopover'
 import type { SelectedMemoryContext } from './memory-context'
 import {
@@ -48,6 +50,7 @@ export interface ConversationInputSendInput {
   attachments: StagedAttachment[]
   selectedTabs: chrome.tabs.Tab[]
   selectedMemories: SelectedMemoryContext[]
+  selectedHistory: SelectedHistoryContext[]
 }
 
 export interface ConversationInputProps {
@@ -139,6 +142,8 @@ function CalmContextControls({
   onToggleTab,
   selectedMemories,
   onAddMemory,
+  selectedHistory,
+  onAddHistory,
   showAgentSelector,
   onAttachClick,
   attachDisabled,
@@ -151,6 +156,8 @@ function CalmContextControls({
   onToggleTab: (tab: chrome.tabs.Tab) => void
   selectedMemories: SelectedMemoryContext[]
   onAddMemory: (memory: SelectedMemoryContext) => void
+  selectedHistory: SelectedHistoryContext[]
+  onAddHistory: (entry: SelectedHistoryContext) => void
   showAgentSelector: boolean
   onAttachClick: () => void
   attachDisabled: boolean
@@ -235,6 +242,7 @@ function CalmContextControls({
         </button>
       </TabPickerPopover>
       <MemoryPickerPopover selected={selectedMemories} onAdd={onAddMemory} />
+      <HistoryPickerPopover selected={selectedHistory} onAdd={onAddHistory} />
       <button
         type="button"
         onClick={onAttachClick}
@@ -318,6 +326,9 @@ export const ConversationInput: FC<ConversationInputProps> = ({
   const [selectedTabs, setSelectedTabs] = useState<chrome.tabs.Tab[]>([])
   const [selectedMemories, setSelectedMemories] = useState<
     SelectedMemoryContext[]
+  >([])
+  const [selectedHistory, setSelectedHistory] = useState<
+    SelectedHistoryContext[]
   >([])
   const [tabMention, setTabMention] = useState<TabMentionState | null>(null)
   const [isExpandedDraft, setIsExpandedDraft] = useState(false)
@@ -422,11 +433,18 @@ export const ConversationInput: FC<ConversationInputProps> = ({
     if (disabled || isStaging) return
     if (streaming && !queueAware) return
     if (!text && attachments.length === 0) return
-    onSend({ text, attachments, selectedTabs, selectedMemories })
+    onSend({
+      text,
+      attachments,
+      selectedTabs,
+      selectedMemories,
+      selectedHistory,
+    })
     setInput('')
     setAttachments([])
     setSelectedTabs([])
     setSelectedMemories([])
+    setSelectedHistory([])
     setAttachmentError(null)
   }
 
@@ -523,7 +541,7 @@ export const ConversationInput: FC<ConversationInputProps> = ({
             error={attachmentError}
           />
         ) : null}
-        {selectedMemories.length > 0 && (
+        {(selectedMemories.length > 0 || selectedHistory.length > 0) && (
           <div className="flex flex-wrap gap-1.5 border-border/40 border-b px-4 pt-2">
             {selectedMemories.map((memory) => (
               <span
@@ -539,6 +557,27 @@ export const ConversationInput: FC<ConversationInputProps> = ({
                   onClick={() =>
                     setSelectedMemories((items) =>
                       items.filter((item) => item.id !== memory.id),
+                    )
+                  }
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            ))}
+            {selectedHistory.map((entry) => (
+              <span
+                key={entry.id}
+                className="inline-flex max-w-full items-center gap-1 rounded-full bg-accent px-2 py-1 text-xs"
+              >
+                <span className="max-w-56 truncate">
+                  History: {entry.title}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Remove browser history"
+                  onClick={() =>
+                    setSelectedHistory((items) =>
+                      items.filter((item) => item.id !== entry.id),
                     )
                   }
                 >
@@ -624,6 +663,14 @@ export const ConversationInput: FC<ConversationInputProps> = ({
               items.some((item) => item.id === memory.id) || items.length >= 3
                 ? items
                 : [...items, memory],
+            )
+          }
+          selectedHistory={selectedHistory}
+          onAddHistory={(entry) =>
+            setSelectedHistory((items) =>
+              items.some((item) => item.id === entry.id) || items.length >= 3
+                ? items
+                : [...items, entry],
             )
           }
           showAgentSelector={variant === 'home'}

@@ -16,6 +16,7 @@ import {
   ConversationInput,
   type ConversationInputSendInput,
 } from './ConversationInput'
+import { withSelectedHistoryContext } from './history-context'
 import { resolveHomeLlmRoutingMode } from './home-compose.helpers'
 import { resolveHomeSearchUrl } from './home-search'
 import { withSelectedMemoryContext } from './memory-context'
@@ -73,7 +74,7 @@ export const AgentCommandHome: FC = () => {
     if (!target) return
     await selectChatTarget(target)
     const message = withSelectedMemoryContext(
-      input.text,
+      withSelectedHistoryContext(input.text, input.selectedHistory),
       input.selectedMemories,
     )
     if (target.kind === 'llm' && llmRoutingMode === 'sidepanel') {
@@ -90,7 +91,11 @@ export const AgentCommandHome: FC = () => {
       return
     }
     const search = new URLSearchParams({ q: input.text, mode: 'agent' })
-    if (input.attachments.length > 0 || input.selectedMemories.length > 0) {
+    if (
+      input.attachments.length > 0 ||
+      input.selectedMemories.length > 0 ||
+      input.selectedHistory.length > 0
+    ) {
       search.set(
         'handoff',
         stagePendingHomeMessage({
