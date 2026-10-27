@@ -1,6 +1,7 @@
 import { DiagnosticsPage } from '@browseros/diagnostics/view'
 import type { FC } from 'react'
 import { HashRouter, Navigate, Route, Routes, useParams } from 'react-router'
+import { AsterCommandPalette } from '@/components/layout/AsterCommandPalette'
 import { SettingsSidebarLayout } from '@/components/layout/SettingsSidebarLayout'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { AgentCommandHome } from '@/screens/agent-command/AgentCommandHome'
@@ -52,6 +53,7 @@ export const App: FC = () => {
 
   return (
     <HashRouter>
+      <AsterCommandPalette />
       <Routes>
         <Route element={<SidebarLayout />}>
           <Route path="home" element={<NewTabLayout />}>
