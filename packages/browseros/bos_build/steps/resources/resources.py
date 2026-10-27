@@ -218,15 +218,17 @@ def product_matches(
     """Return whether a config operation applies to the active product."""
     if product_condition is None:
         return True
-    # Legacy debug builds may package multiple products for their runtime
-    # override. Aster's identity is baked and must never copy foreign assets.
-    if build_type == "debug" and product_id != "aster":
-        return True
     if product_condition == "all":
         raise ValueError("Use a missing product field for all products, not product: all")
     products = (
         [product_condition] if isinstance(product_condition, str) else product_condition
     )
+    # Aster is never part of the legacy BrowserOS/BrowserClaw multi-product
+    # debug bundle, in either direction. Keep their existing debug behavior.
+    if product_id == "aster" or "aster" in products:
+        return product_id in products
+    if build_type == "debug":
+        return True
     return product_id in products
 
 
