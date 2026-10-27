@@ -18,6 +18,7 @@ from typing import Mapping, Protocol, cast
 import requests
 
 from ..core.products import ASTER_EXTENSION_ID, BROWSEROS_BUG_REPORTER_EXTENSION_ID
+from ..lib.utils import get_platform
 from ..products.resource_sources import source_resources_for_product
 from .extensions.build import build_extension_crx
 from .extensions.aster_unpacked_dev import (
@@ -146,6 +147,8 @@ class PreparationRequest:
     output_dir: Path
     manifest_url: str = DEFAULT_BUNDLED_MANIFEST_URL
     aster_unpacked_dev: bool = False
+    build_type: str = "release"
+    is_official_build: bool = True
 
 
 class PreparationOperations(Protocol):
@@ -346,8 +349,9 @@ def validate_prepared_resources(
         raise ValueError("Prepared-resource component versions do not match")
     if expected.aster_unpacked_dev:
         require_aster_unpacked_debug(
-            product=expected.product, platform="linux",
-            build_type="debug", is_official_build=False,
+            product=expected.product, platform=get_platform(),
+            build_type=expected.build_type,
+            is_official_build=expected.is_official_build,
         )
     extension_mode = "unpacked-dev" if expected.aster_unpacked_dev else "signed"
     if manifest.extension_mode != extension_mode:
@@ -441,8 +445,9 @@ def prepare_common_resources(
     source = source_resources_for_product(request.product)
     if request.aster_unpacked_dev:
         require_aster_unpacked_debug(
-            product=request.product, platform="linux",
-            build_type="debug", is_official_build=False,
+            product=request.product, platform=get_platform(),
+            build_type=request.build_type,
+            is_official_build=request.is_official_build,
         )
     product_spec = None if request.aster_unpacked_dev else spec_by_name(source.extension_name)
     product_version = request.component_versions[source.extension_component]
@@ -562,8 +567,9 @@ class LocalPreparationOperations:
     ) -> None:
         """Build WXT with the fixed public dev identity and ZIP regular files."""
         require_aster_unpacked_debug(
-            product=request.product, platform="linux",
-            build_type="debug", is_official_build=False,
+            product=request.product, platform=get_platform(),
+            build_type=request.build_type,
+            is_official_build=request.is_official_build,
         )
         workspace = self.repo_root / "packages/browseros-agent"
         manifest_source = workspace / "apps/app/package.json"
