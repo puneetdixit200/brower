@@ -4,6 +4,8 @@
 import hashlib
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -100,6 +102,21 @@ class FakeOperations:
 
 
 class PreparedResourcesTest(unittest.TestCase):
+    def test_prepared_resources_imports_before_pipeline_registry(self) -> None:
+        # Regression: a direct import previously failed when this module
+        # eagerly imported bos_build.steps.storage.download during initialization.
+        package_root = Path(__file__).resolve().parents[2]
+        result = subprocess.run(
+            [sys.executable, '-c',
+             'from bos_build.release.prepared_resources import PreparationRequest; print("ok")'],
+            cwd=package_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), 'ok')
+
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
