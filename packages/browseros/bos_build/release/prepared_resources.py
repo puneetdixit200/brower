@@ -576,16 +576,22 @@ class LocalPreparationOperations:
         lockfile = workspace / "bun.lock"
         original = (manifest_source.read_bytes(), lockfile.read_bytes())
         environment = dict(os.environ)
+        # Bun/Vite can read .env files from the workspace. Explicit empty
+        # environment values override optional Aster release/publication
+        # settings even if a developer has release secrets in their checkout.
         for secret in (
             "ASTER_EXTENSION_PUBLIC_KEY", "ASTER_EXTENSION_UPDATE_URL",
             "ASTER_REPORTER_EXTENSION_ID", "ASTER_COMPAT_EXTENSION_ID",
             "ASTER_PRODUCT_WEB_URL", "SENTRY_AUTH_TOKEN",
             "SENTRY_ORG", "SENTRY_PROJECT",
         ):
-            environment.pop(secret, None)
+            environment[secret] = ""
         environment["NODE_ENV"] = "development"
+        # Do not use build:agent:dev: that script intentionally supplies
+        # .env.development, while native Aster debugging must not inherit
+        # arbitrary credentials or production updater settings.
         subprocess.run(
-            ["bun", "run", "build:agent:dev"],
+            ["bun", "run", "--filter", "@browseros/app", "build:aster-unpacked"],
             cwd=workspace, env=environment, check=True,
         )
         if (manifest_source.read_bytes(), lockfile.read_bytes()) != original:
