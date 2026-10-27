@@ -6,6 +6,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { useIncognitoWindow } from '@/lib/browseros/use-incognito-window'
 import {
   canSearchBrowserHistory,
   type SelectedHistoryContext,
@@ -28,9 +29,7 @@ export const HistoryPickerPopover: FC<{
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
-  const incognito = !canSearchBrowserHistory(
-    chrome.extension.inIncognitoContext,
-  )
+  const incognito = !canSearchBrowserHistory(useIncognitoWindow())
 
   const search = async () => {
     if (!query.trim() || incognito) return

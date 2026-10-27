@@ -2,6 +2,7 @@ import { type FC, useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { getAgentServerUrl } from '@/lib/browseros/helpers'
+import { useIncognitoWindow } from '@/lib/browseros/use-incognito-window'
 
 interface MemoryEntry {
   id: string
@@ -18,13 +19,17 @@ interface MemorySettings {
   updatedAt: number
 }
 
-const request = async <T,>(path: string, init?: RequestInit): Promise<T> => {
+const request = async <T,>(
+  path: string,
+  incognito: boolean,
+  init?: RequestInit,
+): Promise<T> => {
   const baseUrl = await getAgentServerUrl()
   const response = await fetch(`${baseUrl}/memory${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
-      'X-Aster-Incognito': String(chrome.extension.inIncognitoContext),
+      'X-Aster-Incognito': String(incognito),
       ...init?.headers,
     },
   })
@@ -42,7 +47,7 @@ const request = async <T,>(path: string, init?: RequestInit): Promise<T> => {
 }
 
 export const MemoryPage: FC = () => {
-  const incognito = chrome.extension.inIncognitoContext
+  const incognito = useIncognitoWindow()
   const [memories, setMemories] = useState<MemoryEntry[]>([])
   const [settings, setSettings] = useState<MemorySettings | null>(null)
   const [content, setContent] = useState('')
@@ -56,10 +61,10 @@ export const MemoryPage: FC = () => {
     const result = await request<{
       memories: MemoryEntry[]
       settings: MemorySettings
-    }>('')
+    }>('', incognito)
     setMemories(result.memories)
     setSettings(result.settings)
-  }, [])
+  }, [incognito])
 
   useEffect(() => {
     if (incognito) return
@@ -75,10 +80,14 @@ export const MemoryPage: FC = () => {
     setBusy(true)
     setError(null)
     try {
-      const result = await request<{ settings: MemorySettings }>('/settings', {
-        method: 'PUT',
-        body: JSON.stringify({ ...settings, ...next }),
-      })
+      const result = await request<{ settings: MemorySettings }>(
+        '/settings',
+        incognito,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ ...settings, ...next }),
+        },
+      )
       setSettings(result.settings)
       await refresh()
     } catch (reason) {
@@ -94,7 +103,7 @@ export const MemoryPage: FC = () => {
     setBusy(true)
     setError(null)
     try {
-      await request(editingId ? `/${editingId}` : '', {
+      await request(editingId ? `/${editingId}` : '', incognito, {
         method: editingId ? 'PUT' : 'POST',
         body: JSON.stringify({ content, sourceUrl: sourceUrl.trim() || null }),
       })
@@ -120,7 +129,7 @@ export const MemoryPage: FC = () => {
       return
     setBusy(true)
     try {
-      await request(`/${id}`, { method: 'DELETE' })
+      await request(`/${id}`, incognito, { method: 'DELETE' })
       await refresh()
     } catch (reason) {
       setError(
@@ -135,10 +144,14 @@ export const MemoryPage: FC = () => {
     setBusy(true)
     setError(null)
     try {
-      const result = await request<{ memories: MemoryEntry[] }>('/search', {
-        method: 'POST',
-        body: JSON.stringify({ query: search }),
-      })
+      const result = await request<{ memories: MemoryEntry[] }>(
+        '/search',
+        incognito,
+        {
+          method: 'POST',
+          body: JSON.stringify({ query: search }),
+        },
+      )
       setMemories(result.memories)
     } catch (reason) {
       setError(

@@ -14,6 +14,8 @@ export async function isIncognitoWindow(): Promise<boolean> {
     const window = await chrome.windows.getCurrent()
     return window.incognito ?? false
   } catch {
-    return false
+    // Privacy-sensitive features fail closed if the hosting window cannot be
+    // identified. This may disable persistence until the app is reopened.
+    return true
   }
 }

@@ -216,7 +216,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   // from the hosting window on mount (chrome.extension.inIncognitoContext is
   // false for a side panel in spanning mode). This settles long before any turn
   // ends, so the turn-end save always sees the correct value.
-  const [isIncognito, setIsIncognito] = useState(false)
+  const [isIncognito, setIsIncognito] = useState(true)
   useEffect(() => {
     let cancelled = false
     isIncognitoWindow().then((incognito) => {

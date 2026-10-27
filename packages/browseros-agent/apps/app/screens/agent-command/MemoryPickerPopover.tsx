@@ -7,6 +7,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { getAgentServerUrl } from '@/lib/browseros/helpers'
+import { useIncognitoWindow } from '@/lib/browseros/use-incognito-window'
 import type { SelectedMemoryContext } from './memory-context'
 
 interface MemorySearchResult extends SelectedMemoryContext {
@@ -23,7 +24,7 @@ export const MemoryPickerPopover: FC<{
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
-  const incognito = chrome.extension.inIncognitoContext
+  const incognito = useIncognitoWindow()
 
   const search = async () => {
     if (!query.trim() || incognito) return
