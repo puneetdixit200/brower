@@ -311,3 +311,8 @@ Following user authorization to continue without performing the test suite, GitH
 ### Continued source implementation — 2026-10-28 (tests skipped per user)
 
 Added isolated Aster WXT debug build selection; a native Linux build wrapper; user-scoped Omarchy desktop entry with isolated profile; a native GN debug catalog copy; a non-privileged application command palette and sidebar entry; a Linux CPU/RSS capture utility; and a versioned copy of the original 1,559-line master specification in `docs/`. All changes committed to `feat/aster-linux-ui`, but **no tests, TypeScript builds, GN generation, Chromium compilation, native launch or performance measurements were performed**. U10 becomes PARTIAL at the source level. O01, F01–F05 and all native/browser completion gates remain unverified. See [source development evidence](evidence/aster-source-development-2026-10-28.md). Real signing custody/update feeds, full functional Aside parity and runtime security verification are still open.
+
+
+### Initial-load code-splitting source update — 2026-10-28
+
+The extension app router now lazily loads 15 secondary views (settings, task history, scheduling, diagnostics, onboarding, chat and related screens). The home composer and root layout remain eagerly loaded, with an accessible Suspense fallback for secondary routes. This is a code-level startup optimization; **no bundle analysis, frontend build, visual verification or measured performance data exists for this change yet**. Keep F01–F05 NOT_STARTED/PARTIAL as already recorded; measure stock BrowserOS and Aster on identical hardware before claiming a benefit.
