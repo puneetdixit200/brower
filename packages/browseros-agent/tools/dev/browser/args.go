@@ -15,12 +15,13 @@ import (
 )
 
 type ArgsConfig struct {
-	Root              string
-	Ports             proc.Ports
-	UserDataDir       string
-	Headless          bool
-	LoadDevExtensions bool
-	Product           string
+	Root               string
+	Ports              proc.Ports
+	UserDataDir        string
+	Headless           bool
+	LoadDevExtensions  bool
+	DeferExtensionHome bool
+	Product            string
 }
 
 const (
@@ -136,8 +137,10 @@ func buildArgs(cfg ArgsConfig, resolveBinary func(string) BinaryResolution) []st
 	if cfg.LoadDevExtensions {
 		agentExtDir := filepath.Join(cfg.Root, "apps/app/dist/chrome-mv3-dev")
 		args = append(args, fmt.Sprintf("--load-extension=%s", agentExtDir))
-		if homeURL := devExtensionHomeURL(agentExtDir); homeURL != "" {
-			args = append(args, homeURL)
+		if !cfg.DeferExtensionHome {
+			if homeURL := devExtensionHomeURL(agentExtDir); homeURL != "" {
+				args = append(args, homeURL)
+			}
 		}
 	}
 

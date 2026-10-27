@@ -395,6 +395,11 @@ func startBrowserOSWatch(ctx context.Context, wg *sync.WaitGroup, root string, e
 	}
 
 	waitForCDP(ctx, p.CDP)
+	if manual && runtime.GOOS == "linux" {
+		if err := browser.OpenDevExtensionHome(ctx, p.CDP, root); err != nil {
+			proc.LogMsgf(proc.TagServer, "%s", proc.WarnColor.Sprintf("Could not open the development extension home: %v", err))
+		}
+	}
 
 	sidecarPath := watchSidecarConfigPath(userDataDir, "browseros-server")
 	reservations.ReleaseServer()
@@ -424,11 +429,12 @@ func browserOSManualProcConfig(root string, env []string, p proc.Ports, userData
 		Env:     env,
 		Restart: false,
 		Cmd: browser.BuildArgs(browser.ArgsConfig{
-			Root:              root,
-			Ports:             p,
-			UserDataDir:       userDataDir,
-			LoadDevExtensions: true,
-			Product:           browser.ProductBrowserOS,
+			Root:               root,
+			Ports:              p,
+			UserDataDir:        userDataDir,
+			LoadDevExtensions:  true,
+			DeferExtensionHome: runtime.GOOS == "linux",
+			Product:            browser.ProductBrowserOS,
 		}),
 	}
 }

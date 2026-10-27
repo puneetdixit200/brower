@@ -23,7 +23,7 @@ func TestBuildArgsUsesDevDockIcon(t *testing.T) {
 	}
 }
 
-func TestBuildArgsLoadsDevExtensionWithoutForcingRestrictedNewTabURL(t *testing.T) {
+func TestBuildArgsCanDeferExtensionHomeUntilCDPIsReady(t *testing.T) {
 	root := t.TempDir()
 	extensionDir := filepath.Join(root, "apps/app/dist/chrome-mv3-dev")
 	if err := os.MkdirAll(extensionDir, 0o700); err != nil {
@@ -34,10 +34,11 @@ func TestBuildArgsLoadsDevExtensionWithoutForcingRestrictedNewTabURL(t *testing.
 		t.Fatal(err)
 	}
 	args := BuildArgs(ArgsConfig{
-		Root:              root,
-		Ports:             proc.Ports{CDP: 9005, Server: 9105, Extension: 9305},
-		UserDataDir:       "/tmp/browseros-dev",
-		LoadDevExtensions: true,
+		Root:               root,
+		Ports:              proc.Ports{CDP: 9005, Server: 9105, Extension: 9305},
+		UserDataDir:        "/tmp/browseros-dev",
+		LoadDevExtensions:  true,
+		DeferExtensionHome: true,
 	})
 	joined := strings.Join(args, "\n")
 	if !strings.Contains(joined, "--load-extension="+extensionDir) {
@@ -46,8 +47,18 @@ func TestBuildArgsLoadsDevExtensionWithoutForcingRestrictedNewTabURL(t *testing.
 	if strings.Contains(joined, "chrome://newtab") {
 		t.Fatalf("must not force the restricted BrowserOS new-tab URL in\n%s", joined)
 	}
-	if !strings.Contains(joined, "chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk/app.html#/home") {
-		t.Fatalf("missing direct extension home URL in\n%s", joined)
+	if strings.Contains(joined, "chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk/app.html#/home") {
+		t.Fatalf("extension home should be opened after CDP sees the extension worker; args:\n%s", joined)
+	}
+
+	legacyArgs := BuildArgs(ArgsConfig{
+		Root:              root,
+		Ports:             proc.Ports{CDP: 9005, Server: 9105, Extension: 9305},
+		UserDataDir:       "/tmp/browseros-dev",
+		LoadDevExtensions: true,
+	})
+	if !strings.Contains(strings.Join(legacyArgs, "\n"), "chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk/app.html#/home") {
+		t.Fatal("expected direct extension home URL when deferral is disabled")
 	}
 }
 
