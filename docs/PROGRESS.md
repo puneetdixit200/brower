@@ -1,6 +1,6 @@
 # Progress
 
-## Current phase: Phase 3 — Aster UI foundation and performance harness
+## Current phase: Phase 3 — Aster UI foundation and performance harness (with Phase 4 composer work underway)
 
 **Status: PARTIAL.** Phase 0 is complete against the upstream BrowserOS baseline. Phase 1 dependency installation, static checks, and the development extension build are complete; the full upstream test run has failures. Phase 2's Linux supervisor flow is verified end-to-end. Phase 3 has an Aster home visual foundation and a headed Search/Ask smoke. No Aster-branded browser binary or release package exists.
 
@@ -55,6 +55,13 @@
 - Added `tests/e2e/aster_ui_latency_benchmark.py`; a headed isolated-profile run recorded 100 synthetic Search input events after 10 warmups (median 16.7 ms, p95 17.3 ms). This measures through the next animation frame and checks the React button state; it does not establish physical keyboard or compositor-presented latency. Raw samples are in [`perf/aster-home-input-2026-10-27.json`](perf/aster-home-input-2026-10-27.json).
 - Updated `FEATURE_MATRIX.md`, `UI_REFERENCE.md`, `KNOWN_LIMITATIONS.md`, and the Linux runner guide. U04/U05 are PASS for the verified home mode/search flow; full agent task behavior remains unverified.
 
+### Phase 4 — composer and tab context (partial)
+
+- The home composer now shares the side panel's `@` current-window tab picker. Typing `@` at a word boundary opens it, typing filters by tab title/URL, and Escape cancels the unfinished mention while preserving surrounding text. Selection adds the tab to the existing attached-tabs set.
+- Pure tests cover mention boundary, email exclusion, filtering, marker removal, and edit cancellation. `bun test apps/app/screens/agent-command/tab-mention.test.ts` passes (5/5); app typecheck and targeted Biome pass.
+- Headed BrowserOS v0.51.0 live check opened a local health endpoint in a second tab, typed `@`, saw that tab in the picker, selected it (`Tabs 1`), and pressed Escape; the mention closed and unfinished `@` text was removed. No external page or provider credential was used.
+- U06 is PARTIAL: current-window web-tab mentions are verified; history and memory mentions are not implemented, and files remain a separate attach action.
+
 ### Current blockers / limits
 
 - Aster still inherits BrowserOS UI, branding, product identity, and distribution/update wiring. No modified Chromium shell, installer, desktop entry, or release artifact has been produced.
@@ -64,4 +71,4 @@
 
 ### Next action
 
-Continue Phase 3 shell states and extend the benchmark to matched startup, navigation, tab-switch, and idle CPU/RSS measures. Next prioritize browser-shell navigation/tab regressions on the Aster home, then audit and remove inherited extension identity/updater assumptions before any distribution work.
+Finish a matched stock/Aster navigation, startup, tab-switch, and idle CPU/RSS harness; then complete U06 history/file/memory context coverage or accurately narrow the product target. Continue browser-shell regression checks and audit inherited extension identity/updater assumptions before any distribution work.

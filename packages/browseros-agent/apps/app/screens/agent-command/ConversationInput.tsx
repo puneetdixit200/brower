@@ -35,6 +35,12 @@ import { useMcpServers } from '@/lib/mcp/mcpServerStorage'
 import { cn } from '@/lib/utils'
 import { useGetUserMCPIntegrations } from '@/modules/mcp/user-integrations.hooks'
 import { useWorkspace } from '@/modules/workspace/workspace.hooks'
+import {
+  findTabMention,
+  removeTabMention,
+  type TabMentionState,
+  updateTabMention,
+} from './tab-mention'
 
 export interface ConversationInputSendInput {
   text: string
@@ -308,6 +314,7 @@ export const ConversationInput: FC<ConversationInputProps> = ({
 }) => {
   const [input, setInput] = useState('')
   const [selectedTabs, setSelectedTabs] = useState<chrome.tabs.Tab[]>([])
+  const [tabMention, setTabMention] = useState<TabMentionState | null>(null)
   const [isExpandedDraft, setIsExpandedDraft] = useState(false)
   const [attachments, setAttachments] = useState<StagedAttachment[]>([])
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
@@ -371,6 +378,30 @@ export const ConversationInput: FC<ConversationInputProps> = ({
       }
       return [...prev, tab]
     })
+  }
+
+  const closeTabMention = () => {
+    if (!tabMention) return
+    const nextInput = removeTabMention(input, tabMention)
+    setInput(nextInput)
+    setTabMention(null)
+    requestAnimationFrame(() => {
+      const textarea = textareaRef.current
+      if (!textarea) return
+      textarea.focus()
+      const cursor = tabMention.startPosition
+      textarea.setSelectionRange(cursor, cursor)
+    })
+  }
+
+  const handleInputChange = (value: string) => {
+    const cursor = textareaRef.current?.selectionStart ?? value.length
+    setTabMention((current) =>
+      current
+        ? updateTabMention(value, cursor, current)
+        : findTabMention(value, cursor),
+    )
+    setInput(value)
   }
 
   const hasContent = input.trim().length > 0 || attachments.length > 0
@@ -470,6 +501,15 @@ export const ConversationInput: FC<ConversationInputProps> = ({
           className="hidden"
           onChange={handleFileInputChange}
         />
+        <TabPickerPopover
+          variant="mention"
+          isOpen={tabMention !== null}
+          filterText={tabMention?.filterText ?? ''}
+          selectedTabs={selectedTabs}
+          onToggleTab={toggleTab}
+          onClose={closeTabMention}
+          anchorRef={textareaRef}
+        />
         {attachments.length > 0 || attachmentError ? (
           <AttachmentStrip
             attachments={attachments}
@@ -489,8 +529,22 @@ export const ConversationInput: FC<ConversationInputProps> = ({
             <Textarea
               ref={textareaRef}
               value={input}
-              onChange={(event) => setInput(event.currentTarget.value)}
+              onChange={(event) => handleInputChange(event.currentTarget.value)}
               onKeyDown={(event) => {
+                if (tabMention) {
+                  if (
+                    ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(
+                      event.key,
+                    )
+                  ) {
+                    return
+                  }
+                  if (event.key === 'Tab') {
+                    event.preventDefault()
+                    closeTabMention()
+                    return
+                  }
+                }
                 if (event.key === 'Enter' && !event.shiftKey) {
                   event.preventDefault()
                   handleSend()
