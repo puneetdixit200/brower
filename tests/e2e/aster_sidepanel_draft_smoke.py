@@ -25,15 +25,49 @@ def main() -> int:
                 "url:'http://127.0.0.1:9105/system/health',active:false}))()"
             )
             tabs.append(tab["id"])
+        attachment = cdp.evaluate(
+            "(async()=>await chrome.tabs.create({url:"
+            + json.dumps(
+                "http://127.0.0.1:9105/system/health?asterDraftAttachment=fixture"
+            )
+            + ",active:false}))()"
+        )
+        attachment_tab_id = attachment["id"]
+        tabs.append(attachment_tab_id)
 
-        drafts = [f"draft for owner tab {tab_id}" for tab_id in tabs]
-        for tab_id, draft in zip(tabs, drafts, strict=True):
+        owner_tabs = tabs[:2]
+        drafts = [f"draft for owner tab {tab_id}" for tab_id in owner_tabs]
+        for index, (tab_id, draft) in enumerate(
+            zip(owner_tabs, drafts, strict=True)
+        ):
             open_panel(cdp, tab_id)
             panel = wait_target(f"sidepanel.html?tabId={tab_id}")
             panel_cdp = CDP(panel["webSocketDebuggerUrl"])
             panel_cdp.call("Runtime.enable")
             try:
                 wait_for(panel_cdp, "!!document.querySelector('textarea')")
+                if index == 0:
+                    panel_cdp.evaluate(
+                        "document.querySelector('[data-tab-mention-trigger]').click()"
+                    )
+                    wait_for(
+                        panel_cdp,
+                        "!!document.querySelector('[aria-label=\"Select tabs to attach\"]')",
+                    )
+                    panel_cdp.evaluate(
+                        "(()=>{const item=[...document.querySelectorAll('[data-tab-item]')]"
+                        ".find(e=>e.innerText.includes('asterDraftAttachment=fixture'));"
+                        "if(!item)throw Error('attachment tab missing from picker');item.click()})()"
+                    )
+                    wait_for(
+                        cdp,
+                        "(async({ownerId,attachmentId})=>{const d=await chrome.storage.local.get('sidePanelDrafts');"
+                        "return d.sidePanelDrafts?.[String(ownerId)]?.attachedTabIds?.includes(attachmentId)===true})({ownerId:"
+                        + str(tab_id)
+                        + ",attachmentId:"
+                        + str(attachment_tab_id)
+                        + "})",
+                    )
                 panel_cdp.evaluate(
                     "(()=>{const e=document.querySelector('textarea');"
                     "const set=Object.getOwnPropertyDescriptor("
@@ -60,7 +94,9 @@ def main() -> int:
             wait_no_target(f"sidepanel.html?tabId={tab_id}")
 
         observed: list[str] = []
-        for tab_id, expected in zip(tabs, drafts, strict=True):
+        for index, (tab_id, expected) in enumerate(
+            zip(owner_tabs, drafts, strict=True)
+        ):
             open_panel(cdp, tab_id)
             panel = wait_target(f"sidepanel.html?tabId={tab_id}")
             panel_cdp = CDP(panel["webSocketDebuggerUrl"])
@@ -71,6 +107,11 @@ def main() -> int:
                     "document.querySelector('textarea')?.value==="
                     + json.dumps(expected),
                 )
+                if index == 0:
+                    wait_for(
+                        panel_cdp,
+                        "document.querySelectorAll('footer .styled-scrollbar > div').length===2",
+                    )
                 observed.append(
                     panel_cdp.evaluate("document.querySelector('textarea').value")
                 )
@@ -79,7 +120,15 @@ def main() -> int:
 
         if observed != drafts:
             raise AssertionError(f"Drafts crossed owner tabs: {observed!r}")
-        print(json.dumps({"per_tab_draft_isolation": "passed", "drafts_restored": 2}))
+        print(
+            json.dumps(
+                {
+                    "per_tab_draft_isolation": "passed",
+                    "drafts_restored": 2,
+                    "attached_tab_restored": "passed",
+                }
+            )
+        )
         return 0
     finally:
         try:

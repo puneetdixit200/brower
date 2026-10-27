@@ -66,7 +66,7 @@
 
 - Added local draft storage keyed by the panel's owning tab ID. It restores the prompt and attached web-tab IDs when the panel reopens; stale or closed attachment IDs are dropped. Writes are skipped for incognito windows and when the owning window check cannot be resolved.
 - Draft helper tests pass (2/2), app typecheck passes, and targeted Biome passes. Headed isolated BrowserOS smoke verified that a Translate prompt survives closing and reopening its owner tab's panel. Two-tab switching and browser restart recovery remain unverified; U15 is PARTIAL.
-- Follow-up headed isolated smoke `tests/e2e/aster_sidepanel_draft_smoke.py` created two local tabs, saved distinct prompts, closed and reopened each panel, and verified each owner received its own draft. The smoke passed; restart recovery remains unverified, so U15 stays PARTIAL.
+- Follow-up headed isolated smoke `tests/e2e/aster_sidepanel_draft_smoke.py` created two local owner tabs and a third local attachment tab, saved distinct prompts, attached the third tab to one owner through the picker, then closed and reopened each panel. Each owner received its own draft and the attached tab returned; the smoke passed. Browser restart recovery remains unverified, so U15 stays PARTIAL.
 
 ### Phase 5 — local mocked page-question stream (partial)
 
