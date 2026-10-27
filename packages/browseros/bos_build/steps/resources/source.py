@@ -68,6 +68,8 @@ def _request_from_manifest(
         output_dir=root,
         manifest_url=ctx.get_extensions_manifest_url(),
         aster_unpacked_dev=ctx.aster_unpacked_dev,
+        build_type=ctx.build_type,
+        is_official_build=not ctx.aster_unpacked_dev,
     )
 
 
@@ -153,6 +155,8 @@ class PrepareCommonResourcesModule(Step):
             output_dir=output,
             manifest_url=ctx.get_extensions_manifest_url(),
             aster_unpacked_dev=ctx.aster_unpacked_dev,
+            build_type=ctx.build_type,
+            is_official_build=not ctx.aster_unpacked_dev,
         )
         log_info(f"Preparing common resources from {ctx.source_sha}")
         manifest = prepare_common_resources(
