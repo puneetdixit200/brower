@@ -25,23 +25,40 @@ const MOCK_USAGE: LanguageModelV3Usage = {
   },
 }
 
-/** A fixed allowlist of deterministic calls for isolated browser-tool smokes. */
-function mockToolCall(): { toolName: string; input: string } | undefined {
+function mockToolPageId(): number {
+  const configured = Number(process.env.BROWSEROS_MOCK_TOOL_PAGE)
+  return Number.isSafeInteger(configured) && configured > 0 ? configured : 1
+}
+
+/** Fixed call sequences for isolated browser-tool smokes. */
+function mockToolCalls(): { toolName: string; input: string }[] {
   switch (process.env.BROWSEROS_MOCK_TOOL_CALL) {
     case 'tabs.list':
-      return { toolName: 'tabs', input: JSON.stringify({ action: 'list' }) }
+      return [{ toolName: 'tabs', input: JSON.stringify({ action: 'list' }) }]
     case 'act.click':
-      return {
-        toolName: 'act',
-        input: JSON.stringify({
-          page: 1,
-          kind: 'click',
-          ref: 'e1',
-          diff: 'none',
-        }),
-      }
+      return [mockClickCall()]
+    case 'act.click-after-snapshot':
+      return [
+        {
+          toolName: 'snapshot',
+          input: JSON.stringify({ page: mockToolPageId() }),
+        },
+        mockClickCall(),
+      ]
     default:
-      return undefined
+      return []
+  }
+}
+
+function mockClickCall() {
+  return {
+    toolName: 'act',
+    input: JSON.stringify({
+      page: mockToolPageId(),
+      kind: 'click',
+      ref: 'e1',
+      diff: 'none',
+    }),
   }
 }
 
@@ -78,7 +95,8 @@ export function resolveMockLLMConfig(config: LLMConfig): ResolvedLLMConfig {
 }
 
 export function createMockLanguageModel(): LanguageModel {
-  let toolCallPending = Boolean(mockToolCall())
+  const pendingToolCalls = mockToolCalls()
+  let toolCallId = 0
   const chunks: LanguageModelV3StreamPart[] = [
     { type: 'text-start', id: 'text-1' },
     {
@@ -96,12 +114,19 @@ export function createMockLanguageModel(): LanguageModel {
 
   return new MockLanguageModelV3({
     doGenerate: async () => {
-      const call = mockToolCall()
-      if (!toolCallPending || !call) return createMockResult()
-      toolCallPending = false
+      const call = pendingToolCalls.shift()
+      if (!call) return createMockResult()
+      toolCallId++
       return {
         content: [
-          { type: 'tool-call', toolCallId: 'fixture-tool-call', ...call },
+          {
+            type: 'tool-call',
+            toolCallId:
+              toolCallId === 1
+                ? 'fixture-tool-call'
+                : `fixture-tool-call-${toolCallId}`,
+            ...call,
+          },
         ],
         finishReason: { unified: 'tool-calls', raw: 'tool_calls' },
         usage: MOCK_USAGE,
@@ -109,13 +134,16 @@ export function createMockLanguageModel(): LanguageModel {
       }
     },
     doStream: async () => {
-      const call = mockToolCall()
-      if (toolCallPending && call) {
-        toolCallPending = false
+      const call = pendingToolCalls.shift()
+      if (call) {
+        toolCallId++
         const toolChunks: LanguageModelV3StreamPart[] = [
           {
             type: 'tool-call',
-            toolCallId: 'fixture-tool-call',
+            toolCallId:
+              toolCallId === 1
+                ? 'fixture-tool-call'
+                : `fixture-tool-call-${toolCallId}`,
             ...call,
           },
           {
