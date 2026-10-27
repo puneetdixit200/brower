@@ -66,7 +66,9 @@ export class Application {
     try {
       await createHttpServer({
         port: this.config.serverPort,
-        host: '0.0.0.0',
+        // This service controls the browser through CDP and must never be
+        // reachable from other machines on the network.
+        host: '127.0.0.1',
         version: VERSION,
         browser,
         browserSession,

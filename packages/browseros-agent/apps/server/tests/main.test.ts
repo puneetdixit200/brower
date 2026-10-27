@@ -45,6 +45,7 @@ describe('Application.start', () => {
         browser: expect.any(browserModule.Browser),
       }),
     )
+    expect(createHttpServer.mock.calls[0]?.[0]?.host).toBe('127.0.0.1')
     expect(createHttpServer.mock.calls[0]?.[0]).not.toHaveProperty('controller')
     expect(loggerInfo).toHaveBeenCalled()
     expect(loggerWarn).not.toHaveBeenCalled()
