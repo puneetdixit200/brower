@@ -150,7 +150,7 @@ Reconcile the feature matrix with completed history/memory and approval work, th
 - The local Markdown mirror now accepts content-only edits and reconciles them into SQLite on memory reads/writes/searches. Existing FTS triggers update search immediately; the canonical file is then regenerated with refreshed timestamps.
 - Expired entries are removed from SQLite, FTS, and the Markdown mirror when pruning runs. Tests cover expiry persistence across database reopen and repeated reads after pruning.
 - Reconciliation is conservative: malformed structure, missing/duplicate/unknown IDs, source metadata changes, empty/oversized content, and credential-shaped content abort without importing edits. Note creation, deletion, reordering, and metadata changes remain in Aster settings. The store tests verify FTS reflects a Markdown edit and preserves database content after rejected edits.
-- Focused DB, memory-store, route, and task-draft tests pass (23/23); workspace typecheck and targeted Biome pass. Store tests also verify expiry pruning after a database reopen. Headed network-isolated BrowserOS smoke passed for task draft review/save/provenance, omission of a credential-shaped fixture, and existing note/history selection flows. Markdown edits were validated at the store/API layer, not through a filesystem editor in the headed browser.
+- Focused DB, memory-store, route, and task-draft tests pass (24/24); workspace typecheck and targeted Biome pass. Store tests also verify expiry pruning after a database reopen. Headed network-isolated BrowserOS smoke passed for task draft review/save/provenance, omission of a credential-shaped fixture, and existing note/history selection flows. Markdown edits were validated at the store/API layer, not through a filesystem editor in the headed browser.
 
 ### Phase 7 follow-up — reviewed task memory drafts (partial)
 
@@ -187,6 +187,11 @@ Reconcile the feature matrix with completed history/memory and approval work, th
 - The headed BrowserOS smoke verifies the side panel displays “Connection failed” and Retry for a refused local provider, then uses CDP to block the extension’s `/chat` request and verifies the Aster local-service message and Retry recovery after unblocking. The test-only dummy key is absent from both views; no external network or provider credential is used. The repeatable flow is `tests/e2e/aster_provider_offline_smoke.py`.
 - Chat-error classifier and stream tests pass (28/28), full workspace typecheck and targeted Biome pass, the `ChatError` suite passes (10/10), and the updated headed smoke passes. Empty provider-selection UX and an actual stopped agent-server process remain unverified, so A13 stays PARTIAL.
 - Legacy local fetch failures now tell the user that Aster’s local AI service could not be reached, with a retry action and no BrowserOS-branded help link.
+
+### Phase 5 follow-up — local task detail timeline (partial)
+
+- Added a Task History sidebar page with `/tasks` and `/tasks/:taskId` routes. It reads local execution history only after the browser window is confirmed non-incognito, lists status/time/counts, and shows task UUID, bounded response preview, and ordered tool-step timeline. Common credential-shaped prompts, results, tool names, and displayed step previews are filtered heuristically.
+- The current task record schema has no downloadable artifact descriptors, so the detail page reports an empty artifacts state; full transcripts and artifact rendering are not implemented. Timeline helper tests pass (4/4), app typecheck and targeted Biome pass. Headed BrowserOS v0.51.0 smoke in the network-isolated disposable profile verified task selection, exact task ID, ordered step preview, hidden credential-shaped fixture, and empty-artifacts state. M16 remains PARTIAL.
 
 ### Security follow-up — filesystem path boundaries (partial)
 

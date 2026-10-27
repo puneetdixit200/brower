@@ -99,6 +99,11 @@ describe('DbMemoryStore', () => {
     expect(entry.sourceTitle).toBe(
       'Find the release branch used by this project',
     )
+    expect(
+      readFileSync(join(tempDirs[0], 'memory', 'MEMORY.md'), 'utf8'),
+    ).toContain(
+      `Source task: Find the release branch used by this project (ID: ${sourceId})`,
+    )
 
     const edited = store.save({
       id: entry.id,
@@ -116,6 +121,31 @@ describe('DbMemoryStore', () => {
         sourceTitle: 'API key: secret-value',
       }),
     ).toThrow(/credential/)
+  })
+
+  test('upgrades legacy task provenance metadata to include the task ID', () => {
+    const store = createStore()
+    const sourceId = crypto.randomUUID()
+    const sourceTitle = 'Find the release branch used by this project'
+    store.save({
+      content: 'The release branch is protected.',
+      sourceId,
+      sourceTitle,
+    })
+    const markdownPath = join(tempDirs[0], 'memory', 'MEMORY.md')
+    const current = readFileSync(markdownPath, 'utf8')
+    writeFileSync(
+      markdownPath,
+      current.replace(
+        `Source task: ${sourceTitle} (ID: ${sourceId})`,
+        `Source task: ${sourceTitle}`,
+      ),
+    )
+
+    expect(store.list().memories[0]?.sourceId).toBe(sourceId)
+    expect(readFileSync(markdownPath, 'utf8')).toContain(
+      `Source task: ${sourceTitle} (ID: ${sourceId})`,
+    )
   })
 
   test('imports content-only Markdown edits into SQLite and FTS', () => {

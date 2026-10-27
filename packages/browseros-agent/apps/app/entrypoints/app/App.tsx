@@ -17,6 +17,7 @@ import { NewTabLayout } from '@/screens/newtab/layout/NewTabLayout'
 import { Personalize } from '@/screens/newtab/personalize/Personalize'
 import { OnboardingAiPage } from '@/screens/onboarding-ai/OnboardingAiPage'
 import { ScheduledTasksPage } from '@/screens/scheduled-tasks/ScheduledTasksPage'
+import { TaskHistoryPage } from '@/screens/task-history/TaskHistoryPage'
 
 function getSurveyParams(): { maxTurns?: number; experimentId?: string } {
   const params = new URLSearchParams(window.location.search)
@@ -60,6 +61,8 @@ export const App: FC = () => {
 
           <Route path="connect-apps" element={<ConnectMCP />} />
           <Route path="scheduled" element={<ScheduledTasksPage />} />
+          <Route path="tasks" element={<TaskHistoryPage />} />
+          <Route path="tasks/:taskId" element={<TaskHistoryPage />} />
         </Route>
 
         <Route element={<SettingsSidebarLayout />}>

@@ -67,7 +67,17 @@ def main() -> int:
                             "approvalCount": 0,
                             "deniedCount": 0,
                             "errorCount": 0,
-                            "steps": [],
+                            "steps": [
+                                {
+                                    "id": str(uuid.uuid4()),
+                                    "toolName": "browser.search",
+                                    "order": 1,
+                                    "state": "output-available",
+                                    "startedAt": "2026-10-27T00:00:00.500Z",
+                                    "completedAt": "2026-10-27T00:00:00.750Z",
+                                    "previewText": "Found the local fixture result.",
+                                }
+                            ],
                         },
                         {
                             "id": str(uuid.uuid4()),
@@ -90,6 +100,24 @@ def main() -> int:
         cdp.evaluate(
             "chrome.storage.local.set(" + json.dumps(task_fixture) + ")"
         )
+        cdp.evaluate("location.hash = '#/tasks'")
+        wait_for(cdp, "document.body.innerText.includes('Task History')")
+        wait_for(cdp, f"document.body.innerText.includes({json.dumps(task_title)})")
+        assert not cdp.evaluate(
+            "document.body.innerText.includes("
+            + json.dumps(credential_task_title)
+            + ") || document.body.innerText.includes("
+            + json.dumps(credential_task_result)
+            + ")"
+        ), "credential-shaped task content appeared in task history"
+        cdp.evaluate(
+            "[...document.querySelectorAll('a')].find(x=>x.innerText.includes("
+            + json.dumps(task_title)
+            + "))?.click()"
+        )
+        wait_for(cdp, f"document.body.innerText.includes({json.dumps('Task ID: ' + task_id)})")
+        wait_for(cdp, "document.body.innerText.includes('Found the local fixture result.')")
+        wait_for(cdp, "document.body.innerText.includes('No downloadable artifacts are attached')")
         cdp.evaluate("location.hash = '#/home'")
         wait_for(cdp, "location.hash.endsWith('/home')")
         cdp.evaluate("location.hash = '#/settings/memory'")
@@ -125,6 +153,7 @@ def main() -> int:
             "[...document.querySelectorAll('article')].find(x=>x.innerText.includes('From task:'))?.innerText"
         )
         assert task_result in task_note, "saved task note lost its result"
+        assert task_id in task_note, "saved task note hid its exact source task ID"
 
         cdp.evaluate(set_value("textarea", note))
         cdp.evaluate("[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Save note')?.click()")
@@ -210,6 +239,7 @@ def main() -> int:
             "create_search_edit_delete": "passed",
             "review_and_explicitly_save_task_draft_with_provenance": "passed",
             "credential_shaped_task_hidden_from_memory_review": "passed",
+            "task_history_timeline_and_empty_artifacts_state": "passed",
             "explicit_memory_context_select_remove": "passed",
             "explicit_history_context_select_remove": "passed",
             "network": "isolated",

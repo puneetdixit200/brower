@@ -108,7 +108,7 @@ function renderMarkdownMirror(entries: MemoryRow[]): string {
       entry.content,
       '',
       entry.source === 'task'
-        ? `Source task: ${(entry.source_title ?? entry.source_id ?? 'Completed task').replaceAll(/\s+/g, ' ')}`
+        ? taskSourceMetadata(entry)
         : entry.source_url
           ? `Source: <${entry.source_url}>`
           : 'Source: user',
@@ -116,6 +116,15 @@ function renderMarkdownMirror(entries: MemoryRow[]): string {
       '',
     ]),
   ].join('\n')
+}
+
+function taskSourceMetadata(entry: MemoryRow): string {
+  const title = (entry.source_title ?? 'Completed task').replaceAll(/\s+/g, ' ')
+  return `Source task: ${title} (ID: ${entry.source_id ?? 'unknown'})`
+}
+
+function legacyTaskSourceMetadata(entry: MemoryRow): string {
+  return `Source task: ${(entry.source_title ?? entry.source_id ?? 'Completed task').replaceAll(/\s+/g, ' ')}`
 }
 
 function readMemoryRows(): MemoryRow[] {
@@ -157,7 +166,7 @@ function containsCredentialShapedText(value: string): boolean {
 
 function expectedSourceMetadata(entry: MemoryRow): string {
   if (entry.source === 'task') {
-    return `Source task: ${(entry.source_title ?? entry.source_id ?? 'Completed task').replaceAll(/\s+/g, ' ')}`
+    return taskSourceMetadata(entry)
   }
   return entry.source_url ? `Source: <${entry.source_url}>` : 'Source: user'
 }
@@ -176,7 +185,12 @@ function extractEditedContent(section: string, entry: MemoryRow): string {
     throw new Error(`Memory Markdown note ${entry.id} has malformed metadata`)
   }
   const expectedUpdated = `Updated: ${new Date(entry.updated_at).toISOString()}`
-  if (metadata[0] !== expectedSourceMetadata(entry)) {
+  if (
+    metadata[0] !== expectedSourceMetadata(entry) &&
+    !(
+      entry.source === 'task' && metadata[0] === legacyTaskSourceMetadata(entry)
+    )
+  ) {
     throw new Error(
       `Memory Markdown note ${entry.id} metadata is read-only and was not imported`,
     )

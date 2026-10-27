@@ -1,4 +1,10 @@
-import { CalendarClock, Home, PlugZap, Settings } from 'lucide-react'
+import {
+  CalendarClock,
+  ClipboardList,
+  Home,
+  PlugZap,
+  Settings,
+} from 'lucide-react'
 import type { FC } from 'react'
 import { NavLink, useLocation } from 'react-router'
 import {
@@ -28,6 +34,7 @@ const primaryNavItems: NavItem[] = [
     to: '/connect-apps',
     icon: PlugZap,
   },
+  { name: 'Task History', to: '/tasks', icon: ClipboardList },
   { name: 'Scheduled Tasks', to: '/scheduled', icon: CalendarClock },
   {
     name: 'Settings',
@@ -40,6 +47,8 @@ function isNavItemActive(item: NavItem, pathname: string): boolean {
   if (item.to === '/settings/ai') {
     return pathname.startsWith('/settings')
   }
+
+  if (item.to === '/tasks') return pathname.startsWith('/tasks')
 
   return pathname === item.to
 }

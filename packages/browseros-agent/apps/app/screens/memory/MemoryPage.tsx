@@ -420,6 +420,10 @@ export const MemoryPage: FC = () => {
                   {memory.source === 'task' ? (
                     <span>
                       From task: {memory.sourceTitle ?? 'Completed task'}
+                      {' · Task ID: '}
+                      <code className="break-all">
+                        {memory.sourceId ?? 'unknown'}
+                      </code>
                     </span>
                   ) : memory.sourceUrl ? (
                     <a
