@@ -171,7 +171,8 @@ Reconcile the feature matrix with completed history/memory and approval work, th
 
 - A headed network-isolated run against a configured provider at unused loopback port 9106 exposed a classification gap: the AI SDK wraps refused sockets in a retryable `APICallError`, which had been rendered as generic “Something went wrong.” `toChatError` now maps retryable API errors without an HTTP status to the existing `connection_failed` envelope and troubleshooting guidance.
 - The headed BrowserOS smoke verifies the side panel displays “Connection failed” and Retry, retrying produces the same actionable error, and the test-only dummy key is absent from both views. It uses no external network or provider credential. The repeatable flow is `tests/e2e/aster_provider_offline_smoke.py`.
-- Chat-error classifier and stream tests pass (28/28), targeted Biome passes, and the headed smoke passes. The required full workspace typecheck and a real missing-provider/agent-server outage flow remain to verify; A13 stays PARTIAL.
+- Chat-error classifier and stream tests pass (28/28), full workspace typecheck and targeted Biome pass, and the headed smoke passes. A real missing-provider/agent-server outage flow remains to verify; A13 stays PARTIAL.
+- Legacy local fetch failures now tell the user that Aster’s local AI service could not be reached, with a retry action and no BrowserOS-branded help link. The focused `ChatError` suite passes (10/10); a headed agent-process outage flow is still not verified.
 
 ### Security follow-up — filesystem path boundaries (partial)
 

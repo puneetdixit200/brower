@@ -57,6 +57,8 @@ describe('ChatError legacy string handling', () => {
   it('shows retry for connection errors', () => {
     const html = renderError(new Error('Failed to fetch'))
 
+    expect(html).toContain('Could not reach Aster’s local AI service.')
+    expect(html).not.toContain('docs.browseros.com')
     expect(html).toContain('Try again')
   })
 

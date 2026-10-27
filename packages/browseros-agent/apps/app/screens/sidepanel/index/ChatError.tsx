@@ -75,14 +75,12 @@ function fromEnvelope(envelope: ChatErrorEnvelope): ChatErrorView {
  * or an error raised outside the classifier.
  */
 function fromMessage(message: string): ChatErrorView {
-  // All chat requests go through the local BrowserOS agent server, so any
-  // fetch failure is always a local connection issue.
+  // Chat requests go through the local agent service, so fetch failures here
+  // describe the local service connection rather than the model provider.
   if (message.includes('Failed to fetch') || message.includes('fetch failed')) {
     return {
       title: 'Connection failed',
-      text: 'Unable to connect to BrowserOS agent. Follow below instructions.',
-      url: 'https://docs.browseros.com/troubleshooting/connection-issues',
-      linkLabel: 'View troubleshooting guide',
+      text: 'Could not reach Aster’s local AI service. Check that Aster is running, then try again.',
       canRetry: true,
     }
   }
