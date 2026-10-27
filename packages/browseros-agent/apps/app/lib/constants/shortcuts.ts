@@ -3,6 +3,15 @@
  */
 export const SHORTCUTS_LIST = [
   {
+    key: 'K',
+    description: 'Open Aster command palette',
+    modifier: {
+      windows: 'Ctrl+Alt',
+      mac: '⌘+Option',
+      linux: 'Ctrl+Alt',
+    },
+  },
+  {
     key: 'A',
     description: 'Toggle Agent',
     modifier: {
