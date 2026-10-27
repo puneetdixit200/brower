@@ -30,6 +30,7 @@ export const Chat = () => {
     setMode,
     messages,
     sendMessage,
+    respondToToolApproval,
     status,
     stop,
     agentUrlError,
@@ -190,6 +191,7 @@ export const Chat = () => {
             onClickLike={onClickLike}
             disliked={disliked}
             onClickDislike={onClickDislike}
+            onToolApprovalResponse={respondToToolApproval}
             showJtbdPopup={popupVisible}
             showDontShowAgain={showDontShowAgain}
             onTakeSurvey={onTakeSurvey}

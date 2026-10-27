@@ -18,13 +18,33 @@ describe('mock language model browser fixture', () => {
     expect(first.content).toEqual([
       {
         type: 'tool-call',
-        toolCallId: 'fixture-tabs-list',
+        toolCallId: 'fixture-tool-call',
         toolName: 'tabs',
         input: JSON.stringify({ action: 'list' }),
       },
     ])
     expect(second.content).toEqual([
       { type: 'text', text: 'Mock BrowserOS test response.' },
+    ])
+  })
+
+  it('offers the fixed act.click call for approval boundary fixtures', async () => {
+    process.env.BROWSEROS_MOCK_TOOL_CALL = 'act.click'
+    const model = createMockLanguageModel()
+    const result = await model.doGenerate({ prompt: [] })
+
+    expect(result.content).toEqual([
+      {
+        type: 'tool-call',
+        toolCallId: 'fixture-tool-call',
+        toolName: 'act',
+        input: JSON.stringify({
+          page: 1,
+          kind: 'click',
+          ref: 'e1',
+          diff: 'none',
+        }),
+      },
     ])
   })
 })

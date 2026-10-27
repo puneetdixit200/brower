@@ -1,3 +1,4 @@
+import type { UIMessage } from 'ai'
 import type { Provider } from '../../components/chat/chatComponentTypes'
 import type { LlmProviderConfig } from '../../lib/llm-providers/types'
 import { buildChatRequestBody } from '../../lib/messaging/server/buildChatRequestBody'
@@ -7,6 +8,39 @@ import {
 } from './sidepanel-chat-targets'
 
 export type LlmChatRequestBodyInput = Parameters<typeof buildChatRequestBody>[0]
+
+export function getToolApprovalResponse(messages: UIMessage[]) {
+  for (
+    let messageIndex = messages.length - 1;
+    messageIndex >= 0;
+    messageIndex--
+  ) {
+    const message = messages[messageIndex]
+    if (message.role !== 'assistant') continue
+    for (
+      let partIndex = message.parts.length - 1;
+      partIndex >= 0;
+      partIndex--
+    ) {
+      const part = message.parts[partIndex] as {
+        state?: string
+        approval?: { id?: string; approved?: boolean; reason?: string }
+      }
+      if (
+        part.state === 'approval-responded' &&
+        part.approval?.id &&
+        typeof part.approval.approved === 'boolean'
+      ) {
+        return {
+          id: part.approval.id,
+          approved: part.approval.approved,
+          ...(part.approval.reason ? { reason: part.approval.reason } : {}),
+        }
+      }
+    }
+  }
+  return undefined
+}
 
 export type CommonSidepanelRequestInput = Omit<
   LlmChatRequestBodyInput,
@@ -72,6 +106,9 @@ export function buildSidepanelPreparedSendMessagesRequest({
         attachments: common.attachments?.length
           ? common.attachments
           : undefined,
+        ...(common.approvalResponse
+          ? { approvalResponse: common.approvalResponse }
+          : {}),
       },
     }
   }

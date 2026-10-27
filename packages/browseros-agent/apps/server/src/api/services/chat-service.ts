@@ -25,6 +25,7 @@ import {
   stripReasoningParts,
 } from '../../agent/message-validation'
 import type { AgentSession, SessionStore } from '../../agent/session-store'
+import { applyToolApprovalResponse } from '../../agent/tool-approval-response'
 import type { ResolvedAgentConfig } from '../../agent/types'
 import {
   AcpAgentPreparationError,
@@ -421,10 +422,39 @@ export class ChatService {
     // copy below — the LLM sees it, the user-visible state never
     // does.
     const messagesBeforeTurn = [...session.agent.messages]
-    session.agent.appendUserMessage(request.message)
+    let wrappedUserMessageId: string | undefined
+    if (request.approvalResponse) {
+      if (request.message.trim()) {
+        throw new ChatRequestError(
+          Response.json(
+            { error: 'Approval responses cannot include a new message' },
+            { status: 400 },
+          ),
+        )
+      }
+      const pending = applyToolApprovalResponse(
+        session.agent.messages,
+        request.approvalResponse,
+      )
+      if (!pending) {
+        throw new ChatRequestError(
+          Response.json(
+            { error: 'No matching pending tool approval' },
+            { status: 409 },
+          ),
+        )
+      }
+      logger.info('Tool approval response received', {
+        conversationId: request.conversationId,
+        toolName: pending.toolName,
+        approved: request.approvalResponse.approved,
+      })
+    } else {
+      session.agent.appendUserMessage(request.message)
+      wrappedUserMessageId =
+        session.agent.messages[session.agent.messages.length - 1]?.id
+    }
     const promptUserText = contextPrefix + userContent
-    const wrappedUserMessageId =
-      session.agent.messages[session.agent.messages.length - 1]?.id
 
     // Strip reasoning from the request copy only. session.agent.messages keeps
     // reasoning so it still persists to SQLite and renders in the client history;

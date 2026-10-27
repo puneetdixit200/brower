@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test'
+import type { UIMessage } from 'ai'
 import type { LlmProviderConfig } from '@/lib/llm-providers/types'
 import {
   buildSidepanelPreparedSendMessagesRequest,
+  getToolApprovalResponse,
   prepareSidepanelSendMessagesRequest,
 } from './chat-session-request'
 import type { SidepanelChatTarget } from './sidepanel-chat-targets'
@@ -103,6 +105,40 @@ describe('chat request preparation', () => {
 
     expect(first.api).toBe('http://127.0.0.1:9200/chat')
     expect(second.api).toBe('http://127.0.0.1:9201/chat')
+  })
+
+  it('forwards only the approval decision from the responded assistant part', () => {
+    const message = {
+      id: 'assistant-1',
+      role: 'assistant',
+      parts: [
+        {
+          type: 'tool-act',
+          toolCallId: 'call-1',
+          state: 'approval-responded',
+          input: { kind: 'click', ref: 'e1' },
+          approval: { id: 'approval-1', approved: false },
+        },
+      ],
+    } as UIMessage
+
+    expect(getToolApprovalResponse([message])).toEqual({
+      id: 'approval-1',
+      approved: false,
+    })
+  })
+
+  it('adds approval decision to BrowserOS chat requests only when present', () => {
+    const request = buildSidepanelPreparedSendMessagesRequest({
+      agentServerUrl: 'http://127.0.0.1:5151',
+      target: llmTarget,
+      fallbackProvider,
+      approvalResponse: { id: 'approval-1', approved: true },
+      ...commonRequestInput(),
+    })
+    expect(request.body).toMatchObject({
+      approvalResponse: { id: 'approval-1', approved: true },
+    })
   })
 })
 

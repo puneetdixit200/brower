@@ -84,6 +84,13 @@ export function createChatRoutes(deps: ChatRouteDeps): Hono<Env> {
   const app = new Hono<Env>()
   app.post('/', zValidator('json', ChatRequestSchema), async (c) => {
     const parsed = c.req.valid('json')
+    if (
+      'approvalResponse' in parsed &&
+      parsed.approvalResponse &&
+      !isTrustedAppRequest(c)
+    ) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
     const parsedBrowserRequest = isBrowserOsChatRequest(parsed) ? parsed : null
     if (!parsedBrowserRequest && !isTrustedAppRequest(c)) {
       return c.json({ error: 'Forbidden' }, 403)

@@ -1,6 +1,11 @@
 import { useChat } from '@ai-sdk/react'
 import { useQueryClient } from '@tanstack/react-query'
-import { DefaultChatTransport, type FileUIPart, type UIMessage } from 'ai'
+import {
+  DefaultChatTransport,
+  type FileUIPart,
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+  type UIMessage,
+} from 'ai'
 import { compact } from 'es-toolkit/array'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
@@ -45,6 +50,7 @@ import {
   shouldPersistHistory,
 } from './chat-session-persistence'
 import {
+  getToolApprovalResponse,
   prepareSidepanelSendMessagesRequest,
   toProviderOption,
 } from './chat-session-request'
@@ -60,7 +66,10 @@ import {
 } from './conversation-run-client'
 import { useExecutionHistoryTracker } from './execution-history-tracker.hooks'
 import { PanelConversationAttachment } from './panel-conversation-attachment'
-import { toLlmProviderConfig } from './sidepanel-chat-targets'
+import {
+  type SidepanelChatTarget,
+  toLlmProviderConfig,
+} from './sidepanel-chat-targets'
 import { stripImageToolOutputs } from './tool-output-strip'
 
 const getLastMessageText = (messages: UIMessage[]) => {
@@ -90,6 +99,16 @@ const getLastUserMessageFiles = (messages: UIMessage[]) => {
   }
   return []
 }
+
+const getApprovalResponseForTarget = (
+  messages: UIMessage[],
+  target: SidepanelChatTarget | undefined,
+) => (target?.kind === 'acp' ? undefined : getToolApprovalResponse(messages))
+
+const getApprovalAwareMessage = (
+  messages: UIMessage[],
+  approvalResponse: ReturnType<typeof getToolApprovalResponse>,
+) => (approvalResponse ? '' : getLastMessageText(messages))
 
 const getResponseAndQueryFromMessageId = (
   messages: UIMessage[],
@@ -457,6 +476,10 @@ export const useChatSession = (options?: ChatSessionOptions) => {
           optionsRef.current?.origin,
           personalizationRef.current,
         )
+        const approvalResponse = getApprovalResponseForTarget(
+          messages,
+          selectedChatTargetRef.current,
+        )
         const commonRequest = {
           conversationId: conversationIdRef.current,
           mode: currentMode,
@@ -466,13 +489,14 @@ export const useChatSession = (options?: ChatSessionOptions) => {
           previousConversation,
           persist,
           declinedApps,
+          approvalResponse,
           attachments: getLastUserMessageFiles(messages).map((file) => ({
             mediaType: file.mediaType,
             data: file.url,
           })),
         }
 
-        const message = getLastMessageText(messages)
+        const message = getApprovalAwareMessage(messages, approvalResponse)
 
         const result = await prepareSidepanelSendMessagesRequest({
           resolveAgentServerUrl,
@@ -503,6 +527,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   const {
     messages,
     sendMessage: baseSendMessage,
+    addToolApprovalResponse,
     setMessages,
     status,
     stop: detachStream,
@@ -511,6 +536,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
     regenerate,
   } = useChat({
     transport: chatTransport,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     onError: () => {
       // A failed local POST belongs to the user's Retry action. Only mirrored
       // stream failures should rehydrate; replaying an older run here would
@@ -1075,6 +1101,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
     setMode,
     messages,
     sendMessage,
+    respondToToolApproval: addToolApprovalResponse,
     status,
     stop,
     providers,

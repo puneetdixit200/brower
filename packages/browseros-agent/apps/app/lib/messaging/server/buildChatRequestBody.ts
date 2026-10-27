@@ -66,6 +66,7 @@ export interface ChatRequestBodyParams {
     title: string
   }
   isScheduledTask?: boolean
+  approvalResponse?: { id: string; approved: boolean; reason?: string }
 }
 
 export const buildChatRequestBody = ({
@@ -84,6 +85,7 @@ export const buildChatRequestBody = ({
   selectedText,
   selectedTextSource,
   isScheduledTask,
+  approvalResponse,
 }: ChatRequestBodyParams) => ({
   // The provider is named, not described. The server holds the list and which
   // one is selected, so it resolves the model, endpoint and credentials from
@@ -111,4 +113,5 @@ export const buildChatRequestBody = ({
   selectedText,
   selectedTextSource,
   isScheduledTask,
+  ...(approvalResponse ? { approvalResponse } : {}),
 })

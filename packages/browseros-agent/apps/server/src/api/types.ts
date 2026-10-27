@@ -49,6 +49,13 @@ const PreviousConversationSchema = z
 const ChatInputSchema = z.object({
   conversationId: z.string().uuid(),
   message: z.string().optional().default(''),
+  approvalResponse: z
+    .object({
+      id: z.string().min(1),
+      approved: z.boolean(),
+      reason: z.string().optional(),
+    })
+    .optional(),
   contextWindowSize: z.number().optional(),
   browserContext: BrowserContextSchema.optional(),
   userSystemPrompt: z.string().optional(),

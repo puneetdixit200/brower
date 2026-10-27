@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { devToolsMiddleware } from '@ai-sdk/devtools'
 import type {
   LanguageModelV4,
@@ -40,7 +41,12 @@ import {
   serializesReasoningContent,
 } from './provider-factory'
 import { buildAgentReasoningConfig } from './reasoning-config'
+import { decideToolApproval } from './tool-approval-policy'
 import type { ResolvedAgentConfig } from './types'
+
+// Approval signatures are process-scoped. A restart invalidates an unresolved
+// approval, so recovered tasks cannot execute an action approved by stale UI.
+const TOOL_APPROVAL_SECRET = randomBytes(32)
 
 export interface AiSdkAgentConfig {
   resolvedConfig: ResolvedAgentConfig
@@ -335,6 +341,20 @@ export class AiSdkAgent {
         model,
         instructions,
         tools,
+        toolApproval: ({ toolCall, tools: availableTools }) => {
+          const tool = availableTools?.[toolCall.toolName] as
+            | { description?: string }
+            | undefined
+          const decision = decideToolApproval({
+            toolName: toolCall.toolName,
+            input: toolCall.input,
+            description: tool?.description,
+          })
+          return decision.required
+            ? { type: 'user-approval', reason: decision.reason }
+            : undefined
+        },
+        experimental_toolApprovalSecret: TOOL_APPROVAL_SECRET,
         stopWhen: [stepCountIs(AGENT_LIMITS.MAX_TURNS)],
         prepareStep,
         ...buildAgentReasoningConfig(config.resolvedConfig),

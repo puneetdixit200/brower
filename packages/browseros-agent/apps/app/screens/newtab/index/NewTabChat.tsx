@@ -36,6 +36,7 @@ export const NewTabChat: FC = () => {
     setMode,
     messages,
     sendMessage,
+    respondToToolApproval,
     status,
     agentUrlError,
     chatError,
@@ -187,6 +188,7 @@ export const NewTabChat: FC = () => {
               onClickLike={onClickLike}
               disliked={disliked}
               onClickDislike={onClickDislike}
+              onToolApprovalResponse={respondToToolApproval}
               showJtbdPopup={false}
               showDontShowAgain={false}
               onTakeSurvey={() => {}}

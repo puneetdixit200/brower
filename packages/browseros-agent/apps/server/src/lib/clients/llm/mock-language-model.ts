@@ -25,10 +25,24 @@ const MOCK_USAGE: LanguageModelV3Usage = {
   },
 }
 
-/** A deliberately narrow fixture hook for isolated, local browser-tool smokes. */
+/** A fixed allowlist of deterministic calls for isolated browser-tool smokes. */
 function mockToolCall(): { toolName: string; input: string } | undefined {
-  if (process.env.BROWSEROS_MOCK_TOOL_CALL !== 'tabs.list') return undefined
-  return { toolName: 'tabs', input: JSON.stringify({ action: 'list' }) }
+  switch (process.env.BROWSEROS_MOCK_TOOL_CALL) {
+    case 'tabs.list':
+      return { toolName: 'tabs', input: JSON.stringify({ action: 'list' }) }
+    case 'act.click':
+      return {
+        toolName: 'act',
+        input: JSON.stringify({
+          page: 1,
+          kind: 'click',
+          ref: 'e1',
+          diff: 'none',
+        }),
+      }
+    default:
+      return undefined
+  }
 }
 
 function createMockResult(): LanguageModelV3GenerateResult {
@@ -87,7 +101,7 @@ export function createMockLanguageModel(): LanguageModel {
       toolCallPending = false
       return {
         content: [
-          { type: 'tool-call', toolCallId: 'fixture-tabs-list', ...call },
+          { type: 'tool-call', toolCallId: 'fixture-tool-call', ...call },
         ],
         finishReason: { unified: 'tool-calls', raw: 'tool_calls' },
         usage: MOCK_USAGE,
@@ -101,7 +115,7 @@ export function createMockLanguageModel(): LanguageModel {
         const toolChunks: LanguageModelV3StreamPart[] = [
           {
             type: 'tool-call',
-            toolCallId: 'fixture-tabs-list',
+            toolCallId: 'fixture-tool-call',
             ...call,
           },
           {

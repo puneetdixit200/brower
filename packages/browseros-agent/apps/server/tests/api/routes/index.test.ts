@@ -225,6 +225,21 @@ describe('createApiRoutes', () => {
     expect(remote.status).toBe(403)
   })
 
+  it('rejects originless browser chat approval responses', async () => {
+    const response = await createTestApp().request('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        target: { type: 'browseros' },
+        conversationId: '00000000-0000-4000-8000-000000000003',
+        message: '',
+        approvalResponse: { id: 'approval-1', approved: true },
+      }),
+    })
+
+    expect(response.status).toBe(403)
+  })
+
   it('requires a trusted local app request before probing host agents', async () => {
     const response = await createTestApp().request('/acpx/probe', {
       method: 'POST',
