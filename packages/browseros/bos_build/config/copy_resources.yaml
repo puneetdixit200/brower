@@ -112,6 +112,26 @@ copy_operations:
     type: "directory"
     product: "browserclaw"
 
+  # Aster is a separate Linux product. Its icons and server bundle must be
+  # selected explicitly, not inherited from BrowserOS in debug mode.
+  - name: "Aster Product Logo Icons"
+    source: "resources/aster/icons/*.png"
+    destination: "chrome/app/theme/chromium/"
+    type: "files"
+    product: "aster"
+    os: ["linux"]
+
+  - name: "Aster Linux x64 Server Resources"
+    source: "resources/binaries/aster_server/linux-x64/resources"
+    destination: "chrome/browser/browseros/aster_server/resources"
+    type: "directory"
+    product: "aster"
+    managed: true
+    required: true
+    clear_destination: true
+    os: ["linux"]
+    arch: ["x64"]
+
   - name: "BrowserOS Server Resources - macOS ARM64"
     source: "resources/binaries/browseros_server/darwin-arm64/resources"
     destination: "chrome/browser/browseros/server/resources"
