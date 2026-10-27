@@ -18,6 +18,7 @@ export interface MCPServerHeaderProps {
   serverUrl: string | null
   isLoading: boolean
   error: string | null
+  accessToken: string | null
   onServerRestart?: () => void
 }
 
@@ -27,6 +28,7 @@ export const MCPServerHeader: FC<MCPServerHeaderProps> = ({
   serverUrl,
   isLoading,
   error,
+  accessToken,
   onServerRestart,
 }) => {
   const [isCopied, setIsCopied] = useState(false)
@@ -136,6 +138,26 @@ export const MCPServerHeader: FC<MCPServerHeaderProps> = ({
               </Button>
               <ServerPortEditor onPortChanged={onServerRestart} />
             </div>
+          </div>
+          <div className="mt-3 flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2">
+            <span className="whitespace-nowrap font-medium text-sm">
+              MCP bearer token:
+            </span>
+            <code className="flex-1 break-all font-mono text-xs">
+              {accessToken ?? 'Loading...'}
+            </code>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!accessToken}
+              onClick={async () => {
+                if (!accessToken) return
+                await navigator.clipboard.writeText(`Bearer ${accessToken}`)
+                toast.success('Authorization header copied')
+              }}
+            >
+              Copy header
+            </Button>
           </div>
         </div>
       </div>

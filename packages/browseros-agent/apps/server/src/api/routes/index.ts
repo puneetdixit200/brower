@@ -81,6 +81,10 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
       .use('/agents/*', requireTrustedAppOrigin())
       .use('/conversations/*', requireTrustedAppOrigin())
       .use('/mcp-manager/*', requireTrustedAppOrigin())
+      .use(
+        '/mcp-manager/access',
+        requireTrustedAppOrigin({ requireOrigin: true }),
+      )
       .use('/oauth/*', requireTrustedAppOrigin({ requireOrigin: true }))
       .use('/providers/*', requireTrustedAppOrigin())
       .use('/test-provider/*', requireTrustedAppOrigin())
@@ -101,12 +105,14 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
         '/mcp',
         createMcpRoutes({
           browserMcp,
+          mcpAccessToken: config.mcpAccessToken ?? '',
         }),
       )
       .route(
         '/mcp-manager',
         createMcpManagerRoutes({
           getMcpUrl: () => `http://127.0.0.1:${port}/mcp`,
+          mcpAccessToken: config.mcpAccessToken ?? '',
           klavis,
         }),
       )

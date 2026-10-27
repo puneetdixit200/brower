@@ -1,6 +1,6 @@
 # Progress
 
-## Current phase: Phase 7 — approval gate and response path
+## Current phase: Phase 7 — approval and external MCP authentication
 
 **Status: PARTIAL.** Phase 0 is complete against the upstream BrowserOS baseline. Phase 1 dependency installation, static checks, and the development extension build are complete; the full upstream test run has failures. Phase 2's Linux supervisor flow is verified end-to-end. Phase 3 has an Aster home visual foundation and a headed Search/Ask smoke. No Aster-branded browser binary or release package exists.
 
@@ -97,7 +97,7 @@
 - Route review found `/mcp-manager/*` connector install/uninstall and `/oauth/*` state-changing start/token paths were mounted before any trusted-app guard. Hono applies middleware in registration order, so these guards now register before the routes; OAuth additionally requires an explicit trusted app origin even for GET because `/start` creates OAuth state.
 - Route tests cover originless connector install/OAuth rejection and extension-origin success. Workspace typecheck passed.
 - A second review found chat submissions could use caller-supplied provider credentials without app-origin auth, while conversation state/stream and stop routes were unauthenticated. The entire `/chat/*` surface now requires an explicit trusted extension origin. Originless tests verify state, stream, stop, and submission requests fail; extension-origin chat and stream tests pass.
-- `/mcp` internal agent calls use a server-issued lease, but external MCP clients currently connect without a bearer token and receive the full tool surface. Do not expose external MCP until authenticated client setup is implemented. `/system/shutdown` also keeps its originless localhost compatibility route for shipped BrowserOS restart flows, so another local process can request server shutdown. Packaged ports, telemetry/updater, and third-party requests remain to audit.
+- `/mcp` internal agent calls use a server-issued lease; external MCP now requires a persistent bearer token. The `/system/shutdown` route still accepts originless localhost restart requests for shipped BrowserOS compatibility, so another local process can request shutdown. Packaged ports, telemetry/updater, and third-party requests remain to audit.
 
 ### Current blockers / limits
 
@@ -108,4 +108,12 @@
 
 ### Next action
 
-Add a persistent bearer token and trusted setup flow for external MCP clients without weakening internal conversation leases. Then audit packaged ports, telemetry/updater, and remaining third-party requests. Add explicit approval-rule configuration and Guard/Full modes; verify an approved-action fixture and external send/payment fixture. Continue U06 history/file/memory context, matched browser benchmarks, shell regressions, and inherited extension identity/updater cleanup before distribution work.
+Complete a proxy-through-browser external MCP verification and audit packaged ports, telemetry/updater, and remaining third-party requests. Add explicit approval-rule configuration and Guard/Full modes; verify an approved-action fixture and external send/payment fixture. Continue U06 history/file/memory context, matched browser benchmarks, shell regressions, and inherited extension identity/updater cleanup before distribution work.
+
+
+### Phase 7 follow-up — persistent external MCP authentication (implementation in progress)
+
+- External `/mcp` POSTs now require a durable bearer token unless they carry a valid server-issued internal conversation lease. Read-only query flags do not bypass authentication. The token is generated once under the BrowserOS state directory with directory mode `0700` and file mode `0600`; comparison uses `timingSafeEqual`.
+- The trusted extension settings endpoint exposes the token for manual client setup. One-click HTTP client installs and boot-time URL reconciliation write the Authorization header. If the proxy URL is unavailable at startup, reconciliation preserves the existing manifest URL while migrating the header. The manual setup panel includes authenticated snippets.
+- Added focused tests for denied external access, continued internal lease behavior, token persistence/permissions, and client config emission. A proxy-through-browser and real third-party MCP client round-trip remain unverified; packaging must preserve the private token file and token migration behavior must be checked before release.
+- Current coverage at this checkpoint: focused MCP/settings tests pass (65/65 across isolated test runs); server and app typechecks pass independently. A single combined Bun invocation is unsuitable because the route test's module mock collides with MCP manager tests. Final docs/commit review and a proxy-through-browser round-trip remain pending.

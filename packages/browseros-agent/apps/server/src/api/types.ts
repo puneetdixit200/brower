@@ -171,6 +171,8 @@ export interface HttpServerConfig {
   executionDir: string
   resourcesDir: string
   aiSdkDevtoolsEnabled?: boolean
+  /** Durable credential for external MCP clients. Internal calls use leases. */
+  mcpAccessToken?: string
   activity?: ServerActivity
   onShutdown?: () => void
 }

@@ -29,6 +29,7 @@ interface McpManagerRouteOptions {
    * that have no other source.
    */
   getMcpUrl: () => string
+  mcpAccessToken: string
   /**
    * Optional Klavis service. When present, its connector tools are included in
    * `GET /tools` so the list matches what the `/mcp` tools/list exposes.
@@ -43,7 +44,7 @@ const InstallBodySchema = z
   .partial()
 
 export function createMcpManagerRoutes(options: McpManagerRouteOptions) {
-  const { getMcpUrl, klavis } = options
+  const { getMcpUrl, klavis, mcpAccessToken } = options
 
   return new Hono()
     .get('/tools', (c) => {
@@ -69,6 +70,7 @@ export function createMcpManagerRoutes(options: McpManagerRouteOptions) {
         return c.json({ message }, 500)
       }
     })
+    .get('/access', (c) => c.json({ token: mcpAccessToken }))
     .get('/agents', async (c) => {
       try {
         const agents = await listAgents()
@@ -93,7 +95,7 @@ export function createMcpManagerRoutes(options: McpManagerRouteOptions) {
       }
       const url = parsed.data.mcpUrl ?? getMcpUrl()
       try {
-        const result = await installInto(id, url)
+        const result = await installInto(id, url, mcpAccessToken)
         return c.json(result, 200)
       } catch (err) {
         const { message, status } = humaniseInstallError(err)

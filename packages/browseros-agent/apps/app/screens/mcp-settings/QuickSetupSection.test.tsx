@@ -33,14 +33,19 @@ mock.module('@/components/ui/tabs', () => ({
     createElement('button', { type: 'button', ...props }, children),
 }))
 
-let QuickSetupSection: FC<{ serverUrl: string | null }>
+let QuickSetupSection: FC<{
+  serverUrl: string | null
+  accessToken?: string | null
+}>
 
 beforeAll(async () => {
   QuickSetupSection = (await import('./QuickSetupSection')).QuickSetupSection
 })
 
 function render(serverUrl = 'http://127.0.0.1:9200/mcp'): string {
-  return renderToStaticMarkup(createElement(QuickSetupSection, { serverUrl }))
+  return renderToStaticMarkup(
+    createElement(QuickSetupSection, { serverUrl, accessToken: 'test-token' }),
+  )
 }
 
 describe('QuickSetupSection', () => {
@@ -48,7 +53,7 @@ describe('QuickSetupSection', () => {
     const html = render()
 
     expect(html).toContain(
-      'claude mcp add --transport http browseros http://127.0.0.1:9200/mcp --scope user',
+      'claude mcp add --transport http browseros http://127.0.0.1:9200/mcp --header &quot;Authorization: Bearer test-token&quot; --scope user',
     )
   })
 

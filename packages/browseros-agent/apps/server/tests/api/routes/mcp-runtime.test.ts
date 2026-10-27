@@ -31,6 +31,7 @@ describe('/mcp BrowserMcpModule adapter', () => {
         createMcpServer,
         validateLeaseToken: mock(() => {}),
       } as never,
+      mcpAccessToken: 'test-access-token-01234567890123456789',
       createMcpTransport: (() => new FakeTransport()) as never,
     })
 
@@ -53,6 +54,7 @@ describe('/mcp BrowserMcpModule adapter', () => {
     })
     const app = createMcpRoutes({
       browserMcp: { createMcpServer, validateLeaseToken } as never,
+      mcpAccessToken: 'test-access-token-01234567890123456789',
       createMcpTransport: (() => new FakeTransport()) as never,
     })
 

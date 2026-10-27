@@ -8,6 +8,7 @@ interface McpServerCreation {
 }
 
 const serverCreations: McpServerCreation[] = []
+const TEST_ACCESS_TOKEN = 'test-access-token-01234567890123456789'
 const transportInstances: FakeTransport[] = []
 const connectCalls: FakeTransport[] = []
 
@@ -48,6 +49,7 @@ function createTestMcpRoutes(
       validateLeaseToken: () => {},
       createMcpServer: createMcpServerSpy,
     } as never,
+    mcpAccessToken: TEST_ACCESS_TOKEN,
     createMcpTransport: createMcpTransportSpy as never,
     ...overrides,
   })
@@ -60,7 +62,11 @@ async function postMcp(
 ) {
   return app.request(path, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...headers },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${TEST_ACCESS_TOKEN}`,
+      ...headers,
+    },
     body: JSON.stringify({
       jsonrpc: '2.0',
       id: 1,
@@ -70,6 +76,13 @@ async function postMcp(
 }
 
 describe('createMcpRoutes', () => {
+  it('requires bearer authentication for unleased external MCP requests', async () => {
+    const app = createTestMcpRoutes()
+    const response = await postMcp(app, { Authorization: 'Bearer wrong-token' })
+    expect(response.status).toBe(401)
+    expect(createMcpServerSpy).not.toHaveBeenCalled()
+  })
+
   it('opts into structured and read-only output only for exact query flags', async () => {
     const app = createTestMcpRoutes()
 

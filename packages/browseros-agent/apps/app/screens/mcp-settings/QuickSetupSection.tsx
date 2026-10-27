@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export interface QuickSetupSectionProps {
   serverUrl: string | null
+  accessToken?: string | null
 }
 
 interface ClientConfig {
@@ -13,7 +14,7 @@ interface ClientConfig {
   kind: 'command' | 'config'
   /** Short verb-led instruction shown above the snippet. */
   action: ReactNode
-  getSnippet: (url: string) => string
+  getSnippet: (url: string, token: string) => string
 }
 
 const clients: ClientConfig[] = [
@@ -32,14 +33,19 @@ const clients: ClientConfig[] = [
           settings.json
         </code>
         ). If the schema differs, the only values that matter are{' '}
-        <strong>type</strong> and <strong>url</strong>.
+        <strong>type</strong>, <strong>url</strong>, and the Authorization
+        header.
       </>
     ),
-    getSnippet: (url) =>
+    getSnippet: (url, token) =>
       JSON.stringify(
         {
           mcpServers: {
-            browseros: { type: 'http', url },
+            browseros: {
+              type: 'http',
+              url,
+              headers: { Authorization: `Bearer ${token}` },
+            },
           },
         },
         null,
@@ -51,8 +57,8 @@ const clients: ClientConfig[] = [
     name: 'Claude Code',
     kind: 'command',
     action: 'Run in your terminal:',
-    getSnippet: (url) =>
-      `claude mcp add --transport http browseros ${url} --scope user`,
+    getSnippet: (url, token) =>
+      `claude mcp add --transport http browseros ${url} --header "Authorization: Bearer ${token}" --scope user`,
   },
   {
     id: 'claude-desktop',
@@ -67,13 +73,19 @@ const clients: ClientConfig[] = [
         .
       </>
     ),
-    getSnippet: (url) =>
+    getSnippet: (url, token) =>
       JSON.stringify(
         {
           mcpServers: {
             browseros: {
               command: 'npx',
-              args: ['mcp-remote', url],
+              args: [
+                'mcp-remote',
+                url,
+                '--header',
+                `Authorization:\${BROWSEROS_MCP_AUTH}`,
+              ],
+              env: { BROWSEROS_MCP_AUTH: `Bearer ${token}` },
             },
           },
         },
@@ -84,9 +96,18 @@ const clients: ClientConfig[] = [
   {
     id: 'codex',
     name: 'Codex',
-    kind: 'command',
-    action: 'Run in your terminal:',
-    getSnippet: (url) => `codex mcp add browseros ${url}`,
+    kind: 'config',
+    action: (
+      <>
+        Add this TOML block to{' '}
+        <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
+          ~/.codex/config.toml
+        </code>
+        .
+      </>
+    ),
+    getSnippet: (url, token) =>
+      `[mcp_servers.browseros]\nurl = "${url}"\nhttp_headers = { Authorization = "Bearer ${token}" }`,
   },
 ]
 
@@ -122,8 +143,9 @@ const CopyButton: FC<{ text: string; label?: string }> = ({ text, label }) => {
 
 export const QuickSetupSection: FC<QuickSetupSectionProps> = ({
   serverUrl,
+  accessToken,
 }) => {
-  if (!serverUrl) return null
+  if (!serverUrl || !accessToken) return null
 
   return (
     <div className="space-y-3">
@@ -151,7 +173,7 @@ export const QuickSetupSection: FC<QuickSetupSectionProps> = ({
         </TabsList>
 
         {clients.map((client) => {
-          const snippet = client.getSnippet(serverUrl)
+          const snippet = client.getSnippet(serverUrl, accessToken)
           return (
             <TabsContent
               key={client.id}

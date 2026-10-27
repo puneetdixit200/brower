@@ -11,6 +11,7 @@ import { HttpAgentError } from '../agent/errors'
 import { initializeOAuth, shutdownOAuth } from '../lib/clients/oauth'
 import { getDb } from '../lib/db'
 import { logger } from '../lib/logger'
+import { loadOrCreateMcpAccessToken } from '../lib/mcp-access-token'
 import { Sentry } from '../lib/sentry'
 import { createApiRoutes } from './routes'
 import { KlavisService } from './services/klavis'
@@ -45,6 +46,8 @@ async function assertPortAvailable(port: number): Promise<void> {
 export async function createHttpServer(config: HttpServerConfig) {
   const { port, host = '127.0.0.1', browserosId } = config
   const { onShutdown } = config
+  const mcpAccessToken =
+    config.mcpAccessToken ?? (await loadOrCreateMcpAccessToken())
 
   const tokenManager = browserosId
     ? initializeOAuth(getDb(), browserosId)
@@ -56,7 +59,7 @@ export async function createHttpServer(config: HttpServerConfig) {
   const activity = new ServerActivity()
 
   const app = createApiRoutes({
-    config: { ...config, activity },
+    config: { ...config, activity, mcpAccessToken },
     klavis,
     tokenManager,
     onShutdown: () => {

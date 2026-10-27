@@ -12,6 +12,7 @@ import {
 } from '@modelcontextprotocol/server'
 import { Hono } from 'hono'
 import { logger } from '../../lib/logger'
+import { matchesMcpAccessToken } from '../../lib/mcp-access-token'
 import { metrics } from '../../lib/metrics'
 import { Sentry } from '../../lib/sentry'
 import { rejectBrowserFetch } from '../middleware/reject-browser-fetch'
@@ -32,6 +33,7 @@ type CreateMcpTransportFn = (
 
 interface McpRouteDeps {
   browserMcp: Pick<BrowserMcpModule, 'createMcpServer' | 'validateLeaseToken'>
+  mcpAccessToken: string
   createMcpTransport?: CreateMcpTransportFn
 }
 
@@ -104,6 +106,15 @@ export function createMcpRoutes(deps: McpRouteDeps) {
   app.post('/', async (c) => {
     const raw = c.req.raw
     const { leaseToken, logContext } = readScope(raw)
+    if (
+      !leaseToken &&
+      !matchesMcpAccessToken(
+        raw.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? null,
+        deps.mcpAccessToken,
+      )
+    ) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     if (leaseToken) {
       try {
         // Modern createMcpHandler converts factory exceptions into a generic

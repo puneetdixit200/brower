@@ -188,7 +188,11 @@ describe('installInto', () => {
     const stub = createStubMcpManager()
     setMcpManagerForTesting(stub)
 
-    const result = await installInto('claude-code', 'http://127.0.0.1:9100/mcp')
+    const result = await installInto(
+      'claude-code',
+      'http://127.0.0.1:9100/mcp',
+      'test-token',
+    )
     expect(result.success).toBe(true)
     const linkCalls = callsOf(stub, 'link') as Array<{
       server: { name: string; spec: unknown }
@@ -199,6 +203,7 @@ describe('installInto', () => {
     expect(linkCalls[0].server.spec).toEqual({
       transport: 'http',
       url: 'http://127.0.0.1:9100/mcp',
+      headers: { Authorization: 'Bearer test-token' },
     })
     expect(linkCalls[0].agent).toBe('claude-code')
   })
@@ -213,6 +218,7 @@ describe('installInto', () => {
       const result = await installInto(
         'claude-code',
         'http://127.0.0.1:9100/mcp',
+        'test-token',
       )
 
       expect(result.success).toBe(true)
@@ -220,6 +226,7 @@ describe('installInto', () => {
       expect(config.mcpServers.browseros).toEqual({
         url: 'http://127.0.0.1:9100/mcp',
         type: 'http',
+        headers: { Authorization: 'Bearer test-token' },
       })
     })
   })
@@ -230,7 +237,11 @@ describe('installInto', () => {
     const stub = createStubMcpManager()
     setMcpManagerForTesting(stub)
 
-    const result = await installInto('codex', 'http://127.0.0.1:9100/mcp')
+    const result = await installInto(
+      'codex',
+      'http://127.0.0.1:9100/mcp',
+      'test-token',
+    )
     expect(result.success).toBe(true)
     const linkCalls = callsOf(stub, 'link') as Array<{
       server: { name: string; spec: unknown }
@@ -241,6 +252,7 @@ describe('installInto', () => {
     expect(linkCalls[0].server.spec).toEqual({
       transport: 'http',
       url: 'http://127.0.0.1:9100/mcp',
+      headers: { Authorization: 'Bearer test-token' },
     })
     expect(linkCalls[0].agent).toBe('codex')
   })
@@ -255,6 +267,7 @@ describe('installInto', () => {
     const result = await installInto(
       'claude-desktop',
       'http://127.0.0.1:9100/mcp',
+      'test-token',
     )
     expect(result.success).toBe(true)
     const linkCalls = callsOf(stub, 'link') as Array<{
@@ -266,7 +279,13 @@ describe('installInto', () => {
     expect(linkCalls[0].server.spec).toEqual({
       transport: 'stdio',
       command: 'npx',
-      args: ['mcp-remote', 'http://127.0.0.1:9100/mcp'],
+      args: [
+        'mcp-remote',
+        'http://127.0.0.1:9100/mcp',
+        '--header',
+        `Authorization:\${BROWSEROS_MCP_AUTH}`,
+      ],
+      env: { BROWSEROS_MCP_AUTH: 'Bearer test-token' },
     })
     expect(linkCalls[0].agent).toBe('claude-desktop')
   })
@@ -278,6 +297,7 @@ describe('installInto', () => {
     const result = await installInto(
       'claude-desktop',
       'http://127.0.0.1:9100/mcp',
+      'test-token',
     )
     expect(result.success).toBe(true)
     const unlinkCalls = callsOf(stub, 'unlink') as Array<{
@@ -298,7 +318,11 @@ describe('installInto', () => {
     const stub = createStubMcpManager()
     setMcpManagerForTesting(stub)
     await expect(
-      installInto('not-a-real-agent', 'http://127.0.0.1:9100/mcp'),
+      installInto(
+        'not-a-real-agent',
+        'http://127.0.0.1:9100/mcp',
+        'test-token',
+      ),
     ).rejects.toMatchObject({ agent: 'not-a-real-agent' })
   })
 })

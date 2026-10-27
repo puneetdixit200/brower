@@ -24,6 +24,7 @@ import { initializeDb } from './lib/db'
 import { identity } from './lib/identity'
 import { loadOrCreateInstallationId } from './lib/installation-id'
 import { logger } from './lib/logger'
+import { loadOrCreateMcpAccessToken } from './lib/mcp-access-token'
 import { selfHealMcpLinks } from './lib/mcp-manager'
 import { metrics } from './lib/metrics'
 import { isPortInUseError } from './lib/port-binding'
@@ -32,6 +33,7 @@ import { VERSION } from './version'
 
 export class Application {
   private config: ServerConfig
+  private mcpAccessToken = ''
 
   constructor(config: ServerConfig) {
     this.config = config
@@ -76,6 +78,7 @@ export class Application {
         executionDir: this.config.executionDir,
         resourcesDir: this.config.resourcesDir,
         aiSdkDevtoolsEnabled: this.config.aiSdkDevtoolsEnabled,
+        mcpAccessToken: this.mcpAccessToken,
         onShutdown: () => this.stop('shutdown-endpoint'),
       })
     } catch (error) {
@@ -98,26 +101,21 @@ export class Application {
       })
     }
 
-    // Boot self-heal for the MCP integration. First drops BrowserOS
-    // from any agent no longer in the curated surface, then repairs
-    // every remaining agent's BrowserOS MCP URL against the proxy URL
-    // external clients actually reach. The agent server's own
-    // `serverPort` is NOT that URL: in production the browser proxies
-    // `/mcp` from a separately-configured proxy port. The URL repair
-    // only runs when the launching process passes the public URL via
-    // `BROWSEROS_MCP_PUBLIC_URL`; otherwise we'd rewrite every agent
-    // config with the wrong port. The non-curated cleanup needs no URL
-    // and always runs. The UI's install flow records the correct URL
-    // per click; this is the boot-time recovery path.
+    // Boot self-heal removes obsolete links and repairs current ones. The
+    // explicit proxy URL fixes port drift; without it, keep the URL recorded
+    // in the manifest while refreshing the authentication header.
     const publicMcpUrl = process.env.BROWSEROS_MCP_PUBLIC_URL
-    selfHealMcpLinks({ currentUrl: publicMcpUrl }).catch((err) => {
+    selfHealMcpLinks({
+      currentUrl: publicMcpUrl,
+      accessToken: this.mcpAccessToken,
+    }).catch((err) => {
       logger.warn('MCP manager self-heal failed; agent configs may be stale', {
         error: err instanceof Error ? err.message : String(err),
       })
     })
     if (!publicMcpUrl) {
       logger.debug(
-        'MCP manager URL reconcile skipped — BROWSEROS_MCP_PUBLIC_URL not set',
+        'MCP manager is preserving the manifest URL because BROWSEROS_MCP_PUBLIC_URL is not set',
       )
     }
 
@@ -148,6 +146,7 @@ export class Application {
   private async initCoreServices(): Promise<void> {
     this.configureLogDirectory()
     await ensureBrowserosDir()
+    this.mcpAccessToken = await loadOrCreateMcpAccessToken()
     await cleanOldSessions()
 
     initializeDb({

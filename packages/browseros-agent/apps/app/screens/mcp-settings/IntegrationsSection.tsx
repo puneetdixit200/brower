@@ -18,10 +18,12 @@ import { QuickSetupSection } from './QuickSetupSection'
 
 export interface IntegrationsSectionProps {
   serverUrl: string | null
+  accessToken: string | null
 }
 
 export const IntegrationsSection: FC<IntegrationsSectionProps> = ({
   serverUrl,
+  accessToken,
 }) => {
   const agentsQuery = useMcpAgents()
   const install = useInstallAgent(serverUrl)
@@ -144,7 +146,7 @@ export const IntegrationsSection: FC<IntegrationsSectionProps> = ({
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-3">
-          <QuickSetupSection serverUrl={serverUrl} />
+          <QuickSetupSection serverUrl={serverUrl} accessToken={accessToken} />
         </CollapsibleContent>
       </Collapsible>
     </section>

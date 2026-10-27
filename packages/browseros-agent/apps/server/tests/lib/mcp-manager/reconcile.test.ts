@@ -87,6 +87,7 @@ describe('reconcileUrl', () => {
 
     const result = await reconcileUrl({
       currentUrl: 'http://127.0.0.1:9100/mcp',
+      accessToken: 'test-token',
     })
 
     expect(result).toEqual({ action: 'noop', affectedAgents: [] })
@@ -104,6 +105,7 @@ describe('reconcileUrl', () => {
 
     const result = await reconcileUrl({
       currentUrl: 'http://127.0.0.1:9105/mcp',
+      accessToken: 'test-token',
     })
 
     expect(result.action).toBe('updated')
@@ -128,6 +130,7 @@ describe('reconcileUrl', () => {
 
     const result = await reconcileUrl({
       currentUrl: 'http://127.0.0.1:9105/mcp',
+      accessToken: 'test-token',
     })
 
     expect(result.affectedAgents).toEqual(['claude-code'])
@@ -147,6 +150,7 @@ describe('reconcileUrl', () => {
 
     const result = await reconcileUrl({
       currentUrl: 'http://127.0.0.1:9105/mcp',
+      accessToken: 'test-token',
     })
 
     expect(result.affectedAgents).toEqual(['claude-code'])
@@ -164,6 +168,7 @@ describe('reconcileUrl', () => {
 
     const result = await reconcileUrl({
       currentUrl: 'http://127.0.0.1:9105/mcp',
+      accessToken: 'test-token',
     })
 
     expect(result.affectedAgents).toEqual(['claude-code'])
@@ -173,7 +178,11 @@ describe('reconcileUrl', () => {
   it('keeps the claude-code http type field after URL drift', async () => {
     await withTempMcpEnv(async ({ claudeConfigPath }) => {
       await writeFile(claudeConfigPath, '{"mcpServers":{}}\n', 'utf8')
-      await installInto('claude-code', 'http://127.0.0.1:9100/mcp')
+      await installInto(
+        'claude-code',
+        'http://127.0.0.1:9100/mcp',
+        'test-token',
+      )
 
       expect(
         JSON.parse(await readFile(claudeConfigPath, 'utf8')).mcpServers
@@ -181,11 +190,13 @@ describe('reconcileUrl', () => {
       ).toEqual({
         url: 'http://127.0.0.1:9100/mcp',
         type: 'http',
+        headers: { Authorization: 'Bearer test-token' },
       })
 
       resetMcpManagerForTesting()
       const result = await reconcileUrl({
         currentUrl: 'http://127.0.0.1:9105/mcp',
+        accessToken: 'test-token',
       })
 
       expect(result).toEqual({
@@ -198,6 +209,7 @@ describe('reconcileUrl', () => {
       ).toEqual({
         url: 'http://127.0.0.1:9105/mcp',
         type: 'http',
+        headers: { Authorization: 'Bearer test-token' },
       })
     })
   })
@@ -215,6 +227,7 @@ describe('reconcileUrl', () => {
 
     const result = await reconcileUrl({
       currentUrl: 'http://127.0.0.1:9105/mcp',
+      accessToken: 'test-token',
     })
 
     expect(result.action).toBe('updated')
@@ -234,6 +247,7 @@ describe('selfHealMcpLinks', () => {
 
     const result = await selfHealMcpLinks({
       currentUrl: 'http://127.0.0.1:9105/mcp',
+      accessToken: 'test-token',
     })
 
     // gemini disconnected by cleanup...
@@ -245,7 +259,7 @@ describe('selfHealMcpLinks', () => {
     expect(linkUrls(stub).agents).toEqual(['claude-code'])
   })
 
-  it('still cleans up when no url is provided, skipping the reconcile', async () => {
+  it('preserves the manifest URL while adding auth when no public URL is provided', async () => {
     const stub = createStubMcpManager()
     stub.seedServer(
       'browseros',
@@ -254,11 +268,15 @@ describe('selfHealMcpLinks', () => {
     )
     setMcpManagerForTesting(stub)
 
-    const result = await selfHealMcpLinks({})
+    const result = await selfHealMcpLinks({ accessToken: 'test-token' })
 
-    expect(result).toEqual({ action: 'noop', affectedAgents: [] })
+    expect(result).toEqual({
+      action: 'updated',
+      affectedAgents: ['claude-code'],
+    })
     const disconnects = callsOf(stub, 'disconnect') as Array<{ agent: string }>
     expect(disconnects.some((d) => d.agent === 'gemini')).toBe(true)
-    expect(callsOf(stub, 'link')).toHaveLength(0)
+    expect(callsOf(stub, 'link')).toHaveLength(1)
+    expect(linkUrls(stub).urls).toEqual(['http://127.0.0.1:9100/mcp'])
   })
 })

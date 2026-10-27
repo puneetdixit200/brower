@@ -38,10 +38,11 @@ function createTestApp(
   agentRoutes = new Hono<Env>(),
   onShutdown: () => void = () => {},
   tokenManager: unknown = null,
+  mcpAccessToken = 'test-access-token-01234567890123456789',
 ) {
   return createApiRoutes({
     agentRoutes,
-    config: createTestConfig(),
+    config: { ...createTestConfig(), mcpAccessToken },
     klavis: new KlavisService({ browserosId: null }),
     onShutdown,
     tokenManager: tokenManager as never,
@@ -165,6 +166,31 @@ describe('createApiRoutes', () => {
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({ agents: [] })
+  })
+
+  it('only exposes the external MCP credential to an explicit trusted extension origin', async () => {
+    const app = createTestApp()
+    const denied = await app.request(
+      '/mcp-manager/access',
+      { headers: { Host: 'localhost' } },
+      localServer,
+    )
+    expect(denied.status).toBe(403)
+
+    const allowed = await app.request(
+      '/mcp-manager/access',
+      {
+        headers: {
+          Host: 'localhost',
+          Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+        },
+      },
+      localServer,
+    )
+    expect(allowed.status).toBe(200)
+    await expect(allowed.json()).resolves.toEqual({
+      token: 'test-access-token-01234567890123456789',
+    })
   })
 
   it('serves the tool catalogue for the settings UI', async () => {

@@ -1,5 +1,5 @@
 import { type FC, useCallback, useEffect, useState } from 'react'
-import { getMcpServerUrl } from '@/lib/browseros/helpers'
+import { getAgentServerUrl, getMcpServerUrl } from '@/lib/browseros/helpers'
 import { BrowserClawMcpBanner } from './BrowserClawMcpBanner'
 import { IntegrationsSection } from './IntegrationsSection'
 import { MCPServerHeader } from './MCPServerHeader'
@@ -10,12 +10,24 @@ export const MCPSettingsPage: FC = () => {
   const [serverUrl, setServerUrl] = useState<string | null>(null)
   const [urlLoading, setUrlLoading] = useState(true)
   const [urlError, setUrlError] = useState<string | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
 
   const loadServerUrl = useCallback(async () => {
     setUrlLoading(true)
     setUrlError(null)
     try {
-      setServerUrl(await getMcpServerUrl())
+      const [mcpUrl, agentUrl] = await Promise.all([
+        getMcpServerUrl(),
+        getAgentServerUrl(),
+      ])
+      setServerUrl(mcpUrl)
+      const response = await fetch(`${agentUrl}/mcp-manager/access`)
+      if (!response.ok)
+        throw new Error(
+          `Failed to load MCP access credentials: ${response.status}`,
+        )
+      const body = (await response.json()) as { token: string }
+      setAccessToken(body.token)
     } catch (err) {
       setUrlError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
@@ -33,12 +45,13 @@ export const MCPSettingsPage: FC = () => {
         serverUrl={serverUrl}
         isLoading={urlLoading}
         error={urlError}
+        accessToken={accessToken}
         onServerRestart={loadServerUrl}
       />
 
       <BrowserClawMcpBanner />
 
-      <IntegrationsSection serverUrl={serverUrl} />
+      <IntegrationsSection serverUrl={serverUrl} accessToken={accessToken} />
 
       <MCPToolsSection />
     </div>

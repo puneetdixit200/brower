@@ -44,6 +44,7 @@ mock.module('@/lib/constants/analyticsEvents', () => ({
 
 mock.module('@/lib/browseros/helpers', () => ({
   getMcpServerUrl: async () => 'http://127.0.0.1:9200/mcp',
+  getAgentServerUrl: async () => 'http://127.0.0.1:9200',
 }))
 
 let MCPSettingsPage: FC

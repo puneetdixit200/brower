@@ -46,6 +46,7 @@ import type { McpAgentId, ReconcileResult } from './types'
 export interface ReconcileUrlInput {
   /** The client-facing MCP URL, e.g. http://127.0.0.1:9100/mcp */
   currentUrl: string
+  accessToken: string
 }
 
 const MANAGED_SERVER_NAMES: ReadonlySet<string> = new Set([
@@ -61,15 +62,26 @@ const MANAGED_SERVER_NAMES: ReadonlySet<string> = new Set([
 function rebuildSpec(
   serverName: string,
   currentUrl: string,
+  accessToken: string,
 ): McpHttpSpec | McpStdioSpec {
   if (serverName === BROWSEROS_MCP_STDIO_SERVER_NAME) {
     return {
       transport: 'stdio',
       command: 'npx',
-      args: ['mcp-remote', currentUrl],
+      args: [
+        'mcp-remote',
+        currentUrl,
+        '--header',
+        `Authorization:\${BROWSEROS_MCP_AUTH}`,
+      ],
+      env: { BROWSEROS_MCP_AUTH: `Bearer ${accessToken}` },
     }
   }
-  return { transport: 'http', url: currentUrl }
+  return {
+    transport: 'http',
+    url: currentUrl,
+    headers: { Authorization: `Bearer ${accessToken}` },
+  }
 }
 
 /**
@@ -100,7 +112,7 @@ export async function reconcileUrl(
 
   const affected: McpAgentId[] = []
   for (const { serverName, agent } of targets) {
-    const spec = rebuildSpec(serverName, input.currentUrl)
+    const spec = rebuildSpec(serverName, input.currentUrl, input.accessToken)
     try {
       await mgr.link({
         server: { name: serverName, spec },
@@ -130,11 +142,11 @@ export async function reconcileUrl(
 
 export interface SelfHealInput {
   /**
-   * The client-facing MCP URL. When omitted (the launching process did
-   * not pass one) the URL reconcile is skipped, but the non-curated
-   * cleanup still runs since it needs no URL.
+   * The client-facing MCP URL. When omitted, the reconciler preserves the
+   * URL already recorded in the BrowserOS HTTP manifest entry.
    */
   currentUrl?: string
+  accessToken: string
 }
 
 /**
@@ -148,6 +160,19 @@ export async function selfHealMcpLinks(
   input: SelfHealInput,
 ): Promise<ReconcileResult> {
   await cleanupNonCuratedLinks()
-  if (!input.currentUrl) return { action: 'noop', affectedAgents: [] }
-  return reconcileUrl({ currentUrl: input.currentUrl })
+  let currentUrl = input.currentUrl
+  if (!currentUrl) {
+    const entries = await getMcpManager().list()
+    const httpEntry = entries.find(
+      (entry) =>
+        entry.name === BROWSEROS_MCP_SERVER_NAME &&
+        entry.spec.transport === 'http',
+    )
+    if (httpEntry?.spec.transport === 'http') currentUrl = httpEntry.spec.url
+  }
+  if (!currentUrl) return { action: 'noop', affectedAgents: [] }
+  return reconcileUrl({
+    currentUrl,
+    accessToken: input.accessToken,
+  })
 }

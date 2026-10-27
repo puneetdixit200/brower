@@ -106,6 +106,7 @@ async function setupApplicationTest() {
   const dbModule = await import('../src/lib/db')
   const identityModule = await import('../src/lib/identity')
   const installationIdModule = await import('../src/lib/installation-id')
+  const mcpAccessTokenModule = await import('../src/lib/mcp-access-token')
   const loggerModule = await import('../src/lib/logger')
   const metricsModule = await import('../src/lib/metrics')
   const sentryModule = await import('../src/lib/sentry')
@@ -135,6 +136,9 @@ async function setupApplicationTest() {
   const installationId = '2e087632-1f4e-4ee7-b8bb-cf8ad53e91a8'
   spyOn(installationIdModule, 'loadOrCreateInstallationId').mockImplementation(
     async () => installationId,
+  )
+  spyOn(mcpAccessTokenModule, 'loadOrCreateMcpAccessToken').mockImplementation(
+    async () => 'test-access-token-01234567890123456789',
   )
   const identityInitialize = spyOn(
     identityModule.identity,

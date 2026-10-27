@@ -14,6 +14,7 @@ const CLIENT_META = {
 
 function route(browserSession: unknown = {}) {
   return createMcpRoutes({
+    mcpAccessToken: 'test-access-token-01234567890123456789',
     browserMcp: new BrowserMcpModule({
       version: '0.0.0-test',
       browserSession: browserSession as never,
@@ -29,7 +30,11 @@ async function post(
 ) {
   const res = await app.request('/', {
     method: 'POST',
-    headers: { ...BASE, ...headers },
+    headers: {
+      ...BASE,
+      Authorization: 'Bearer test-access-token-01234567890123456789',
+      ...headers,
+    },
     body: JSON.stringify(body),
   })
   return {

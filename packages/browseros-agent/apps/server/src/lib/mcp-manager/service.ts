@@ -95,18 +95,32 @@ interface AgentServerPlan {
  * accept stdio get wrapped via `npx mcp-remote <url>` so a stdio
  * client still ends up talking to the local HTTP MCP endpoint.
  */
-function planFor(agentId: AgentId, currentUrl: string): AgentServerPlan {
+function planFor(
+  agentId: AgentId,
+  currentUrl: string,
+  accessToken: string,
+): AgentServerPlan {
   const surface = resolveAgentSurface(agentId, 'system')
   const supportsHttp = surface.supportedTransports.includes('http')
   if (!supportsHttp) {
     const spec: McpStdioSpec = {
       transport: 'stdio',
       command: 'npx',
-      args: ['mcp-remote', currentUrl],
+      args: [
+        'mcp-remote',
+        currentUrl,
+        '--header',
+        `Authorization:\${BROWSEROS_MCP_AUTH}`,
+      ],
+      env: { BROWSEROS_MCP_AUTH: `Bearer ${accessToken}` },
     }
     return { serverName: BROWSEROS_MCP_STDIO_SERVER_NAME, spec }
   }
-  const spec: McpHttpSpec = { transport: 'http', url: currentUrl }
+  const spec: McpHttpSpec = {
+    transport: 'http',
+    url: currentUrl,
+    headers: { Authorization: `Bearer ${accessToken}` },
+  }
   return { serverName: BROWSEROS_MCP_SERVER_NAME, spec }
 }
 
@@ -167,12 +181,13 @@ export async function listAgents(
 export async function installInto(
   agentId: string,
   currentUrl: string,
+  accessToken: string,
 ): Promise<InstallAgentResult> {
   if (!isAgentSupported(agentId)) {
     throw new AgentNotSupportedError(agentId)
   }
   const mgr = getMcpManager()
-  const { serverName, spec } = planFor(agentId, currentUrl)
+  const { serverName, spec } = planFor(agentId, currentUrl, accessToken)
 
   await sweepLegacyLinks(agentId, serverName)
 
