@@ -18,6 +18,13 @@ function mockStreamDelayMs(): number {
     : 0
 }
 
+function mockWaitDurationMs(): number {
+  const configured = Number(process.env.BROWSEROS_MOCK_WAIT_MS)
+  return Number.isSafeInteger(configured) && configured > 0
+    ? Math.min(configured, 30_000)
+    : 20_000
+}
+
 const MOCK_USAGE: LanguageModelV3Usage = {
   inputTokens: {
     total: 1,
@@ -49,7 +56,7 @@ function mockToolCalls(): { toolName: string; input: string }[] {
           input: JSON.stringify({
             page: mockToolPageId(),
             for: 'time',
-            value: mockStreamDelayMs() || 20_000,
+            value: mockWaitDurationMs(),
           }),
         },
       ]

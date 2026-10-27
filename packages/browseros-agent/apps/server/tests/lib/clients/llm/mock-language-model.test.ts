@@ -4,6 +4,7 @@ import { createMockLanguageModel } from '../../../../src/lib/clients/llm/mock-la
 const previous = process.env.BROWSEROS_MOCK_TOOL_CALL
 const previousPage = process.env.BROWSEROS_MOCK_TOOL_PAGE
 const previousDelay = process.env.BROWSEROS_MOCK_STREAM_DELAY_MS
+const previousWait = process.env.BROWSEROS_MOCK_WAIT_MS
 
 afterEach(() => {
   if (previous === undefined) delete process.env.BROWSEROS_MOCK_TOOL_CALL
@@ -13,6 +14,8 @@ afterEach(() => {
   if (previousDelay === undefined)
     delete process.env.BROWSEROS_MOCK_STREAM_DELAY_MS
   else process.env.BROWSEROS_MOCK_STREAM_DELAY_MS = previousDelay
+  if (previousWait === undefined) delete process.env.BROWSEROS_MOCK_WAIT_MS
+  else process.env.BROWSEROS_MOCK_WAIT_MS = previousWait
 })
 
 describe('mock language model browser fixture', () => {
@@ -72,7 +75,7 @@ describe('mock language model browser fixture', () => {
 
   it('offers a bounded abortable wait tool only as an explicit fixture', async () => {
     process.env.BROWSEROS_MOCK_TOOL_CALL = 'wait'
-    process.env.BROWSEROS_MOCK_STREAM_DELAY_MS = '20000'
+    process.env.BROWSEROS_MOCK_WAIT_MS = '20000'
     const model = createMockLanguageModel()
     const result = await model.doGenerate({ prompt: [] })
 

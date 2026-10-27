@@ -106,6 +106,92 @@ def main() -> int:
         wait_for(cdp, "document.body.innerText.includes('Mock BrowserOS test response.')")
         click_text(cdp, "Close")
 
+        click_text(cdp, "Scheduled Tasks")
+        click_text(cdp, "Test")
+        wait_for(
+            cdp,
+            "(async({id})=>{const r=await fetch('http://127.0.0.1:9105/scheduled-job-runs');"
+            "if(!r.ok)return false;const d=await r.json();"
+            "return d.runs.some(x=>x.jobId===id&&x.status==='running')})({id:"
+            + json.dumps(job_id)
+            + "})",
+            timeout=30,
+        )
+        wait_for(
+            cdp,
+            "!!document.querySelector('[aria-label=\"Cancel run\"]')",
+            timeout=30,
+        )
+        click_aria(cdp, "Cancel run")
+        wait_for(
+            cdp,
+            "(async({id})=>{const r=await fetch('http://127.0.0.1:9105/scheduled-job-runs');"
+            "if(!r.ok)return false;const d=await r.json();"
+            "return d.runs.some(x=>x.jobId===id&&x.status==='failed'&&"
+            "x.result==='Cancelled by user')})({id:"
+            + json.dumps(job_id)
+            + "})",
+            timeout=15,
+        )
+
+        deleted_provider = cdp.evaluate(
+            "(async({providerId})=>{const r=await fetch(`http://127.0.0.1:9105/providers/${providerId}`,"
+            "{method:'DELETE'});return r.status})({providerId:"
+            + json.dumps(provider_id)
+            + "})"
+        )
+        if deleted_provider != 200:
+            raise AssertionError("could not remove the disposable provider for retry fixture")
+
+        before_failed_retry = cdp.evaluate(
+            "(async({id})=>{const r=await fetch('http://127.0.0.1:9105/scheduled-job-runs');"
+            "const d=await r.json();return d.runs.filter(x=>x.jobId===id).length})({id:"
+            + json.dumps(job_id)
+            + "})"
+        )
+        click_text(cdp, "Test")
+        wait_for(
+            cdp,
+            "(async({id,count})=>{const r=await fetch('http://127.0.0.1:9105/scheduled-job-runs');"
+            "if(!r.ok)return false;const d=await r.json();const runs=d.runs.filter(x=>x.jobId===id);"
+            "return runs.length>count&&runs.sort((a,b)=>b.startedAt-a.startedAt)[0]?.status==='failed'})({id:"
+            + json.dumps(job_id)
+            + ",count:"
+            + str(before_failed_retry)
+            + "})",
+            timeout=30,
+        )
+        restored_provider = cdp.evaluate(
+            "(async({providerId})=>{const p={type:'openai-compatible',"
+            "name:'Aster Schedule Fixture Mock',baseUrl:'http://127.0.0.1:9105/v1',"
+            "modelId:'aster-test-mock',supportsImages:false,contextWindow:32000,"
+            "temperature:0.2,apiKey:'test-only-dummy',createdAt:Date.now()};"
+            "const headers={'Content-Type':'application/json'};"
+            "const saved=await fetch(`http://127.0.0.1:9105/providers/${providerId}`,"
+            "{method:'PUT',headers,body:JSON.stringify(p)});"
+            "if(!saved.ok)return saved.status;"
+            "const selected=await fetch('http://127.0.0.1:9105/providers/default',"
+            "{method:'PUT',headers,body:JSON.stringify({providerId})});"
+            "return selected.status})({providerId:"
+            + json.dumps(provider_id)
+            + "})"
+        )
+        if restored_provider != 200:
+            raise AssertionError("could not restore the disposable mock provider")
+        wait_for(cdp, "!!document.querySelector('[aria-label=\"Retry run\"]')")
+        click_aria(cdp, "Retry run")
+        wait_for(
+            cdp,
+            "(async({id,count})=>{const r=await fetch('http://127.0.0.1:9105/scheduled-job-runs');"
+            "if(!r.ok)return false;const d=await r.json();const runs=d.runs.filter(x=>x.jobId===id);"
+            "return runs.length>count&&runs.sort((a,b)=>b.startedAt-a.startedAt)[0]?.status==='completed'})({id:"
+            + json.dumps(job_id)
+            + ",count:"
+            + str(before_failed_retry + 1)
+            + "})",
+            timeout=30,
+        )
+
         click_aria(cdp, f"Disable {name}")
         wait_for(cdp, "document.body.innerText.includes('Disabled')")
         disabled_alarm = cdp.evaluate(
@@ -136,6 +222,8 @@ def main() -> int:
                     "edit": "passed",
                     "manual_test_and_run_history": "passed",
                     "run_history_detail_view": "passed",
+                    "active_run_cancellation": "passed",
+                    "failed_run_retry": "passed",
                     "disable_cleared_alarm": "passed",
                     "delete": "passed",
                     "provider_request": "local mock only; dummy key",
