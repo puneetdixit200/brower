@@ -160,3 +160,9 @@ Reconcile the feature matrix with completed history/memory and approval work, th
 
 - Review confirmed the BrowserOS agent prompt treats tool output as untrusted, browser tool text is wrapped in per-call nonce fences, and side-effectful calls use the approval policy. Prompt, approval-policy, and snapshot-fence tests pass (40/40). No headed hostile-page attempt against a protected action has been run; S01 stays PARTIAL.
 - Common key, bearer, JWT, credential-URL and sensitive JSON patterns are scrubbed from user-visible provider error details; Sentry captured headers are sanitized. The focused chat-error and Sentry tests pass (26/26). Full provider/telemetry outbound review, first-use disclosure and log-sink scans remain open; S04 stays PARTIAL.
+
+### Phase 5 follow-up — stop an active tool run (partial)
+
+- Added an opt-in deterministic `wait` tool call to the mock model fixture. The delay is environment-controlled, capped at 30 seconds, and is only used when the mock tool fixture is explicitly enabled.
+- Headed BrowserOS v0.51.0 smoke ran in a network-isolated disposable profile with a dummy-only local provider. It submitted a chat, waited until the `wait` tool appeared, clicked the side-panel Stop control, observed server-owned run state transition from `running` to `aborted`, and confirmed the delayed mock response did not arrive. The provider and test tab were removed and the browser stopped cleanly.
+- The repeatable smoke is `tests/e2e/aster_chat_cancel_smoke.py`. Focused mock-model, ConversationRuns, and `/chat` route tests pass (24/24); full workspace typecheck and Python syntax/diff checks pass. A real external provider and cancellation during browser navigation/click remain unverified, so A04 remains PARTIAL.

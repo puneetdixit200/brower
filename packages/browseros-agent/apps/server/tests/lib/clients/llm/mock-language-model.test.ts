@@ -3,15 +3,34 @@ import { createMockLanguageModel } from '../../../../src/lib/clients/llm/mock-la
 
 const previous = process.env.BROWSEROS_MOCK_TOOL_CALL
 const previousPage = process.env.BROWSEROS_MOCK_TOOL_PAGE
+const previousDelay = process.env.BROWSEROS_MOCK_STREAM_DELAY_MS
 
 afterEach(() => {
   if (previous === undefined) delete process.env.BROWSEROS_MOCK_TOOL_CALL
   else process.env.BROWSEROS_MOCK_TOOL_CALL = previous
   if (previousPage === undefined) delete process.env.BROWSEROS_MOCK_TOOL_PAGE
   else process.env.BROWSEROS_MOCK_TOOL_PAGE = previousPage
+  if (previousDelay === undefined)
+    delete process.env.BROWSEROS_MOCK_STREAM_DELAY_MS
+  else process.env.BROWSEROS_MOCK_STREAM_DELAY_MS = previousDelay
 })
 
 describe('mock language model browser fixture', () => {
+  it('delays only the deterministic mock response when explicitly configured', async () => {
+    process.env.BROWSEROS_MOCK_STREAM_DELAY_MS = '25'
+    const model = createMockLanguageModel()
+    const result = await model.doStream({ prompt: [] })
+    const reader = result.stream.getReader()
+    const first = await reader.read()
+    const startedDelayAt = Date.now()
+    const second = await reader.read()
+
+    expect(first.done).toBe(false)
+    expect(second.done).toBe(false)
+    expect(Date.now() - startedDelayAt).toBeGreaterThanOrEqual(15)
+    await reader.cancel()
+  })
+
   it('emits one deterministic tabs.list tool call only when explicitly enabled', async () => {
     process.env.BROWSEROS_MOCK_TOOL_CALL = 'tabs.list'
     const model = createMockLanguageModel()
@@ -47,6 +66,22 @@ describe('mock language model browser fixture', () => {
           ref: 'e1',
           diff: 'none',
         }),
+      },
+    ])
+  })
+
+  it('offers a bounded abortable wait tool only as an explicit fixture', async () => {
+    process.env.BROWSEROS_MOCK_TOOL_CALL = 'wait'
+    process.env.BROWSEROS_MOCK_STREAM_DELAY_MS = '20000'
+    const model = createMockLanguageModel()
+    const result = await model.doGenerate({ prompt: [] })
+
+    expect(result.content).toEqual([
+      {
+        type: 'tool-call',
+        toolCallId: 'fixture-tool-call',
+        toolName: 'wait',
+        input: JSON.stringify({ page: 1, for: 'time', value: 20000 }),
       },
     ])
   })

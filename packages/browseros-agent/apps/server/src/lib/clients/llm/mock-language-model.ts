@@ -11,6 +11,13 @@ import type { ResolvedLLMConfig } from './types'
 const MOCK_MODEL_ID = 'browseros-test-mock'
 export const MOCK_LLM_RESPONSE_TEXT = 'Mock BrowserOS test response.'
 
+function mockStreamDelayMs(): number {
+  const configured = Number(process.env.BROWSEROS_MOCK_STREAM_DELAY_MS)
+  return Number.isSafeInteger(configured) && configured > 0
+    ? Math.min(configured, 30_000)
+    : 0
+}
+
 const MOCK_USAGE: LanguageModelV3Usage = {
   inputTokens: {
     total: 1,
@@ -35,6 +42,17 @@ function mockToolCalls(): { toolName: string; input: string }[] {
   switch (process.env.BROWSEROS_MOCK_TOOL_CALL) {
     case 'tabs.list':
       return [{ toolName: 'tabs', input: JSON.stringify({ action: 'list' }) }]
+    case 'wait':
+      return [
+        {
+          toolName: 'wait',
+          input: JSON.stringify({
+            page: mockToolPageId(),
+            for: 'time',
+            value: mockStreamDelayMs() || 20_000,
+          }),
+        },
+      ]
     case 'act.click':
       return [mockClickCall()]
     case 'act.click-after-snapshot':
@@ -154,7 +172,14 @@ export function createMockLanguageModel(): LanguageModel {
         ]
         return { stream: simulateReadableStream({ chunks: toolChunks }) }
       }
-      return { stream: simulateReadableStream({ chunks }) }
+      return {
+        stream: simulateReadableStream({
+          chunks,
+          ...(mockStreamDelayMs() > 0 && {
+            chunkDelayInMs: mockStreamDelayMs(),
+          }),
+        }),
+      }
     },
   }) as LanguageModel
 }
