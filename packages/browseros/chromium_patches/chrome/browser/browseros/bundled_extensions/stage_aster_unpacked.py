@@ -2,13 +2,13 @@ diff --git a/chrome/browser/browseros/bundled_extensions/stage_aster_unpacked.py
 new file mode 100644
 --- /dev/null
 +++ b/chrome/browser/browseros/bundled_extensions/stage_aster_unpacked.py
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,48 @@
 +#!/usr/bin/env python3
 +"""GN action: stage only source-validated Aster development extension files.
 +
 +This is a build action, not a loader, installer, or signed CRX substitute.
 +"""
-+import os
++import json
 +import shutil
 +import sys
 +from pathlib import Path
@@ -30,12 +30,21 @@ new file mode 100644
 +            raise RuntimeError("Aster unpacked source contains a link or special file")
 +    if not (source / "manifest.json").is_file():
 +        raise RuntimeError("Aster unpacked source is missing manifest.json")
++    # CRX discovery expects an on-disk JSON catalog even when this debug
++    # loader deliberately installs its unpacked extension separately.
++    catalog_source = source.parent / "bundled_extensions.json"
++    if catalog_source.is_symlink() or not catalog_source.is_file():
++        raise RuntimeError("Aster unpacked catalog is missing")
++    data = catalog_source.read_bytes()
++    if len(data) > 4096 or json.loads(data) != {}:
++        raise RuntimeError("Aster debug catalog may not declare CRX/update entries")
 +    if destination.exists():
 +        if destination.is_symlink() or not destination.is_dir():
 +            raise RuntimeError("Unsafe existing unpacked destination")
 +        shutil.rmtree(destination)
 +    destination.parent.mkdir(parents=True, exist_ok=True)
 +    shutil.copytree(source, destination, symlinks=False)
++    shutil.copyfile(catalog_source, destination.parent / "bundled_extensions.json")
 +    stamp.parent.mkdir(parents=True, exist_ok=True)
 +    stamp.write_text("Aster unpacked development source staged\n", encoding="utf-8")
 +
