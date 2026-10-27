@@ -1,5 +1,6 @@
 import type {
   LanguageModelV3GenerateResult,
+  LanguageModelV3Prompt,
   LanguageModelV3StreamPart,
   LanguageModelV3Usage,
 } from '@ai-sdk/provider'
@@ -44,8 +45,60 @@ function mockToolPageId(): number {
   return Number.isSafeInteger(configured) && configured > 0 ? configured : 1
 }
 
+function a02FixturePageId(prompt: LanguageModelV3Prompt): number | null {
+  const userText = prompt
+    .filter((message) => message.role === 'user')
+    .flatMap((message) => message.content)
+    .filter((part) => part.type === 'text')
+    .map((part) => part.text)
+    .join('\n')
+  const markers = [...userText.matchAll(/^A02_FIXTURE_TAB_ID=([^\r\n]+)$/gm)]
+  if (markers.length !== 1) return null
+
+  const markerValue = markers[0]?.[1]
+  if (!markerValue || !/^\d+$/.test(markerValue)) return null
+  const chromeTabId = Number(markerValue)
+  if (!Number.isSafeInteger(chromeTabId) || chromeTabId <= 0) return null
+
+  const browserContextSections = [
+    ...userText.matchAll(/^## Browser Context\r?\n([\s\S]*?)\r?\n\r?\n---/gm),
+  ]
+  if (browserContextSections.length !== 1) return null
+  const context = browserContextSections[0]?.[1]
+  if (!context) return null
+
+  const selectedSections = [
+    ...context.matchAll(
+      /^\*\*Selected Tabs \(\d+\):\*\*\r?\n((?:[ \t]+\d+\. Tab .*\r?\n?)*)/gm,
+    ),
+  ]
+  if (selectedSections.length !== 1) return null
+  const selectedLines = selectedSections[0]?.[1] ?? ''
+  const mappings = new Map<number, number[]>()
+  for (const match of selectedLines.matchAll(
+    /^\s+\d+\. Tab (\d+) \(Page ID: (\d+)\)(?:\s|$)/gm,
+  )) {
+    const chromeTabId = Number(match[1])
+    const pageId = Number(match[2])
+    if (
+      !Number.isSafeInteger(chromeTabId) ||
+      chromeTabId <= 0 ||
+      !Number.isSafeInteger(pageId) ||
+      pageId <= 0
+    ) {
+      return null
+    }
+    mappings.set(chromeTabId, [...(mappings.get(chromeTabId) ?? []), pageId])
+  }
+
+  const pageIds = mappings.get(chromeTabId) ?? []
+  return pageIds.length === 1 ? (pageIds[0] ?? null) : null
+}
+
 /** Fixed call sequences for isolated browser-tool smokes. */
-function mockToolCalls(): { toolName: string; input: string }[] {
+function mockToolCalls(
+  prompt: LanguageModelV3Prompt,
+): { toolName: string; input: string }[] {
   switch (process.env.BROWSEROS_MOCK_TOOL_CALL) {
     case 'tabs.list':
       return [{ toolName: 'tabs', input: JSON.stringify({ action: 'list' }) }]
@@ -70,6 +123,40 @@ function mockToolCalls(): { toolName: string; input: string }[] {
         },
         mockClickCall(),
       ]
+    case 'a02.multi-page': {
+      const pageId = a02FixturePageId(prompt)
+      if (!pageId) return []
+      return [
+        { toolName: 'snapshot', input: JSON.stringify({ page: pageId }) },
+        mockActCall(pageId, 'fill', {
+          ref: 'e1',
+          value: 'typed on page one',
+        }),
+        mockActCall(pageId, 'click', { ref: 'e2' }),
+        {
+          toolName: 'navigate',
+          input: JSON.stringify({
+            page: pageId,
+            action: 'url',
+            url: 'http://127.0.0.1:9191/two',
+          }),
+        },
+        { toolName: 'snapshot', input: JSON.stringify({ page: pageId }) },
+        mockActCall(pageId, 'fill', {
+          ref: 'e1',
+          value: 'typed on page two',
+        }),
+        mockActCall(pageId, 'click', { ref: 'e2' }),
+        {
+          toolName: 'navigate',
+          input: JSON.stringify({
+            page: pageId,
+            action: 'url',
+            url: 'http://127.0.0.1:9191/done',
+          }),
+        },
+      ]
+    }
     default:
       return []
   }
@@ -84,6 +171,17 @@ function mockClickCall() {
       ref: 'e1',
       diff: 'none',
     }),
+  }
+}
+
+function mockActCall(
+  page: number,
+  kind: 'fill' | 'click',
+  args: { ref: string; value?: string },
+) {
+  return {
+    toolName: 'act',
+    input: JSON.stringify({ page, kind, ...args, diff: 'none' }),
   }
 }
 
@@ -120,7 +218,7 @@ export function resolveMockLLMConfig(config: LLMConfig): ResolvedLLMConfig {
 }
 
 export function createMockLanguageModel(): LanguageModel {
-  const pendingToolCalls = mockToolCalls()
+  let pendingToolCalls: { toolName: string; input: string }[] | undefined
   let toolCallId = 0
   const chunks: LanguageModelV3StreamPart[] = [
     { type: 'text-start', id: 'text-1' },
@@ -138,7 +236,8 @@ export function createMockLanguageModel(): LanguageModel {
   ]
 
   return new MockLanguageModelV3({
-    doGenerate: async () => {
+    doGenerate: async ({ prompt }) => {
+      pendingToolCalls ??= mockToolCalls(prompt)
       const call = pendingToolCalls.shift()
       if (!call) return createMockResult()
       toolCallId++
@@ -158,7 +257,8 @@ export function createMockLanguageModel(): LanguageModel {
         warnings: [],
       }
     },
-    doStream: async () => {
+    doStream: async ({ prompt }) => {
+      pendingToolCalls ??= mockToolCalls(prompt)
       const call = pendingToolCalls.shift()
       if (call) {
         toolCallId++

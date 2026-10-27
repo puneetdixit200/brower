@@ -83,6 +83,12 @@
 - A follow-up MCP policy run passed 18/18 across `browser-mcp-module.test.ts` and `mcp.test.ts`. It verifies a read-only lease cannot be widened by a client query, rejects `tabs.new` under that lease, and omits `navigate` from an externally requested read-only tool surface. These are read-only denials, not interactive approval support.
 - This proved one read-only tool dispatch end to end; approval work below now covers one mutation boundary. Page comprehension, cancellation, retries, multi-step tasks, and real-provider behavior remain unverified.
 
+### Phase 5 follow-up — two-page task actions in one active tab (partial)
+
+- Added an opt-in `BROWSEROS_MOCK_TOOL_CALL=a02.multi-page` fixture sequence. It resolves one selected Chrome tab ID to the MCP Page ID from the formatted Browser Context; if the exact marker or selected-tab mapping is absent or ambiguous, the fixture emits no tool calls. Tool names, action arguments, and loopback URLs are fixed in code.
+- Headed, network-isolated BrowserOS v0.51.0 smoke used one active tab to visit local `/one` and `/two` forms, fill and submit both after four explicit approvals, then navigate to `/done`. CDP checked field values, the fixture recorded both submitted values, and the final page content was verified. The repeatable flow is `tests/e2e/aster_multi_page_smoke.py`.
+- Mock fixture tests pass (10/10); server typecheck and targeted Biome pass; Python compilation and `git diff --check` pass. No external network or real provider credential was used. A02 is PARTIAL: this proves a deterministic sequence through the existing Browser MCP path, not model planning or semantic page comprehension. Typing into background tabs remains unverified.
+
 ### Phase 6 — split tabs and selection actions (partial)
 
 - Source review found BrowserOS Chromium patch integration for the native split-view new-tab URL and a default-pinned Split Tab toolbar action. Aster does not currently own split-state UI or controls; two live panes and resize/swap/close/restart behavior have not been verified. Native Chromium compilation remains deferred on this 14 GiB host against the project's 16 GiB guidance.
@@ -121,7 +127,7 @@
 
 ### Next action
 
-Reconcile the feature matrix with completed history/memory and approval work, then close the highest-impact testable gaps in incognito persistence and security controls. Release blockers remain Aster extension identity/update ownership, telemetry and outbound-traffic audit, external send/payment classification, Guard/Full policy configuration, native packaging, and matched stock/Aster browser performance.
+Investigate A05 durable task state and crash recovery using the existing server-owned run/session path before expanding more agent behaviors. Release blockers remain Aster extension identity/update ownership, telemetry and outbound-traffic audit, external send/payment classification, Guard/Full policy configuration, native packaging, and matched stock/Aster browser performance.
 
 
 ### Phase 7 follow-up — persistent external MCP authentication (implemented; packaged verification pending)
