@@ -1,6 +1,15 @@
 import { Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { NoProviderNotice } from '@/components/chat/NoProviderNotice'
+import { isIncognitoWindow } from '@/lib/browseros/incognito'
+import { panelTabIdFromUrl } from '@/lib/browseros/panelTab'
+import { sidePanelDraftsStorage } from '@/lib/browseros/sidePanelDraftStorage'
+import {
+  getSidePanelDraft,
+  removeSidePanelDraft,
+  type SidePanelDraft,
+  setSidePanelDraft,
+} from '@/lib/browseros/sidepanelDrafts'
 import { createBrowserOSAction } from '@/lib/chat-actions/types'
 import {
   SIDEPANEL_AI_TRIGGERED_EVENT,
@@ -61,6 +70,9 @@ export const Chat = () => {
 
   const [input, setInput] = useState('')
   const [attachedTabs, setAttachedTabs] = useState<chrome.tabs.Tab[]>([])
+  const [draftOwnerTabId, setDraftOwnerTabId] = useState<number | undefined>()
+  const [draftIncognito, setDraftIncognito] = useState(true)
+  const [draftLoaded, setDraftLoaded] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -68,16 +80,73 @@ export const Chat = () => {
   }, [])
 
   useEffect(() => {
-    ;(async () => {
-      const currentTab = (
-        await chrome.tabs.query({
-          active: true,
-          currentWindow: true,
-        })
-      ).filter((tab) => tab.url?.startsWith('http'))
-      setAttachedTabs(currentTab)
-    })()
+    let cancelled = false
+    const restoreDraft = async () => {
+      const ownerTabId = panelTabIdFromUrl(location.href)
+      const incognito = await isIncognitoWindow()
+      const currentTab =
+        ownerTabId !== undefined
+          ? await chrome.tabs.get(ownerTabId).catch(() => undefined)
+          : (await chrome.tabs.query({ active: true, currentWindow: true }))[0]
+      const currentTabs = currentTab?.url?.startsWith('http')
+        ? [currentTab]
+        : []
+      let draft: SidePanelDraft | undefined
+      if (ownerTabId !== undefined && !incognito) {
+        const drafts = await sidePanelDraftsStorage.getValue()
+        draft = getSidePanelDraft(drafts, ownerTabId)
+      }
+
+      let restoredTabs = currentTabs
+      if (draft) {
+        restoredTabs = (
+          await Promise.all(
+            draft.attachedTabIds.map((tabId) =>
+              chrome.tabs.get(tabId).catch(() => undefined),
+            ),
+          )
+        ).filter((tab): tab is chrome.tabs.Tab =>
+          Boolean(tab?.url?.startsWith('http')),
+        )
+        if (draft.input) setInput(draft.input)
+      }
+
+      if (cancelled) return
+      setDraftOwnerTabId(ownerTabId)
+      setDraftIncognito(incognito)
+      setAttachedTabs(restoredTabs)
+      setDraftLoaded(true)
+    }
+
+    restoreDraft().catch(() => {
+      if (!cancelled) setDraftLoaded(true)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [])
+
+  useEffect(() => {
+    if (!draftLoaded || draftIncognito || draftOwnerTabId === undefined) return
+    const persistDraft = async () => {
+      const drafts = await sidePanelDraftsStorage.getValue()
+      const attachedTabIds = attachedTabs
+        .map((tab) => tab.id)
+        .filter((tabId): tabId is number => tabId !== undefined)
+      const hasDraft =
+        input.length > 0 ||
+        attachedTabIds.some((tabId) => tabId !== draftOwnerTabId)
+      const nextDrafts = hasDraft
+        ? setSidePanelDraft(drafts, draftOwnerTabId, {
+            input,
+            attachedTabIds,
+            updatedAt: Date.now(),
+          })
+        : removeSidePanelDraft(drafts, draftOwnerTabId)
+      await sidePanelDraftsStorage.setValue(nextDrafts)
+    }
+    void persistDraft().catch(() => undefined)
+  }, [input, attachedTabs, draftLoaded, draftIncognito, draftOwnerTabId])
 
   // Trigger JTBD popup when AI finishes responding
   const previousChatStatus = useRef(status)

@@ -62,6 +62,11 @@
 - Headed BrowserOS v0.51.0 live check opened a local health endpoint in a second tab, typed `@`, saw that tab in the picker, selected it (`Tabs 1`), and pressed Escape; the mention closed and unfinished `@` text was removed. No external page or provider credential was used.
 - U06 is PARTIAL: current-window web-tab mentions are verified; history and memory mentions are not implemented, and files remain a separate attach action.
 
+### Phase 4 follow-up — per-tab side-panel drafts (partial)
+
+- Added local draft storage keyed by the panel's owning tab ID. It restores the prompt and attached web-tab IDs when the panel reopens; stale or closed attachment IDs are dropped. Writes are skipped for incognito windows and when the owning window check cannot be resolved.
+- Draft helper tests pass (2/2), app typecheck passes, and targeted Biome passes. Headed isolated BrowserOS smoke verified that a Translate prompt survives closing and reopening its owner tab's panel. Two-tab switching and browser restart recovery remain unverified; U15 is PARTIAL.
+
 ### Phase 5 — local mocked page-question stream (partial)
 
 - Started the supervised dev browser in a network-isolated namespace with `BROWSEROS_USE_MOCK_LLM=true`. Added a disposable OpenAI-shaped provider row containing a test-only dummy key, selected it, attached `http://127.0.0.1:<port>/system/health`, and asked for the page title.
