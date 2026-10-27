@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Verify selected-text actions populate the side-panel composer."""
+"""Verify selected-text prompts, mock submission, and per-tab draft restore."""
 
 from __future__ import annotations
 
 import json
 import time
 import urllib.request
+import uuid
 
 from aster_ui_latency_benchmark import CDP
 
@@ -15,8 +16,36 @@ def main() -> int:
     extension_target = wait_for_target(base, "#/home")
     cdp = CDP(extension_target["webSocketDebuggerUrl"])
     cdp.call("Runtime.enable")
+    provider_id = f"aster-selection-smoke-{uuid.uuid4()}"
+    provider_saved = False
     fixture_tab_id: int | None = None
     try:
+        wait_for(
+            cdp,
+            "fetch('http://127.0.0.1:9105/system/health').then(r=>r.ok).catch(()=>false)",
+            timeout=45,
+        )
+        setup = cdp.evaluate(
+            "(async({providerId})=>{const p={type:'openai-compatible',"
+            "name:'Aster Selection Fixture Mock',baseUrl:'http://127.0.0.1:9105/v1',"
+            "modelId:'aster-test-mock',supportsImages:false,contextWindow:32000,"
+            "temperature:0.2,apiKey:'test-only-dummy',createdAt:Date.now()};"
+            "const headers={'Content-Type':'application/json'};"
+            "const saved=await fetch(`http://127.0.0.1:9105/providers/${providerId}`,"
+            "{method:'PUT',headers,body:JSON.stringify(p)});"
+            "if(!saved.ok)return {saved:saved.status};"
+            "const selected=await fetch('http://127.0.0.1:9105/providers/default',"
+            "{method:'PUT',headers,body:JSON.stringify({providerId})});"
+            "return {saved:saved.status,selected:selected.status}})({providerId:"
+            + json.dumps(provider_id)
+            + "})"
+        )
+        provider_saved = setup.get("saved") == 200
+        if setup.get("saved") != 200 or setup.get("selected") != 200:
+            raise RuntimeError(f"could not configure local mock provider: {setup}")
+        cdp.evaluate("location.reload()")
+        wait_for(cdp, "document.body.innerText.includes('Aster Selection Fixture Mock')")
+
         fixture = cdp.evaluate(
             "(async()=>await chrome.tabs.create({"
             "url:'http://127.0.0.1:9105/system/health'}))()"
@@ -51,6 +80,15 @@ def main() -> int:
             )
             summarize = panel_cdp.evaluate(
                 "document.querySelector('textarea')?.value"
+            )
+            panel_cdp.evaluate(
+                "[...document.querySelectorAll('button')].find(b=>"
+                "b.textContent.trim()==='Send')?.click()"
+            )
+            wait_for(
+                panel_cdp,
+                "document.body.innerText.includes('Mock BrowserOS test response.')",
+                timeout=60,
             )
             panel_cdp.evaluate(
                 "[...document.querySelectorAll('button')].find(b=>"
@@ -109,8 +147,9 @@ def main() -> int:
                     "selection_fixture_content": selected,
                     "summarize_action": summarize,
                     "translate_action": translate,
+                    "mock_response": "received after explicit submit",
                     "draft_restore_after_panel_close": "passed",
-                    "provider_request": "not sent; composer prompts only",
+                    "provider_request": "local mock only; dummy key",
                     "network": "isolated",
                 },
                 indent=2,
@@ -134,6 +173,16 @@ def main() -> int:
             )
         except Exception:
             pass
+        if provider_saved:
+            try:
+                cdp.evaluate(
+                    "(async({providerId})=>fetch(`http://127.0.0.1:9105/providers/${providerId}`,"
+                    "{method:'DELETE'}).catch(()=>{}))({providerId:"
+                    + json.dumps(provider_id)
+                    + "})"
+                )
+            except Exception:
+                pass
         cdp.ws.close()
 
 
