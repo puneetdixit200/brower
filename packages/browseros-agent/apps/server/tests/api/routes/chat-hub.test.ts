@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import type { UIMessageChunk } from 'ai'
+import type { Hono } from 'hono'
 import { createChatRoutes } from '../../../src/api/routes/chat'
 import { ConversationRuns } from '../../../src/api/services/conversation-runs'
+import type { Env } from '../../../src/api/types'
 
 const localServer = {
   server: {
@@ -26,7 +28,10 @@ describe('/chat server-owned run routes', () => {
     })
     const app = route(runs)
 
-    const stateResponse = await app.request(`/${conversationId}/state`)
+    const stateResponse = await requestFromExtension(
+      app,
+      `/${conversationId}/state`,
+    )
     expect(stateResponse.status).toBe(200)
     expect(await stateResponse.json()).toMatchObject({
       conversationId,
@@ -34,7 +39,10 @@ describe('/chat server-owned run routes', () => {
       messages: [{ id: 'user-1' }],
     })
 
-    const streamResponse = await app.request(`/${conversationId}/stream`)
+    const streamResponse = await requestFromExtension(
+      app,
+      `/${conversationId}/stream`,
+    )
     expect(streamResponse.headers.get('content-type')).toContain(
       'text/event-stream',
     )
@@ -54,16 +62,14 @@ describe('/chat server-owned run routes', () => {
       createStream: () => new ReadableStream<UIMessageChunk>(),
     })
     const app = route(runs)
-    const response = await app.request(`/${conversationId}/stream?runId=old`)
-    expect(response.status).toBe(409)
-    const removed = await app.request(
-      'http://localhost/panels/42',
-      {
-        method: 'DELETE',
-        headers: { Host: 'localhost', Origin: 'chrome-extension://assistant' },
-      },
-      localServer,
+    const response = await requestFromExtension(
+      app,
+      `/${conversationId}/stream?runId=old`,
     )
+    expect(response.status).toBe(409)
+    const removed = await requestFromExtension(app, '/panels/42', {
+      method: 'DELETE',
+    })
     expect(removed.status).toBe(200)
     const assignments = runs.subscribePanelAssignments().getReader()
     expect((await assignments.read()).value?.assignments).toEqual([])
@@ -91,7 +97,10 @@ describe('/chat server-owned run routes', () => {
       expect(runs.getSnapshot(conversationId)?.status).toBe('completed'),
     )
 
-    const response = await route(runs).request(`/${conversationId}/stream`)
+    const response = await requestFromExtension(
+      route(runs),
+      `/${conversationId}/stream`,
+    )
 
     expect(response.status).toBe(200)
     expect(await response.text()).toContain('"type":"text-start"')
@@ -106,11 +115,7 @@ describe('/chat server-owned run routes', () => {
       createStream: () => new ReadableStream<UIMessageChunk>(),
     })
 
-    const response = await route(runs).request(
-      'http://localhost/panels',
-      { headers: { Host: 'localhost' } },
-      localServer,
-    )
+    const response = await requestFromExtension(route(runs), '/panels')
     expect(response.status).toBe(200)
     const reader = response.body?.getReader()
     const first = await reader?.read()
@@ -129,12 +134,43 @@ describe('/chat server-owned run routes', () => {
       createStream: () => new ReadableStream<UIMessageChunk>(),
     })
 
-    const response = await route(runs).request(`/${conversationId}/stop`, {
-      method: 'POST',
-    })
+    const response = await requestFromExtension(
+      route(runs),
+      `/${conversationId}/stop`,
+      {
+        method: 'POST',
+      },
+    )
 
     expect(await response.json()).toEqual({ stopped: true })
     expect(runs.getSnapshot(conversationId)?.status).toBe('aborted')
+  })
+
+  it('rejects originless conversation reads and stop requests', async () => {
+    const runs = new ConversationRuns()
+    const conversationId = crypto.randomUUID()
+    await runs.start({
+      conversationId,
+      messages: [],
+      createStream: () => new ReadableStream<UIMessageChunk>(),
+    })
+    const app = route(runs)
+
+    for (const path of [
+      `/${conversationId}/state`,
+      `/${conversationId}/stream`,
+    ]) {
+      const response = await app.request(path, {}, localServer)
+      expect(response.status).toBe(403)
+    }
+    const stop = await app.request(
+      `/${conversationId}/stop`,
+      { method: 'POST' },
+      localServer,
+    )
+    expect(stop.status).toBe(403)
+    expect(runs.getSnapshot(conversationId)?.status).toBe('running')
+    await runs.stop(conversationId)
   })
 })
 
@@ -145,6 +181,17 @@ function route(runs: ConversationRuns) {
     serverPort: 9000,
     conversationRuns: runs,
   })
+}
+
+function requestFromExtension(
+  app: Hono<Env>,
+  path: string,
+  init: RequestInit = {},
+) {
+  const headers = new Headers(init.headers)
+  headers.set('Host', 'localhost')
+  headers.set('Origin', 'chrome-extension://assistant')
+  return app.request(path, { ...init, headers }, localServer)
 }
 
 async function eventually(assertion: () => void): Promise<void> {

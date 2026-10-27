@@ -3,6 +3,18 @@ import { createChatRoutes } from '../../../src/api/routes/chat'
 import type { ChatProviderLookup } from '../../../src/api/services/chat-provider-config'
 import type { ProviderRow } from '../../../src/lib/db/schema'
 
+const localServer = {
+  server: {
+    requestIP: () => ({ address: '127.0.0.1' }),
+  },
+} as never
+
+const extensionHeaders = {
+  'Content-Type': 'application/json',
+  Host: 'localhost',
+  Origin: 'chrome-extension://assistant',
+}
+
 function storedProvider(): ProviderRow {
   return {
     id: 'anthropic-1',
@@ -53,10 +65,8 @@ function chatBody(extra: Record<string, unknown> = {}) {
 }
 
 /**
- * A browseros chat request is deliberately allowed without the app-origin
- * check, because it normally carries its own credentials. Naming a stored
- * provider changes that: the server supplies the user's key, so any local
- * process could spend it. These cover the line between the two.
+ * Every chat request is bound to the trusted extension origin, including
+ * caller-supplied provider configurations.
  */
 describe('chat provider credentials', () => {
   it('refuses an untrusted caller that names a stored provider', async () => {
@@ -104,19 +114,21 @@ describe('chat provider credentials', () => {
     },
   )
 
-  // Bringing your own configuration is what this path always allowed, and it
-  // stays allowed: nothing of the user's is being spent.
-  it('does not gate a request that brought its own configuration', async () => {
-    const response = await routes().request('/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: chatBody({
-        target: { type: 'browseros', providerId: 'not-stored' },
-        provider: 'openai',
-        model: 'gpt-5.5',
-        apiKey: 'sk-caller-own',
-      }),
-    })
+  it('accepts a custom provider request from the trusted extension', async () => {
+    const response = await routes().request(
+      '/',
+      {
+        method: 'POST',
+        headers: extensionHeaders,
+        body: chatBody({
+          target: { type: 'browseros', providerId: 'not-stored' },
+          provider: 'openai',
+          model: 'gpt-5.5',
+          apiKey: 'sk-caller-own',
+        }),
+      },
+      localServer,
+    )
 
     expect(response.status).not.toBe(403)
   })

@@ -30,7 +30,10 @@ import {
   type Env,
   type HydratedChatRequest,
 } from '../types'
-import { isTrustedAppRequest } from '../utils/request-auth'
+import {
+  isTrustedAppRequest,
+  requireTrustedAppOrigin,
+} from '../utils/request-auth'
 import { ConversationIdParamSchema } from '../utils/validation'
 
 interface ChatRouteDeps {
@@ -82,6 +85,7 @@ export function createChatRoutes(deps: ChatRouteDeps): Hono<Env> {
   })
 
   const app = new Hono<Env>()
+  app.use('/*', requireTrustedAppOrigin({ requireOrigin: true }))
   app.post('/', zValidator('json', ChatRequestSchema), async (c) => {
     const parsed = c.req.valid('json')
     if (
@@ -106,16 +110,9 @@ export function createChatRoutes(deps: ChatRouteDeps): Hono<Env> {
         deps.providerStore ?? credentialedProviderLookup,
       )
       if (!hydrated.ok) return c.json({ error: hydrated.error }, 400)
-      // A browseros request is otherwise allowed without the app-origin check,
-      // on the reasoning that it carries its own credentials and so can only
-      // spend what the caller already held.
-      //
-      // Two things break that reasoning, and both have to be caught. Naming a
-      // stored provider has the server supply the key. So does naming one of
-      // the provider types the server credentials itself: the oauth three take
-      // a token from this machine's store and browseros takes the gateway
-      // credential, none of which the request carries. A caller that genuinely
-      // brought its own key is as unrestricted as it was before.
+      // Keep this credential-provenance check as defense in depth alongside
+      // the route-wide trusted-origin guard. Naming a stored provider or a
+      // server-credentialed type would otherwise spend this machine's secret.
       const usesServerCredentials =
         hydrated.usedStoredProvider ||
         SERVER_CREDENTIALED_PROVIDERS.has(hydrated.request.provider)
