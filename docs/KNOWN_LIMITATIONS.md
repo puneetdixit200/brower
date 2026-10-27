@@ -11,7 +11,7 @@
 - The WXT development build passed with `NODE_OPTIONS=--max-old-space-size=4096`; output includes unresolved Geist font references and dependency annotation warnings. It produced an upstream-branded dev extension only.
 - AppImage-backed `server.integration.test.ts` runs fail before CDP startup in the helper launch mode with `chrome_crashpad_handler: --database is required`, including headless and Wayland attempts. No integration assertions ran.
 - The agent HTTP API now binds loopback, but CDP, proxy, native messaging, telemetry/Sentry, and third-party startup integrations still need a full local-only/privacy audit.
-- Current upstream extension configuration embeds BrowserOS extension identity, updater URL, and externally connectable IDs. Do not distribute an Aster extension until those assumptions are removed or replaced with Aster-controlled values.
+- The inspected Aster-named development manifest concretely contains BrowserOS's extension key, updater URL, and reporter extension ID. This is tracked as S05 and is a distribution blocker; do not distribute it as Aster until identity, updater, trusted origins, and reporter integration are deliberately replaced.
 - Linux binary resolution and deferred extension-page startup are implemented in the Go dev supervisor, covered by tests, and exercised end-to-end with the AppImage.
 - BrowserOS AppImage startup may have initiated upstream telemetry/integration requests; no credentials or personal browser data were used. Do not describe the baseline as offline.
 - No baseline performance comparison exists yet. Keep feature, benchmark, and shipping claims limited to measured evidence.

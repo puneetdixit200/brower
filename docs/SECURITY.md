@@ -7,6 +7,7 @@
 - Require explicit approvals for external sends, posts, purchases, destructive changes, and sensitive file writes.
 - No credentials, real user tasks, or existing browser profiles in tests.
 - Model calls, analytics, sync, and update traffic must be disclosed and user controlled.
+- The built Aster-named extension currently retains BrowserOS's manifest key, update URL, and reporter extension ID. This identity/update mismatch is a release blocker; do not distribute the current manifest as Aster.
 - Preserve AGPL-3.0-or-later and third-party license notices.
 
 ## Verified Aster controls
