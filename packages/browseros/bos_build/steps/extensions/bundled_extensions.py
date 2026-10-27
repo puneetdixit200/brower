@@ -3,6 +3,7 @@
 
 import json
 import shutil
+import zipfile
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -11,12 +12,14 @@ from typing import Dict, List, NamedTuple
 import requests
 
 from ...core.context import Context
+from ...core.products import ASTER_EXTENSION_ID
 from ...core.step import Step, ValidationError, step
 from ...lib.utils import log_info, log_success
 from ...products.resource_sources import source_resources_for_product
 from ...release.components import normalize_component_version
 from ...release.feeds.spec import extension_by_name
-from ...release.prepared_resources import PreparedResourcesManifest
+from ...release.prepared_resources import PreparedResourcesManifest, _validate_unpacked_zip
+from ...release.extensions.aster_unpacked_dev import validate_aster_unpacked_debug
 from ..resources.source import validated_common_resources
 
 
@@ -46,6 +49,10 @@ class BundledExtensionsModule(Step):
         self.validate(ctx)
         if ctx.resource_mode == "source":
             manifest = validated_common_resources(ctx)
+            if ctx.aster_unpacked_dev:
+                self._stage_aster_unpacked(ctx, manifest)
+                ctx.artifact_registry.add("common_manifest_digest", manifest.digest())
+                return
             staged = self._prepared_extensions(ctx, manifest)
             ctx.artifact_registry.add("common_manifest_digest", manifest.digest())
             source_label = "prepared common resources"
@@ -70,6 +77,61 @@ class BundledExtensionsModule(Step):
                 self._download_extension(extension, output_dir)
         self._generate_json(staged, output_dir)
         log_success(f"Bundled {len(staged)} extensions successfully")
+
+    def _stage_aster_unpacked(
+        self, ctx: Context, manifest: PreparedResourcesManifest
+    ) -> None:
+        """Stage a separately validated unpacked tree, never a fake CRX."""
+        if manifest.extension_mode != "unpacked-dev" or ctx.product.id != "aster":
+            raise ValueError("Aster unpacked development resources are required")
+        root = ctx.prepared_resources
+        if root is None:
+            raise RuntimeError("Prepared Aster resources are not registered")
+        archive_file = manifest.files["product_unpacked_zip"]
+        archive_path = root / archive_file.path
+        _validate_unpacked_zip(
+            archive_path,
+            expected_version=archive_file.version,
+            expected_id=ASTER_EXTENSION_ID,
+        )
+        output_dir = self._get_output_dir(ctx)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        self._clear_generated_outputs(ctx, output_dir)
+        target = output_dir / "aster_unpacked_dev"
+        target.mkdir()
+        relative_files = []
+        with zipfile.ZipFile(archive_path, "r") as archive:
+            for entry in archive.infolist():
+                # The archive was fully validated immediately above. Re-check
+                # paths before writing, avoiding extractall() semantics.
+                if entry.is_dir() or ".." in Path(entry.filename).parts:
+                    raise ValueError("Unsafe unpacked development entry")
+                relative = Path(entry.filename)
+                if relative.is_absolute():
+                    raise ValueError("Unsafe absolute unpacked development entry")
+                output = target / relative
+                output.parent.mkdir(parents=True, exist_ok=True)
+                with archive.open(entry) as source, output.open("wb") as destination:
+                    shutil.copyfileobj(source, destination)
+                relative_files.append(relative.as_posix())
+        result = validate_aster_unpacked_debug(
+            target, product="aster", platform="linux",
+            build_type="debug", is_official_build=False,
+            expected_version=archive_file.version,
+        )
+        if tuple(sorted(relative_files)) != result.files:
+            raise ValueError("Staged Aster development extension differs from archive")
+        # GN's sources list must enumerate the WXT output deterministically.
+        # The generated .gni is consumed only when the debug buildflag is true.
+        gn_lines = ['aster_unpacked_dev_sources = [']
+        gn_lines += [f'  "aster_unpacked_dev/{item}",' for item in result.files]
+        gn_lines.append(']')
+        (output_dir / "aster_unpacked_dev_sources.gni").write_text(
+            "\n".join(gn_lines) + "\n", encoding="utf-8"
+        )
+        self._generate_json([], output_dir)
+        ctx.artifact_registry.add("aster_unpacked_development", target)
+        log_success(f"Staged {len(result.files)} Aster development extension files")
 
     def _prepared_extensions(
         self, ctx: Context, manifest: PreparedResourcesManifest
@@ -116,6 +178,10 @@ class BundledExtensionsModule(Step):
     def _clear_generated_outputs(self, ctx: Context, output_dir: Path) -> None:
         for crx_path in output_dir.glob("*.crx"):
             crx_path.unlink()
+        unpacked = output_dir / "aster_unpacked_dev"
+        if unpacked.exists():
+            shutil.rmtree(unpacked)
+        (output_dir / "aster_unpacked_dev_sources.gni").unlink(missing_ok=True)
         (output_dir / "bundled_extensions.json").unlink(missing_ok=True)
         generated = ctx.chromium_src / ctx.out_dir / "browseros_extensions"
         if generated.is_symlink() or generated.is_file():
