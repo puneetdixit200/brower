@@ -4,9 +4,19 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { TEST_PORTS } from '@browseros/shared/constants/ports'
 
-const DEFAULT_BINARY_PATH =
-  process.env.BROWSEROS_BINARY ??
-  '/Applications/BrowserOS.app/Contents/MacOS/BrowserOS'
+function resolveBrowserBinaryPath(): string {
+  const configured =
+    process.env.ASTER_BROWSER_BIN ??
+    process.env.ASTER_BROWSER_BINARY ??
+    process.env.BROWSEROS_BINARY
+  if (configured) return configured
+  // Linux runners should install/link a BrowserOS-compatible AppImage as
+  // `browseros` on PATH, or set ASTER_BROWSER_BINARY explicitly. Do not fall
+  // back to system Chromium: these tests depend on BrowserOS flags and CDP.
+  return process.platform === 'linux'
+    ? 'browseros'
+    : '/Applications/BrowserOS.app/Contents/MacOS/BrowserOS'
+}
 const PORT_SCAN_RANGE = 100
 
 export interface RuntimePorts {
@@ -154,7 +164,7 @@ export async function createTestRuntimePlan(): Promise<TestRuntimePlan> {
   return {
     ports: resolvedPorts.ports,
     userDataDir,
-    binaryPath: DEFAULT_BINARY_PATH,
+    binaryPath: resolveBrowserBinaryPath(),
     headless,
     extraArgs,
     usesFixedPorts: resolvedPorts.usesFixedPorts,

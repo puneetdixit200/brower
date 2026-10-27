@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -17,7 +18,15 @@ func DefaultDevUserDataDir(root string) (string, error) {
 	}
 	sum := sha256.Sum256([]byte(absRoot))
 	key := hex.EncodeToString(sum[:])[:8]
-	return filepath.Join(os.TempDir(), fmt.Sprintf("browseros-dev-%s-%s", worktreeLabel(absRoot), key)), nil
+	profileName := fmt.Sprintf("browseros-dev-%s-%s", worktreeLabel(absRoot), key)
+	if runtime.GOOS == "linux" {
+		cacheDir, err := os.UserCacheDir()
+		if err != nil {
+			return "", fmt.Errorf("resolve user cache directory: %w", err)
+		}
+		return filepath.Join(cacheDir, "aster-browser", "dev", profileName), nil
+	}
+	return filepath.Join(os.TempDir(), profileName), nil
 }
 
 func worktreeLabel(root string) string {

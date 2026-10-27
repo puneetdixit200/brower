@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -87,6 +88,16 @@ func TestDefaultDevUserDataDirIsWorktreeScoped(t *testing.T) {
 	}
 	if !strings.Contains(firstProfile, "browseros-dev-main-2-") {
 		t.Fatalf("expected worktree label in %s", firstProfile)
+	}
+	if runtime.GOOS == "linux" {
+		cacheDir, err := os.UserCacheDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantRoot := filepath.Join(cacheDir, "aster-browser", "dev")
+		if !strings.HasPrefix(firstProfile, wantRoot+string(filepath.Separator)) {
+			t.Fatalf("expected Linux profile under %s, got %s", wantRoot, firstProfile)
+		}
 	}
 }
 

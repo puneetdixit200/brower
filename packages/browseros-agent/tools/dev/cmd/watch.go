@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -98,27 +99,45 @@ func runWatch(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		dir, err := os.MkdirTemp("", "browseros-dev-")
+		tempRoot := ""
+		if runtime.GOOS == "linux" {
+			cacheDir, cacheErr := os.UserCacheDir()
+			if cacheErr != nil {
+				return fmt.Errorf("resolving user cache directory: %w", cacheErr)
+			}
+			tempRoot = filepath.Join(cacheDir, "aster-browser", "dev")
+			if err := os.MkdirAll(tempRoot, 0o700); err != nil {
+				return fmt.Errorf("creating Linux dev profile root: %w", err)
+			}
+		}
+		dir, err := os.MkdirTemp(tempRoot, "browseros-dev-")
 		if err != nil {
 			return fmt.Errorf("creating temp dir: %w", err)
 		}
 		userDataDir = dir
+		if err := os.Chmod(userDataDir, 0o700); err != nil {
+			return fmt.Errorf("restricting fresh profile permissions: %w", err)
+		}
 		proc.LogMsgf(proc.TagInfo, "Created fresh profile: %s", userDataDir)
 		if err := acquireRunLock(p); err != nil {
 			return err
 		}
 	} else {
-		if err := os.MkdirAll(userDataDir, 0o755); err != nil {
+		if err := os.MkdirAll(userDataDir, 0o700); err != nil {
 			return fmt.Errorf("creating user-data dir: %w", err)
 		}
 		if err := acquireRunLock(p); err != nil {
 			return err
 		}
-		proc.LogMsg(proc.TagInfo, "Killing processes on preferred ports...")
-		if err := proc.KillPortsAndWait(defaultPorts, 3*time.Second); err != nil {
-			return err
+		if runtime.GOOS != "linux" {
+			proc.LogMsg(proc.TagInfo, "Killing processes on preferred ports...")
+			if err := proc.KillPortsAndWait(defaultPorts, 3*time.Second); err != nil {
+				return err
+			}
+			proc.LogMsg(proc.TagInfo, "Ports cleared")
+		} else {
+			proc.LogMsg(proc.TagInfo, "Selecting available loopback ports without stopping other processes...")
 		}
-		proc.LogMsg(proc.TagInfo, "Ports cleared")
 		killedBrowsers, err := proc.KillBrowserProcessesForUserDataDirs([]string{userDataDir}, 3*time.Second)
 		if err != nil {
 			return err
@@ -239,7 +258,7 @@ func buildWatchEnv(p proc.Ports, userDataDir string, claw bool) ([]string, error
 
 func buildWatchEnvWithBinaryResolution(p proc.Ports, userDataDir string, claw bool, binaryResolution browser.BinaryResolution) ([]string, error) {
 	env := proc.BuildEnv(p, "development")
-	stateKey, stateDir, err := resolveWatchProductStateDir(claw)
+	stateKey, stateDir, err := resolveWatchProductStateDir(claw, userDataDir)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +280,7 @@ func buildWatchEnvWithBinaryResolution(p proc.Ports, userDataDir string, claw bo
 	return env, nil
 }
 
-func resolveWatchProductStateDir(claw bool) (string, string, error) {
+func resolveWatchProductStateDir(claw bool, userDataDir string) (string, string, error) {
 	key := "BROWSEROS_DIR"
 	dirName := devDirName
 	if claw {
@@ -274,6 +293,11 @@ func resolveWatchProductStateDir(claw bool) (string, string, error) {
 			return "", "", fmt.Errorf("resolve %s: %w", key, err)
 		}
 		return key, absolute, nil
+	}
+	if runtime.GOOS == "linux" {
+		// Keep agent databases, logs, generated files, and server config with
+		// this checkout's private Chromium profile instead of ~/.browseros-dev.
+		return key, filepath.Join(userDataDir, "agent-state"), nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {

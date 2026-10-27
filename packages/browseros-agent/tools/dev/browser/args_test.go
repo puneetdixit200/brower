@@ -1,6 +1,9 @@
 package browser
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -17,6 +20,77 @@ func TestBuildArgsUsesDevDockIcon(t *testing.T) {
 	joined := strings.Join(args, "\n")
 	if !strings.Contains(joined, "--browseros-dock-icon=dev") {
 		t.Fatalf("missing dev dock icon arg in\n%s", joined)
+	}
+}
+
+func TestBuildArgsLoadsDevExtensionWithoutForcingRestrictedNewTabURL(t *testing.T) {
+	root := t.TempDir()
+	extensionDir := filepath.Join(root, "apps/app/dist/chrome-mv3-dev")
+	if err := os.MkdirAll(extensionDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `{"key":"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvBDAaDRvv61NpBeLR8etBRw82lv9VJO3sz/mA26gDzWKtVuzW4DXCl8Zfj5oWmoXLTfv3aiTigUXo/LHOoGpSucEVroMmAc7cgu2KuQ1fZPpMvYa0npD/m4h89360q8Oz0oKKaZGS905IJ04M2IkF4CuU3YEHFJBWb+cUyK9H8YVugelYbPD0IVs63T1SkGbh/t/Tfb2DpkinduSO8+x26sKydm30SRt+iZ2+7Nolcdum3LExInUiX2Pgb65Jb+mVw8NqyTVJyCEp8uq0cSHomWFQirSJ80tsDhISp4btwaRKHrXqovQx9XHQv4hCd+3LuB830eUEVMUNuCO+OyPxQIDAQAB","chrome_url_overrides":{"newtab":"app.html"}}`
+	if err := os.WriteFile(filepath.Join(extensionDir, "manifest.json"), []byte(manifest), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	args := BuildArgs(ArgsConfig{
+		Root:              root,
+		Ports:             proc.Ports{CDP: 9005, Server: 9105, Extension: 9305},
+		UserDataDir:       "/tmp/browseros-dev",
+		LoadDevExtensions: true,
+	})
+	joined := strings.Join(args, "\n")
+	if !strings.Contains(joined, "--load-extension="+extensionDir) {
+		t.Fatalf("missing development extension path in\n%s", joined)
+	}
+	if strings.Contains(joined, "chrome://newtab") {
+		t.Fatalf("must not force the restricted BrowserOS new-tab URL in\n%s", joined)
+	}
+	if !strings.Contains(joined, "chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk/app.html#/home") {
+		t.Fatalf("missing direct extension home URL in\n%s", joined)
+	}
+}
+
+func TestResolveInstalledBinaryUsesLinuxOverride(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux binary resolution")
+	}
+	t.Setenv("ASTER_BROWSER_BINARY", "/home/test/.local/opt/aster/browseros.AppImage")
+	t.Setenv("ASTER_BROWSER_BIN", "/home/test/.local/opt/aster/browseros-bin.AppImage")
+	t.Setenv("BROWSEROS_BINARY", "/usr/bin/browseros")
+
+	got := ResolveInstalledBinary(ProductBrowserOS)
+	if got.Path != "/home/test/.local/opt/aster/browseros-bin.AppImage" || got.Product != ProductBrowserOS {
+		t.Fatalf("ResolveInstalledBinary got %#v", got)
+	}
+}
+
+func TestResolveInstalledBinaryUsesBrowserOSOverrideFallback(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux binary resolution")
+	}
+	t.Setenv("ASTER_BROWSER_BINARY", "")
+	t.Setenv("ASTER_BROWSER_BIN", "")
+	t.Setenv("BROWSEROS_BINARY", "/usr/bin/browseros")
+
+	got := ResolveInstalledBinary(ProductBrowserOS)
+	if got.Path != "/usr/bin/browseros" {
+		t.Fatalf("ResolveInstalledBinary got %#v", got)
+	}
+}
+
+func TestResolveInstalledBinaryHasActionableLinuxDefault(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux binary resolution")
+	}
+	t.Setenv("ASTER_BROWSER_BINARY", "")
+	t.Setenv("ASTER_BROWSER_BIN", "")
+	t.Setenv("BROWSEROS_BINARY", "")
+	t.Setenv("PATH", t.TempDir())
+
+	got := ResolveInstalledBinary(ProductBrowserOS)
+	if got.Path != "browseros" {
+		t.Fatalf("ResolveInstalledBinary got %#v", got)
 	}
 }
 

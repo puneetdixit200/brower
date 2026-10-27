@@ -99,7 +99,7 @@ func TestBuildWatchEnvSelectsBrowserOSProduct(t *testing.T) {
 	for _, want := range []string{
 		"BROWSEROS_PRODUCT=browseros",
 		"BROWSEROS_USER_DATA_DIR=/tmp/browseros-dev",
-		"BROWSEROS_DIR=" + filepath.Join(home, ".browseros-dev"),
+		"BROWSEROS_DIR=" + filepath.Join("/tmp/browseros-dev", "agent-state"),
 	} {
 		if !hasEnvEntry(env, want) {
 			t.Fatalf("expected env to contain %q, got %#v", want, env)
@@ -129,7 +129,7 @@ func TestBuildWatchEnvSelectsBrowserClawProduct(t *testing.T) {
 		"BROWSEROS_BINARY=/Applications/BrowserOS neo.app/Contents/MacOS/BrowserOS neo",
 		"BROWSEROS_CLAW_CDP_PORT=9012",
 		"VITE_BROWSEROS_CLAW_API_URL=http://127.0.0.1:9123",
-		"BROWSERCLAW_DIR=" + filepath.Join(home, ".browserclaw-dev"),
+		"BROWSERCLAW_DIR=" + filepath.Join("/tmp/browseros-dev", "agent-state"),
 	} {
 		if !hasEnvEntry(env, want) {
 			t.Fatalf("expected env to contain %q, got %#v", want, env)
