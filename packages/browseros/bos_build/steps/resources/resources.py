@@ -218,7 +218,9 @@ def product_matches(
     """Return whether a config operation applies to the active product."""
     if product_condition is None:
         return True
-    if build_type == "debug":
+    # Legacy debug builds may package multiple products for their runtime
+    # override. Aster's identity is baked and must never copy foreign assets.
+    if build_type == "debug" and product_id != "aster":
         return True
     if product_condition == "all":
         raise ValueError("Use a missing product field for all products, not product: all")
