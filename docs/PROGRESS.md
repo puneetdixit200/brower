@@ -1,6 +1,6 @@
 # Progress
 
-## Current phase: Phase 3 — Aster UI foundation and performance harness (with Phase 4 composer work underway)
+## Current phase: Phase 7 — approval gate and response path
 
 **Status: PARTIAL.** Phase 0 is complete against the upstream BrowserOS baseline. Phase 1 dependency installation, static checks, and the development extension build are complete; the full upstream test run has failures. Phase 2's Linux supervisor flow is verified end-to-end. Phase 3 has an Aster home visual foundation and a headed Search/Ask smoke. No Aster-branded browser binary or release package exists.
 
@@ -75,7 +75,15 @@
 - A disposable dummy provider row was used only to exercise the setup surface and deleted before shutdown. No external model request or real credential was used. Browser and server stopped cleanly.
 - The focused fixture test passes (1/1); a first filtered typecheck attempt hit TS2589, while the subsequent full workspace typecheck passed, including the server package. The fixture test and Biome formatting are clean.
 - A follow-up MCP policy run passed 18/18 across `browser-mcp-module.test.ts` and `mcp.test.ts`. It verifies a read-only lease cannot be widened by a client query, rejects `tabs.new` under that lease, and omits `navigate` from an externally requested read-only tool surface. These are read-only denials, not interactive approval support.
-- This proves one read-only tool dispatch end to end. It does not prove page comprehension, mutation approvals, cancellation, retries, multi-step tasks, or real-provider behavior.
+- This proved one read-only tool dispatch end to end; approval work below now covers one mutation boundary. Page comprehension, cancellation, retries, multi-step tasks, and real-provider behavior remain unverified.
+
+### Phase 7 — approval gate and response path (partial)
+
+- Added server-side tool approval decisions to `ToolLoopAgent`. Browser `act`, code execution (`run`/`evaluate`), file upload/download/write/delete, tab close, and connector tools whose name or description indicates external/destructive side effects require user approval. Read-only observations and navigation continue without a prompt. Decisions are evaluated after the model proposes a call and before execution.
+- Approval requests carry a server-only, process-scoped HMAC secret. The extension UI now renders the reason and redacted input details with Approve and Deny controls; the response request sends only the approval ID, decision, and optional reason. The server applies that decision only to a still-pending approval already in its own conversation history and requires a trusted local app origin. Unknown, stale, duplicate, and originless responses fail closed. A server restart invalidates the process-scoped HMAC key, so unresolved approvals cannot resume across restart yet.
+- Headed BrowserOS v0.51.0 verification ran in a network-isolated namespace with the fixed `act.click` mock fixture. The real agent stream emitted `tool-approval-request` before the action executed. Sending Deny resumed the stream with `tool-output-denied` and the final assistant response. A forged approval ID returned HTTP 409 `No matching pending tool approval`; originless approvals return 403 in route tests. The browser action was not executed in the denial run.
+- Focused policy, pending-response, mock-model, route-auth and request-shaping tests passed (30/30 across five test files), the full workspace typecheck passed, and targeted Biome passed. In the headed isolated UI run, the pending card stayed expanded, Deny was visible/clickable, and clicking it completed the mocked assistant turn. Temporary dummy provider rows were deleted, and the browser/server shut down cleanly. The Approve path and actual approved browser action remain unverified.
+- A06 is PARTIAL: runtime gating and denial are verified; broader semantic coverage for sends/payments, explicit allow/ask/deny rule configuration, policy persistence, restart recovery, and actual UI interaction still remain. A09 remains PARTIAL: only existing read-only mode and new approval gates exist; Guard/Full access modes are not implemented.
 
 ### Privacy hardening — remote connector opt-in (partial)
 
@@ -93,4 +101,4 @@
 
 ### Next action
 
-Extend deterministic local fixtures to cover guarded mutations and approval boundaries; then audit every local control route and third-party network path. Continue U06 history/file/memory context, matched browser benchmarks, shell regressions, and inherited extension identity/updater cleanup before any distribution work.
+Exercise the approval controls through the headed transcript UI, expand the semantic side-effect policy coverage, then audit every local control route and third-party network path. Continue U06 history/file/memory context, matched browser benchmarks, shell regressions, and inherited extension identity/updater cleanup before any distribution work.
