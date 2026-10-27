@@ -36,6 +36,8 @@ class Switches:
     sign: Optional[bool] = None
     upload: Optional[bool] = None
     resource_mode: str = "published"
+    # Only an explicit Aster Linux non-official debug source build can opt in.
+    aster_unpacked_dev: bool = False
     skip: Tuple[str, ...] = ()
 
     def resolved(self) -> "Switches":
@@ -52,8 +54,17 @@ class Switches:
             )
         if self.resource_mode == "source" and self.download is True:
             raise ValueError("source mode cannot download published resources")
-        if self.resource_mode == "source" and self.preset != "release":
+        if self.resource_mode == "source" and self.preset != "release" and not self.aster_unpacked_dev:
             raise ValueError("source mode requires the release preset")
+        if self.aster_unpacked_dev and (
+            self.product != "aster"
+            or self.preset != "debug"
+            or self.resource_mode != "source"
+            or get_platform() != "linux"
+            or self.sign is True
+            or self.upload is True
+        ):
+            raise ValueError("Unpacked Aster development requires Linux debug source mode without signing/upload")
         resolved_download = (
             False
             if self.resource_mode == "source"
