@@ -105,7 +105,7 @@ function verifyIndexReferences(indexHtml: string) {
   }
   const expectedIcon =
     expectedBrand === 'aster' ? './icon/aster-mark.svg' : './icon/32.png'
-  const iconLinks = indexHtml.match(/<link\\b[^>]*\\brel=["']icon["'][^>]*>/gi) ?? []
+  const iconLinks = indexHtml.match(/<link\b[^>]*\brel=["']icon["'][^>]*>/gi) ?? []
   if (
     iconLinks.length !== 1 ||
     !iconLinks[0]?.includes(`href="${expectedIcon}"`)
