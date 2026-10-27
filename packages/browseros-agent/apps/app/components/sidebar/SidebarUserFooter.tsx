@@ -1,4 +1,4 @@
-import { Info, Keyboard } from 'lucide-react'
+import { Command, Info, Keyboard } from 'lucide-react'
 import type { FC } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -73,9 +73,35 @@ export const SidebarUserFooter: FC<SidebarUserFooterProps> = ({
     </Button>
   )
 
+  const commandButton = (
+    <Button
+      variant="ghost"
+      onClick={() => window.dispatchEvent(new Event('aster:open-command-palette'))}
+      className="flex h-9 w-full items-center justify-start gap-2 overflow-hidden whitespace-nowrap rounded-md px-3 font-medium text-sm transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+    >
+      <Command className="size-4 shrink-0" />
+      <span
+        className={cn(
+          'truncate transition-opacity duration-200',
+          expanded ? 'opacity-100' : 'opacity-0',
+        )}
+      >
+        Quick Commands
+      </span>
+    </Button>
+  )
+
   return (
     <TooltipProvider delayDuration={0}>
       <div className="mt-auto space-y-1 border-t p-2">
+        {expanded ? (
+          commandButton
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>{commandButton}</TooltipTrigger>
+            <TooltipContent side="right">Quick Commands</TooltipContent>
+          </Tooltip>
+        )}
         {expanded ? (
           shortcutsButton
         ) : (
