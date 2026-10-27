@@ -1,6 +1,6 @@
 # Aster next steps
 
-Checkpoint: 2026-10-28, branch `feat/aster-linux-ui`. This repository contains the full current source and implementation plan, not a finished browser release. The overall goal is paused at the user's request and remains incomplete.
+Checkpoint: 2026-10-28, branch `feat/aster-linux-ui`. This repository contains the full current source and implementation plan, not a finished browser release. The user explicitly authorized resuming on 2026-10-28. The goal remains incomplete; the prior pause is retained as a historical checkpoint.
 
 ## Next execution order
 
@@ -37,3 +37,10 @@ The local-only Linux x64 server archive includes verified Bun 1.4.2 and migratio
 ## User-requested stop checkpoint — 2026-10-28
 
 Commit and push all current source and Markdown now, then stop. Resume only on user request. The new onboarding producer is a development checkpoint; native Aster compilation and launch remain unverified. Next: finish onboarding integration checks, implement the gated unpacked extension development path in `ASTER_NATIVE_DEVELOPMENT_PLAN.md`, then attempt a low-concurrency pinned native build and repeat runtime/privacy checks. Use Luna medium for implementation and Terra for planning/review; reserve Sol for exceptional unresolved cases.
+
+
+## GitHub-only resume — 2026-10-28
+
+The latest source commits address the Aster onboarding Vite favicon ordering, add brand-specific output validation, defer a prepared-resource import to avoid premature pipeline registration, and add a **read-only** gated unpacked development extension validator plus focused tests. See [the resume checkpoint](evidence/aster-github-resume-2026-10-28.md). These changes were committed to `aster/feat/aster-linux-ui` remotely; this session did **not** run the builds/tests, inspect the user's local working tree, or build native Chromium.
+
+**Immediate next step:** run both onboarding modes and focused Python tests on the user's Omarchy checkout; fix regressions before wiring the unpacked validator through prepared-resource staging, GN flags, and native extension loading. Keep signed-CRX release checks intact. Then attempt the monitored jobs=2 native build and runtime checks. The user-requested earlier pause above is historical, not the current instruction.
