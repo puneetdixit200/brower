@@ -154,7 +154,7 @@ Reconcile the feature matrix with completed history/memory and approval work, th
 ### Phase 8 follow-up — scheduled task lifecycle smoke (partial)
 
 - The existing scheduled-task UI's create → edit → manual Test → disable → delete flow was exercised in headed BrowserOS v0.51.0 inside the network-isolated dev profile. A dummy-only provider used the local mock response; the smoke observed a persisted completed run, confirmed create installs an alarm and disable removes it, and confirmed delete returned 404 from the local job API. The provider, run, job, and alarm were confined to the disposable profile.
-- The repeatable smoke is `tests/e2e/aster_scheduled_task_lifecycle_smoke.py`. Schedule conversion, provider resolution, result selection, and alarm-policy tests pass (24/24). Cancellation/retry, rendered run-history details, and real recurring fire remain unverified; R01/R04 stay PARTIAL.
+- The repeatable smoke is `tests/e2e/aster_scheduled_task_lifecycle_smoke.py`. Schedule conversion, provider resolution, result selection, and alarm-policy tests pass (24/24). Cancellation/retry of an active or failed run and real recurring fire remain unverified; R01/R04 stay PARTIAL.
 
 ### Security follow-up — injection boundaries and secret redaction (partial)
 

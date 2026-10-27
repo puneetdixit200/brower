@@ -97,7 +97,14 @@ def main() -> int:
             + "})",
             timeout=60,
         )
+        wait_for(cdp, f"document.body.innerText.includes({json.dumps(name)})")
         click_text(cdp, "Scheduled Tasks")
+        wait_for(cdp, "document.body.innerText.includes('Run History (1)')")
+        click_text(cdp, "Run History (1)")
+        wait_for(cdp, "[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='View')")
+        click_text(cdp, "View")
+        wait_for(cdp, "document.body.innerText.includes('Mock BrowserOS test response.')")
+        click_text(cdp, "Close")
 
         click_aria(cdp, f"Disable {name}")
         wait_for(cdp, "document.body.innerText.includes('Disabled')")
@@ -128,6 +135,7 @@ def main() -> int:
                     "create_and_alarm": "passed",
                     "edit": "passed",
                     "manual_test_and_run_history": "passed",
+                    "run_history_detail_view": "passed",
                     "disable_cleared_alarm": "passed",
                     "delete": "passed",
                     "provider_request": "local mock only; dummy key",
