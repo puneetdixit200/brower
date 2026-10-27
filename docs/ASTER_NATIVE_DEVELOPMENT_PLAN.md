@@ -26,3 +26,8 @@ Candidate code seams include `bos_build/release/extensions/`, `bos_build/steps/r
 ## Release remains separate
 
 A release needs a provisioned private signing key, the matching public extension identity and an independently provisioned HTTPS update feed/configuration. If the release key derives a different ID, update all product, manifest, native loader and server-origin identities deliberately and verify them together. The development public key is not evidence of release signing custody. The development route must never silently enable itself in an official/release build.
+
+
+## Implementation checkpoint — 2026-10-28
+
+A partial first step now exists at `bos_build/release/extensions/aster_unpacked_dev.py`, with `aster_unpacked_dev_test.py`. It implements a **read-only** identity, manifest, file-tree and request-mode validator and has no effect on the existing signed release path. These are committed source changes, not runtime-verified tests in this session. The validator is **not** yet called by `steps/resources/source.py`, `prepared_resources.py`, GN or C++ loader. Explicit debug-only prepared-resource roles, path staging, GN input/copy lists, the native unpacked loader, and the native test remain open. See [resume evidence](../../../docs/evidence/aster-github-resume-2026-10-28.md).
