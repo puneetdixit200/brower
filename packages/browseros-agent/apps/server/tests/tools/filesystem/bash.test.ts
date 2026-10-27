@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import { mkdir, readFile, rm } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createBashTool } from '../../../src/tools/filesystem/bash'
@@ -95,6 +95,42 @@ describe('filesystem_bash', () => {
   it('passes environment variables through', async () => {
     const result = await exec({ command: 'echo $HOME' })
     expect(result.isError).toBeUndefined()
-    expect(result.text.trim().length).toBeGreaterThan(0)
+    expect(result.text.trim()).toBe(tmpDir)
+  })
+
+  it('cannot read or modify a sibling of the selected workspace', async () => {
+    const sibling = `${tmpDir}-sibling-secret`
+    await writeFile(sibling, 'host-only-secret')
+    try {
+      const read = await exec({ command: `cat '${sibling}'` })
+      expect(read.isError).toBe(true)
+      expect(read.text).not.toContain('host-only-secret')
+
+      const write = await exec({ command: `echo changed > '${sibling}'` })
+      expect(write.isError).toBeUndefined()
+      expect(await readFile(sibling, 'utf-8')).toBe('host-only-secret')
+    } finally {
+      await rm(sibling, { force: true })
+    }
+  })
+
+  it('does not pass unrelated host environment variables into the shell', async () => {
+    const previous = process.env.ASTER_BASH_TEST_SECRET
+    process.env.ASTER_BASH_TEST_SECRET = 'host-secret-value'
+    try {
+      const result = await exec({
+        command: 'printenv ASTER_BASH_TEST_SECRET || echo unset',
+      })
+      expect(result.isError).toBeUndefined()
+      expect(result.text.trim()).toBe('unset')
+    } finally {
+      if (previous === undefined) delete process.env.ASTER_BASH_TEST_SECRET
+      else process.env.ASTER_BASH_TEST_SECRET = previous
+    }
+  })
+
+  it('does not expose host credential files from /etc', async () => {
+    const result = await exec({ command: 'test ! -e /etc/shadow' })
+    expect(result.isError).toBeUndefined()
   })
 })
