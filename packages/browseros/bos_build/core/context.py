@@ -87,6 +87,7 @@ class Context:
     # args.gn (GN last-write-wins). Never persisted to profiles.
     extra_gn_args: tuple[str, ...] = ()
     resource_mode: str = "published"
+    aster_unpacked_dev: bool = False
     prepared_resources: Optional[Path] = None
     prepared_resources_supplied: bool = False
     source_sha: str = ""
@@ -335,11 +336,18 @@ class Context:
     def get_product_gn_args(self) -> list[str]:
         """Product GN args: release bakes identity; debug keeps the runtime
         product switch working (it needs both server resource sets)."""
-        dev_build = "true" if self.build_type == "debug" else "false"
+        dev_build = self.build_type == "debug" and self.product.id != "aster"
+        if self.aster_unpacked_dev and (
+            self.product.id != "aster"
+            or self.build_type != "debug"
+            or self.resource_mode != "source"
+        ):
+            raise ValueError("Unpacked Aster extension is only available in Aster source debug mode")
         return [
             f'browseros_product = "{self.product.gn_product}"',
-            f"browseros_allow_runtime_product_override = {dev_build}",
-            f"browseros_package_all_server_resources = {dev_build}",
+            f"browseros_allow_runtime_product_override = {str(dev_build).lower()}",
+            f"browseros_package_all_server_resources = {str(dev_build).lower()}",
+            f"aster_use_unpacked_dev_extension = {str(self.aster_unpacked_dev).lower()}",
         ]
 
     def get_features_yaml_path(self) -> Path:
