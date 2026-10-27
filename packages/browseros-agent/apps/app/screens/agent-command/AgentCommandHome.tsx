@@ -18,6 +18,7 @@ import {
 } from './ConversationInput'
 import { resolveHomeLlmRoutingMode } from './home-compose.helpers'
 import { resolveHomeSearchUrl } from './home-search'
+import { withSelectedMemoryContext } from './memory-context'
 
 export const AgentCommandHome: FC = () => {
   const navigate = useNavigate()
@@ -71,10 +72,14 @@ export const AgentCommandHome: FC = () => {
     )
     if (!target) return
     await selectChatTarget(target)
+    const message = withSelectedMemoryContext(
+      input.text,
+      input.selectedMemories,
+    )
     if (target.kind === 'llm' && llmRoutingMode === 'sidepanel') {
       const action = createBrowserOSAction({
         mode: 'chat',
-        message: input.text,
+        message,
         tabs: input.selectedTabs,
       })
       await openSidePanelWithSearch('open', {
@@ -85,11 +90,11 @@ export const AgentCommandHome: FC = () => {
       return
     }
     const search = new URLSearchParams({ q: input.text, mode: 'agent' })
-    if (input.attachments.length > 0) {
+    if (input.attachments.length > 0 || input.selectedMemories.length > 0) {
       search.set(
         'handoff',
         stagePendingHomeMessage({
-          text: input.text,
+          text: message,
           attachments: input.attachments,
         }),
       )

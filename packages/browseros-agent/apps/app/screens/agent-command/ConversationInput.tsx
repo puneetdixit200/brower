@@ -34,6 +34,8 @@ import type { ProviderType } from '@/lib/llm-providers/types'
 import { useMcpServers } from '@/lib/mcp/mcpServerStorage'
 import { cn } from '@/lib/utils'
 import { useWorkspace } from '@/modules/workspace/workspace.hooks'
+import { MemoryPickerPopover } from './MemoryPickerPopover'
+import type { SelectedMemoryContext } from './memory-context'
 import {
   findTabMention,
   removeTabMention,
@@ -45,6 +47,7 @@ export interface ConversationInputSendInput {
   text: string
   attachments: StagedAttachment[]
   selectedTabs: chrome.tabs.Tab[]
+  selectedMemories: SelectedMemoryContext[]
 }
 
 export interface ConversationInputProps {
@@ -134,6 +137,8 @@ function CalmContextControls({
   onSelectProvider,
   selectedTabs,
   onToggleTab,
+  selectedMemories,
+  onAddMemory,
   showAgentSelector,
   onAttachClick,
   attachDisabled,
@@ -144,6 +149,8 @@ function CalmContextControls({
   onSelectProvider?: (provider: Provider) => void
   selectedTabs: chrome.tabs.Tab[]
   onToggleTab: (tab: chrome.tabs.Tab) => void
+  selectedMemories: SelectedMemoryContext[]
+  onAddMemory: (memory: SelectedMemoryContext) => void
   showAgentSelector: boolean
   onAttachClick: () => void
   attachDisabled: boolean
@@ -227,6 +234,7 @@ function CalmContextControls({
           </span>
         </button>
       </TabPickerPopover>
+      <MemoryPickerPopover selected={selectedMemories} onAdd={onAddMemory} />
       <button
         type="button"
         onClick={onAttachClick}
@@ -308,6 +316,9 @@ export const ConversationInput: FC<ConversationInputProps> = ({
 }) => {
   const [input, setInput] = useState('')
   const [selectedTabs, setSelectedTabs] = useState<chrome.tabs.Tab[]>([])
+  const [selectedMemories, setSelectedMemories] = useState<
+    SelectedMemoryContext[]
+  >([])
   const [tabMention, setTabMention] = useState<TabMentionState | null>(null)
   const [isExpandedDraft, setIsExpandedDraft] = useState(false)
   const [attachments, setAttachments] = useState<StagedAttachment[]>([])
@@ -411,10 +422,11 @@ export const ConversationInput: FC<ConversationInputProps> = ({
     if (disabled || isStaging) return
     if (streaming && !queueAware) return
     if (!text && attachments.length === 0) return
-    onSend({ text, attachments, selectedTabs })
+    onSend({ text, attachments, selectedTabs, selectedMemories })
     setInput('')
     setAttachments([])
     setSelectedTabs([])
+    setSelectedMemories([])
     setAttachmentError(null)
   }
 
@@ -511,6 +523,31 @@ export const ConversationInput: FC<ConversationInputProps> = ({
             error={attachmentError}
           />
         ) : null}
+        {selectedMemories.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 border-border/40 border-b px-4 pt-2">
+            {selectedMemories.map((memory) => (
+              <span
+                key={memory.id}
+                className="inline-flex max-w-full items-center gap-1 rounded-full bg-accent px-2 py-1 text-xs"
+              >
+                <span className="max-w-56 truncate">
+                  Memory: {memory.content.split('\n')[0]}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Remove saved memory"
+                  onClick={() =>
+                    setSelectedMemories((items) =>
+                      items.filter((item) => item.id !== memory.id),
+                    )
+                  }
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
         <div
           className={cn(
             'flex gap-3',
@@ -581,6 +618,14 @@ export const ConversationInput: FC<ConversationInputProps> = ({
           onSelectProvider={onSelectProvider}
           selectedTabs={selectedTabs}
           onToggleTab={toggleTab}
+          selectedMemories={selectedMemories}
+          onAddMemory={(memory) =>
+            setSelectedMemories((items) =>
+              items.some((item) => item.id === memory.id) || items.length >= 3
+                ? items
+                : [...items, memory],
+            )
+          }
           showAgentSelector={variant === 'home'}
           onAttachClick={openFilePicker}
           attachDisabled={attachments.length >= 10 || isStaging || !!disabled}

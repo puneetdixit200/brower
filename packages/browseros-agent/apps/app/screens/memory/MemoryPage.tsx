@@ -177,7 +177,8 @@ export const MemoryPage: FC = () => {
               <strong>Enable memory retrieval</strong>
               <span className="mt-1 block text-muted-foreground">
                 When enabled, matching saved notes are available in Memory
-                search. Notes are not added to chats automatically.
+                search. Notes join a request only when you select them from the
+                home composer.
               </span>
             </span>
           </label>

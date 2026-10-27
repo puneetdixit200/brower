@@ -71,10 +71,35 @@ def main() -> int:
         cdp.evaluate("[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Delete')?.click()")
         wait_for(cdp, f"!document.body.innerText.includes({json.dumps(updated)})")
 
+        picker_note = f"Aster memory picker smoke {uuid.uuid4()}"
+        cdp.evaluate(set_value("textarea", picker_note))
+        cdp.evaluate("[...document.querySelectorAll('button')].find(x=>x.textContent.trim()==='Save note')?.click()")
+        wait_for(cdp, f"[...document.querySelectorAll('article')].some(x=>x.innerText.includes({json.dumps(picker_note)}))")
+
+        cdp.evaluate("location.hash = '#/home'")
+        wait_for(cdp, "[...document.querySelectorAll('button')].some(x=>x.getAttribute('aria-label')==='Attach saved memory')")
+        cdp.evaluate("document.querySelector('button[aria-label=\"Attach saved memory\"]')?.click()")
+        wait_for(cdp, "document.querySelector('input[aria-label=\"Search saved memory\"]')")
+        cdp.evaluate(set_value("input[aria-label='Search saved memory']", "Aster memory picker smoke"))
+        wait_for(cdp, "![...document.querySelectorAll('button')].find(x=>x.getAttribute('aria-label')==='Search memory')?.disabled")
+        cdp.evaluate("document.querySelector('button[aria-label=\"Search memory\"]')?.click()")
+        wait_for(cdp, f"document.body.innerText.includes({json.dumps(picker_note)})")
+        cdp.evaluate("[...document.querySelectorAll('button')].find(x=>x.textContent.includes('Add to request'))?.click()")
+        wait_for(cdp, f"[...document.querySelectorAll('span')].some(x=>x.innerText.includes({json.dumps(picker_note)}))")
+        cdp.evaluate("document.querySelector('button[aria-label=\"Remove saved memory\"]')?.click()")
+        wait_for(cdp, "!document.querySelector('button[aria-label=\"Remove saved memory\"]')")
+
+        cdp.evaluate("location.hash = '#/settings/memory'")
+        wait_for(cdp, f"[...document.querySelectorAll('article')].some(x=>x.innerText.includes({json.dumps(picker_note)}))")
+        cdp.evaluate("window.confirm = () => true")
+        cdp.evaluate("(() => {const card=[...document.querySelectorAll('article')].find(x=>x.innerText.includes('Aster memory picker smoke'));[...card.querySelectorAll('button')].find(x=>x.textContent.trim()==='Delete')?.click()})()")
+        wait_for(cdp, f"![...document.querySelectorAll('article')].some(x=>x.innerText.includes({json.dumps(picker_note)}))")
+
         result = {
             "memory_page": "loaded",
             "retrieval_default_disabled": initially_disabled,
             "create_search_edit_delete": "passed",
+            "explicit_memory_context_select_remove": "passed",
             "network": "isolated",
             "fixture_content_retained": False,
         }
