@@ -140,6 +140,11 @@ def main(
         "--resource-mode",
         help="Preset mode: resource provider (published or source)",
     ),
+    aster_unpacked_dev: bool = typer.Option(
+        False,
+        "--aster-unpacked-dev",
+        help="Aster Linux debug source mode only; use unpacked extension resources (never release CRX)",
+    ),
     prepared_resources: Optional[Path] = typer.Option(
         None,
         "--prepared-resources",
@@ -291,6 +296,7 @@ def main(
         resource_mode is not None
         or prepared_resources is not None
         or source_sha is not None
+        or aster_unpacked_dev
     ) and not has_preset:
         log_error(
             "--resource-mode/--prepared-resources/--source-sha require "
@@ -318,6 +324,7 @@ def main(
             resource_mode=resource_mode,
             prepared_resources=prepared_resources,
             source_sha=source_sha,
+            aster_unpacked_dev=aster_unpacked_dev,
             sign=sign,
             upload=upload,
             build_type=build_type,
@@ -566,6 +573,7 @@ def _resolve_preset(
     chromium_src: Optional[Path],
     source_sha: Optional[str] = None,
     extra_gn_args: Tuple[str, ...] = (),
+    aster_unpacked_dev: bool = False,
 ) -> _PlanProjection:
     """Resolve preset/profile + CLI overrides into a plan projection.
 
@@ -580,6 +588,8 @@ def _resolve_preset(
             else Profile(Switches())
         )
         if prof.modules is not None:
+            if aster_unpacked_dev:
+                raise ValueError("--aster-unpacked-dev requires a debug preset, not modules profile")
             if source_sha is not None:
                 raise ValueError("--source-sha does not combine with a modules profile")
             return _resolve_modules_profile(
@@ -620,6 +630,8 @@ def _resolve_preset(
             overrides["download"] = download
         if resource_mode is not None:
             overrides["resource_mode"] = resource_mode
+        if aster_unpacked_dev:
+            overrides["aster_unpacked_dev"] = True
         if sign is not None:
             overrides["sign"] = sign
         if upload is not None:
@@ -649,7 +661,8 @@ def _resolve_preset(
             f"Switches: clean={switches.clean} provision={switches.provision} "
             f"download={switches.download} sign={switches.sign} "
             f"upload={switches.upload} "
-            f"resource_mode={switches.resource_mode}",
+            f"resource_mode={switches.resource_mode} "
+            f"aster_unpacked_dev={switches.aster_unpacked_dev}",
         ]
         if prepared_resources is not None:
             header.append(f"Prepared resources: {prepared_resources.resolve()}")
@@ -720,6 +733,7 @@ def _resolve_preset(
                             product=get_product_descriptor(switches.product),
                             extra_gn_args=extra_gn_args,
                             resource_mode=switches.resource_mode,
+                            aster_unpacked_dev=switches.aster_unpacked_dev,
                             prepared_resources=common_dir,
                             prepared_resources_supplied=prepared_resources is not None,
                             source_sha=resolved_source_sha,
