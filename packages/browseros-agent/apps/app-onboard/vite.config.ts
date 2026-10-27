@@ -19,10 +19,10 @@ export default defineConfig(({ mode }) => {
         transformIndexHtml: {
           order: 'pre',
           handler(html) {
-          const branded = html.replace(
-            '<title>BrowserOS Onboarding</title>',
-            `<title>${isAsterBuild ? 'Aster' : 'BrowserOS'} Onboarding</title>`,
-          )
+            const branded = html.replace(
+              '<title>BrowserOS Onboarding</title>',
+              `<title>${isAsterBuild ? 'Aster' : 'BrowserOS'} Onboarding</title>`,
+            )
             if (!isAsterBuild) return branded
             const browserosIcon =
               '<link rel="icon" type="image/png" sizes="32x32" href="/icon/32.png" />'
