@@ -85,8 +85,7 @@ export const MemoryPage: FC = () => {
         .flatMap((history) => history.tasks ?? [])
         .filter(
           (task) =>
-            task.status === 'completed' &&
-            Boolean(task.responseText?.trim() || task.responsePreview?.trim()),
+            task.status === 'completed' && createTaskMemoryDraft(task) !== null,
         )
         .sort((left, right) =>
           (right.completedAt ?? right.startedAt).localeCompare(

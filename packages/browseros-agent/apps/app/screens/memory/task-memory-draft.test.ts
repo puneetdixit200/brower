@@ -38,6 +38,27 @@ describe('createTaskMemoryDraft', () => {
     expect(createTaskMemoryDraft(task({ responseText: ' ' }))).toBeNull()
   })
 
+  it('does not expose credential-shaped task titles or results as drafts', () => {
+    expect(
+      createTaskMemoryDraft(task({ promptText: 'Save API key: do-not-show' })),
+    ).toBeNull()
+    expect(
+      createTaskMemoryDraft(
+        task({
+          responseText: 'Use this Bearer abcdefghijklmnopqrstuvwxyz123456',
+        }),
+      ),
+    ).toBeNull()
+    expect(
+      createTaskMemoryDraft(
+        task({
+          responseText: undefined,
+          responsePreview: 'AWS key AKIA1234567890ABCDEF',
+        }),
+      ),
+    ).toBeNull()
+  })
+
   it('bounds the draft size while retaining the task source', () => {
     const draft = createTaskMemoryDraft(
       task({ responseText: 'x'.repeat(12_000) }),

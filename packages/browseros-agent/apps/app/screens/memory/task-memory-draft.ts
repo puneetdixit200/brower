@@ -8,6 +8,18 @@ export interface TaskMemoryDraft {
 
 const MAX_DRAFT_CHARS = 8_000
 
+function containsCredentialShapedText(value: string): boolean {
+  return (
+    /\b(password|passwd|api[_ -]?key|secret[_ -]?key|access[_ -]?token)\s*[:=]/i.test(
+      value,
+    ) ||
+    /\bBearer\s+[A-Za-z0-9._~+/-]{20,}/i.test(value) ||
+    /\b(?:AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{24,}|gh[pousr]_[A-Za-z0-9]{30,})\b/.test(
+      value,
+    )
+  )
+}
+
 /** Build a local, user-reviewed draft from a completed task without an LLM call. */
 export function createTaskMemoryDraft(
   task: ExecutionTaskRecord,
@@ -16,7 +28,15 @@ export function createTaskMemoryDraft(
   const result = task.responseText?.trim() || task.responsePreview?.trim()
   if (!result) return null
 
-  const sourceTitle = task.promptText.trim().slice(0, 300)
+  const rawTitle = task.promptText.trim()
+  if (
+    containsCredentialShapedText(rawTitle) ||
+    containsCredentialShapedText(result)
+  ) {
+    return null
+  }
+
+  const sourceTitle = rawTitle.slice(0, 300)
   const content = [
     sourceTitle ? `Task: ${sourceTitle}` : '',
     `Result: ${result}`,

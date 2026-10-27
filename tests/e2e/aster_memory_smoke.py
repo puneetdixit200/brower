@@ -39,6 +39,8 @@ def main() -> int:
     task_id = str(uuid.uuid4())
     task_title = f"Aster task memory smoke {uuid.uuid4()}"
     task_result = f"Reviewed task result {uuid.uuid4()}"
+    credential_task_title = "Aster task memory smoke API key: fixture-not-real"
+    credential_task_result = "Bearer fixture-token-that-must-not-be-shown"
     try:
         cdp.call("Runtime.enable")
         cdp.evaluate("location.hash = '#/settings/memory'")
@@ -66,7 +68,21 @@ def main() -> int:
                             "deniedCount": 0,
                             "errorCount": 0,
                             "steps": [],
-                        }
+                        },
+                        {
+                            "id": str(uuid.uuid4()),
+                            "conversationId": "aster-memory-smoke",
+                            "promptText": credential_task_title,
+                            "startedAt": "2026-10-27T00:00:00.000Z",
+                            "completedAt": "2026-10-27T00:00:02.000Z",
+                            "status": "completed",
+                            "responseText": credential_task_result,
+                            "actionCount": 0,
+                            "approvalCount": 0,
+                            "deniedCount": 0,
+                            "errorCount": 0,
+                            "steps": [],
+                        },
                     ],
                 }
             }
@@ -78,6 +94,13 @@ def main() -> int:
         wait_for(cdp, "location.hash.endsWith('/home')")
         cdp.evaluate("location.hash = '#/settings/memory'")
         wait_for(cdp, f"document.body.innerText.includes({json.dumps(task_title)})")
+        assert not cdp.evaluate(
+            "document.body.innerText.includes("
+            + json.dumps(credential_task_title)
+            + ") || document.body.innerText.includes("
+            + json.dumps(credential_task_result)
+            + ")"
+        ), "credential-shaped task content appeared in memory review UI"
         cdp.evaluate(
             "[...document.querySelectorAll('article')].find(x=>x.innerText.includes("
             + json.dumps(task_title)
@@ -186,6 +209,7 @@ def main() -> int:
             "retrieval_default_disabled": initially_disabled,
             "create_search_edit_delete": "passed",
             "review_and_explicitly_save_task_draft_with_provenance": "passed",
+            "credential_shaped_task_hidden_from_memory_review": "passed",
             "explicit_memory_context_select_remove": "passed",
             "explicit_history_context_select_remove": "passed",
             "network": "isolated",
