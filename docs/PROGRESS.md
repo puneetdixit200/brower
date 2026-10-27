@@ -83,7 +83,7 @@
 - Approval requests carry a server-only, process-scoped HMAC secret. The extension UI now renders the reason and redacted input details with Approve and Deny controls; the response request sends only the approval ID, decision, and optional reason. The server applies that decision only to a still-pending approval already in its own conversation history and requires a trusted local app origin. Unknown, stale, duplicate, and originless responses fail closed. A server restart invalidates the process-scoped HMAC key, so unresolved approvals cannot resume across restart yet.
 - Headed BrowserOS v0.51.0 verification ran in a network-isolated namespace with the fixed `act.click` mock fixture. The real agent stream emitted `tool-approval-request` before the action executed. Sending Deny resumed the stream with `tool-output-denied` and the final assistant response. A forged approval ID returned HTTP 409 `No matching pending tool approval`; originless approvals return 403 in route tests. The browser action was not executed in the denial run.
 - Focused policy, pending-response, mock-model, route-auth and request-shaping tests passed (30/30 across five test files), the full workspace typecheck passed, and targeted Biome passed. In the headed isolated UI run, the pending card stayed expanded, Deny was visible/clickable, and clicking it completed the mocked assistant turn. Temporary dummy provider rows were deleted, and the browser/server shut down cleanly. The Approve path and actual approved browser action remain unverified.
-- A06 is PARTIAL: runtime gating and denial are verified; broader semantic coverage for sends/payments, explicit allow/ask/deny rule configuration, policy persistence, restart recovery, and actual UI interaction still remain. A09 remains PARTIAL: only existing read-only mode and new approval gates exist; Guard/Full access modes are not implemented.
+- A06 is PARTIAL: runtime gating, classified external tool verbs, unknown-tool fail-closed behavior, and headed UI denial are verified; an approved action, a concrete send/payment fixture, editable allow/ask/deny rules, persistence, and restart recovery remain. A09 remains PARTIAL: only existing read-only mode and new approval gates exist; Guard/Full access modes are not implemented.
 
 ### Privacy hardening — remote connector opt-in (partial)
 
@@ -91,6 +91,12 @@
 - Protected `/klavis/*` with trusted local extension-origin middleware. Route tests reject originless activation and accept the registered extension origin.
 - In a network-isolated headed run, startup and the closed home produced no Klavis request logs. Opening Connect Apps triggered integration and proxy requests, which the namespace blocked. No external response was received.
 - Targeted tests: server route suite 19/19 passed; full workspace typecheck passed; targeted Biome passed. S03 remains PARTIAL because the complete MCP route set, packaged ports, telemetry, updater, and other outbound traffic have not been audited.
+
+### Local API route authentication audit (partial)
+
+- Route review found `/mcp-manager/*` connector install/uninstall and `/oauth/*` state-changing start/token paths were mounted before any trusted-app guard. Hono applies middleware in registration order, so these guards now register before the routes; OAuth additionally requires an explicit trusted app origin even for GET because `/start` creates OAuth state.
+- Route tests cover originless connector install/OAuth rejection and extension-origin success. Workspace typecheck passed.
+- `/system/shutdown` keeps its originless localhost compatibility route for shipped BrowserOS restart flows. Cross-origin browser requests are rejected, but another local process can still request server shutdown. The broader CDP/MCP surface, production ports, telemetry/updater, and third-party requests remain to audit.
 
 ### Current blockers / limits
 
@@ -101,4 +107,4 @@
 
 ### Next action
 
-Exercise the approval controls through the headed transcript UI, expand the semantic side-effect policy coverage, then audit every local control route and third-party network path. Continue U06 history/file/memory context, matched browser benchmarks, shell regressions, and inherited extension identity/updater cleanup before any distribution work.
+Continue the local control-route and third-party network audit, then add explicit approval-rule configuration and Guard/Full modes. Verify an approved-action fixture and an external send/payment fixture. Continue U06 history/file/memory context, matched browser benchmarks, shell regressions, and inherited extension identity/updater cleanup before any distribution work.
