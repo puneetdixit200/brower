@@ -124,7 +124,21 @@ def server_build_command(
     except KeyError as exc:
         raise ValueError(f"Unknown server target {target_id}") from exc
     bundle = _server_bundle(product)
+    if bundle.supported_targets and target_id not in bundle.supported_targets:
+        raise ValueError(
+            f"Server bundle {bundle.id} does not support target {target_id}"
+        )
     if bundle.source_builder == "bun":
+        if product == "aster":
+            return (
+                (
+                    "bun",
+                    "scripts/build/aster-server.ts",
+                    f"--target={target.id}",
+                    "--no-upload",
+                ),
+                agent_root / "dist/prod/aster-server" / target.id,
+            )
         return (
             (
                 "bun",
@@ -202,6 +216,65 @@ def _validate_file_entry(destination: Path, entry: object) -> str:
     return relative
 
 
+def _validate_aster_bun_runtime(
+    destination: Path,
+    declared: set[str],
+    agent_root: Path,
+) -> None:
+    runtime_relative = "resources/bin/third_party/bun"
+    provenance_relative = "resources/bin/third_party/bun.provenance.json"
+    if runtime_relative not in declared or provenance_relative not in declared:
+        raise ValueError("Aster server artifact is missing its pinned Bun runtime")
+    runtime = destination / runtime_relative
+    if not runtime.stat().st_mode & 0o100:
+        raise ValueError("Aster bundled Bun runtime is not executable")
+    try:
+        with runtime.open("rb") as stream:
+            header = stream.read(20)
+    except OSError as exc:
+        raise ValueError("Aster bundled Bun runtime could not be read") from exc
+    if (
+        len(header) < 20
+        or header[:4] != b"\x7fELF"
+        or header[4] != 2
+        or header[5] != 1
+        or int.from_bytes(header[18:20], "little") != 62
+    ):
+        raise ValueError("Aster bundled Bun runtime is not a Linux x64 ELF")
+
+    try:
+        package = json.loads((agent_root / "package.json").read_text(encoding="utf-8"))
+        expected_version = package["engines"]["bun"]
+        provenance = json.loads(
+            (destination / provenance_relative).read_text(encoding="utf-8")
+        )
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        raise ValueError("Aster Bun runtime provenance is unreadable") from exc
+    if expected_version != "1.4.2":
+        raise ValueError("Aster server package must pin Bun 1.4.2")
+    if (
+        not isinstance(provenance, dict)
+        or provenance.get("schemaVersion") != 1
+        or provenance.get("version") != expected_version
+        or provenance.get("platform") != "linux"
+        or provenance.get("arch") != "x64"
+        or provenance.get("sha256") != _sha256(runtime)
+    ):
+        raise ValueError("Aster Bun runtime provenance does not match the binary")
+    try:
+        actual_version = subprocess.run(
+            [str(runtime), "--version"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ValueError("Aster bundled Bun runtime could not be verified") from exc
+    if actual_version != expected_version:
+        raise ValueError("Aster bundled Bun runtime version does not match its pin")
+
+
 def validate_server_resources(
     destination: Path,
     *,
@@ -238,6 +311,10 @@ def validate_server_resources(
         raise ValueError("Server artifact contains undeclared or missing files")
 
     bundle = _server_bundle(product)
+    if bundle.supported_targets and target not in bundle.supported_targets:
+        raise ValueError(
+            f"Server bundle {bundle.id} does not support target {target}"
+        )
     suffix = ".exe" if target_spec.os == "windows" else ""
     runtime_path = f"resources/bin/{bundle.runtime_binary_name}{suffix}"
     if runtime_path not in declared:
@@ -246,6 +323,12 @@ def validate_server_resources(
         runtime = destination.joinpath(*PurePosixPath(runtime_path).parts)
         if not runtime.stat().st_mode & 0o100:
             raise ValueError(f"Server runtime is not executable: {runtime_path}")
+    if product == "aster":
+        _validate_aster_bun_runtime(
+            destination,
+            declared,
+            Path(__file__).resolve().parents[2].parent / "browseros-agent",
+        )
     if product == "browserclaw":
         if "resources/skills/browserclaw/SKILL.md" not in declared:
             raise ValueError("BrowserOS neo server artifact is missing its skill")
@@ -287,6 +370,19 @@ class ServerResourceBuilder:
 
     def _preflight(self, product: str, target: ServerTarget) -> ServerBundle:
         bundle = _server_bundle(product)
+        if product == "aster" and (
+            self.host_platform != "linux"
+            or platform.machine().lower() not in {"x86_64", "amd64"}
+        ):
+            raise RuntimeError(
+                "Aster Linux x64 server resources require a Linux x64 build host"
+            )
+        if bundle.supported_targets and target.id not in bundle.supported_targets:
+            raise RuntimeError(
+                f"Server bundle {bundle.id} does not support target {target.id}; "
+                f"supported targets: "
+                f"{', '.join(bundle.supported_targets)}"
+            )
         tool = "bun" if bundle.source_builder == "bun" else "cargo"
         if bundle.source_builder == "cargo" and self.host_platform != target.os:
             raise RuntimeError(

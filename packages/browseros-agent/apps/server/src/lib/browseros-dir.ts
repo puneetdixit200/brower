@@ -9,30 +9,25 @@ import {
   stat,
   writeFile,
 } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { PATHS } from '@browseros/shared/constants/paths'
 import type { ServerDiscoveryConfig } from '@browseros/shared/types/server-config'
+import { getProductStateDir } from '@browseros/shared/utils/browseros-dir'
+import { INLINED_ENV } from '../env'
 import { logger } from './logger'
 
 export const TOOL_OUTPUT_DIR_MODE = 0o700
 export const TOOL_OUTPUT_FILE_MODE = 0o600
 
 export function getBrowserosDir(): string {
-  const override = process.env.BROWSEROS_DIR?.trim()
-  if (override) {
-    return override
-  }
-  const dirName =
-    process.env.NODE_ENV === 'development'
-      ? PATHS.DEV_BROWSEROS_DIR_NAME
-      : PATHS.BROWSEROS_DIR_NAME
-  return join(homedir(), dirName)
+  return getProductStateDir(INLINED_ENV.ASTER_SERVER_BUILD)
 }
 
 export function logDevelopmentBrowserosDir(): void {
   if (process.env.NODE_ENV !== 'development') return
-  logger.info(`Using development BrowserOS directory: ${getBrowserosDir()}`)
+  const product =
+    INLINED_ENV.ASTER_SERVER_BUILD === 'aster' ? 'Aster' : 'BrowserOS'
+  logger.info(`Using development ${product} directory: ${getBrowserosDir()}`)
 }
 
 export function getSessionsDir(): string {

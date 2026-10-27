@@ -35,6 +35,20 @@ describe('buildAgentFilesystemToolSet', () => {
     ])
   })
 
+  it('passes configured resources to filesystem_bash for packaged runtime lookup', async () => {
+    if (process.platform !== 'linux') return
+    const tools = buildAgentFilesystemToolSet(
+      agentConfig({ workingDir: process.cwd() }),
+      { resourcesDir: '/missing-browseros-resources' },
+    )
+    // biome-ignore lint/suspicious/noExplicitAny: test helper
+    const result = await (tools.filesystem_bash as any).execute({
+      command: 'bun --version',
+    })
+    expect(result.isError).toBe(true)
+    expect(result.text).toContain('bundled Bun runtime')
+  })
+
   it('exposes only output-file reads in chat mode even when a workspace is selected', () => {
     const tools = buildAgentFilesystemToolSet(
       agentConfig({ chatMode: true, workingDir: '/tmp/browseros-workspace' }),

@@ -1,0 +1,35 @@
+{
+  "scope": "Aster Linux x64 development server bundle; not native Aster browser",
+  "archive": "packages/browseros-agent/dist/prod/aster-server/aster-server-resources-linux-x64.zip",
+  "archive_bytes": 75052142,
+  "archive_sha256": "0b8075fa824e6a03d1f98beff2e3951d25b9cfcfa4fd37a39446cbe1252be287",
+  "bun_version": "1.4.2",
+  "bun_sha256": "a83d263767d839e4d2649ca8e35d07159c7afc99afdc96d731ced29e056dda0c",
+  "bun_mode": "0o755",
+  "checks": {
+    "bundled_bun_executes_javascript": true,
+    "runtime_hash_matches_provenance_and_artifact_metadata": true,
+    "compiled_server_help": true,
+    "isolated_health_status_ok": true,
+    "isolated_cdp_connected": true,
+    "telemetry_default_off": true,
+    "aster_state_used": true,
+    "poisoned_browseros_state_absent": true,
+    "test_process_cleanup": true
+  },
+  "verification": "Luna build/focused checks; independent Terra artifact/CDP startup review; parent archive digest and mode inspection",
+  "tests": {
+    "python_discovery_run": 1333,
+    "python_skipped": 3,
+    "builder_bun_tests": 7,
+    "server_state_tests": 16,
+    "filesystem_tests": 22,
+    "workspace_typecheck": "passed"
+  },
+  "limitations": [
+    "Development archive built from the working tree, not a release artifact.",
+    "Invoking Bun version/ELF/hash are checked; provenance is not upstream vendor authentication.",
+    "No native Aster Chromium build or end-to-end MCP tool output verification.",
+    "Aster extension/CRX and onboarding source producers remain open."
+  ]
+}

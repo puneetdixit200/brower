@@ -66,6 +66,16 @@ COMPONENTS: Mapping[str, ComponentSpec] = {
         tag_prefix="agent-server/v",
         legacy_tag_prefixes=("browseros-server-v",),
     ),
+    "aster-server": ComponentSpec(
+        id="aster-server",
+        display_name="Aster development server",
+        version_scheme="semver",
+        manifest_path=Path("packages/browseros-agent/apps/server/package.json"),
+        lockfile_path=Path("packages/browseros-agent/bun.lock"),
+        package_name="@browseros/server",
+        workspace_path="apps/server",
+        tag_prefix="aster-server/v",
+    ),
     "agent": ComponentSpec(
         id="agent",
         display_name="BrowserOS agent extension",

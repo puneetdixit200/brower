@@ -12,6 +12,7 @@ const INLINED_ENV_VARS = [
   'SENTRY_DSN',
   'NODE_ENV',
   'LOG_LEVEL',
+  'ASTER_SERVER_BUILD',
 ] as const
 const CI_INLINE_ENV_DEFAULTS = {
   LOG_LEVEL: 'info',
@@ -32,6 +33,7 @@ export const browserosServerBuildProduct: BuildProductDescriptor = {
   env: {
     requiredInlineEnvKeys: REQUIRED_PROD_VARS,
     inlineEnvKeys: INLINED_ENV_VARS,
+    inlineEnvOverrides: { ASTER_SERVER_BUILD: '' },
     ciInlineEnvDefaults: CI_INLINE_ENV_DEFAULTS,
     defaultR2UploadPrefix: 'artifacts/server',
     defaultR2DownloadPrefix: 'artifacts/vendor',

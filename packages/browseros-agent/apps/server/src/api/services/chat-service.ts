@@ -876,6 +876,7 @@ export class ChatService {
         browserosId: this.deps.browserosId,
         aiSdkDevtoolsEnabled: this.deps.aiSdkDevtoolsEnabled,
         outputFileAccess,
+        resourcesDir: this.deps.resourcesDir,
       })
       return { agent, browserToolLease }
     } catch (error) {

@@ -74,9 +74,9 @@ class CheckProductTest(unittest.TestCase):
         self.assertEqual(diagnose(root, "browseros"), [])
         self.assertEqual(diagnose(root, "browserclaw"), [])
 
-    def test_aster_is_reported_incomplete_until_its_server_exists(self):
+    def test_aster_server_bundle_is_registered(self):
         findings = diagnose(get_package_root(), "aster")
-        self.assertEqual(findings, ["aster: no server bundle registered"])
+        self.assertNotIn("aster: no server bundle registered", findings)
 
 
 class UniquenessTest(unittest.TestCase):

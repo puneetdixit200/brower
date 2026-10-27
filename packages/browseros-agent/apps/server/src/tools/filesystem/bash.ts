@@ -1,7 +1,14 @@
-import { existsSync, realpathSync, statSync } from 'node:fs'
-import { dirname, resolve, sep } from 'node:path'
+import {
+  accessSync,
+  constants,
+  existsSync,
+  realpathSync,
+  statSync,
+} from 'node:fs'
+import { basename, dirname, resolve, sep } from 'node:path'
 import { type Tool, tool } from 'ai'
 import { z } from 'zod/v4'
+import { resolveBundledBun } from '../../lib/agents/host-acp/bundled-bun'
 import {
   DEFAULT_BASH_TIMEOUT,
   executeWithMetrics,
@@ -12,7 +19,69 @@ import {
 
 const TOOL_NAME = 'filesystem_bash'
 
-function getLinuxSandboxArgs(cwd: string): string[] {
+function resolveBashRuntime(resourcesDir?: string | null): string {
+  // Packaged servers are compiled native executables. Their process.execPath
+  // is the Aster ELF, not Bun, so only the explicitly configured resources
+  // directory can provide the script runtime in that case.
+  if (resourcesDir?.trim()) {
+    const bunPath = resolveBundledBun({ resourcesDir })
+    if (!bunPath) {
+      throw new Error(
+        'filesystem_bash requires the bundled Bun runtime in the configured resources directory.',
+      )
+    }
+    try {
+      const resourcesRoot = realpathSync(resolve(resourcesDir))
+      const runtimePath = realpathSync(bunPath)
+      const runtimeStat = statSync(runtimePath)
+      if (
+        (runtimePath !== resourcesRoot &&
+          !runtimePath.startsWith(`${resourcesRoot}${sep}`)) ||
+        !runtimeStat.isFile() ||
+        (runtimeStat.mode & 0o022) !== 0
+      ) {
+        throw new Error(
+          'Bundled Bun runtime has unsafe location or permissions.',
+        )
+      }
+      accessSync(runtimePath, constants.X_OK)
+      return runtimePath
+    } catch {
+      throw new Error(
+        'filesystem_bash could not verify the bundled Bun runtime.',
+      )
+    }
+  }
+
+  // Source/development runs use Bun directly. Do not expose a compiled server
+  // executable under a misleading /tmp/bin/bun name.
+  if (basename(process.execPath).toLowerCase() !== 'bun') {
+    throw new Error(
+      'filesystem_bash requires a configured bundled Bun runtime; refusing to expose the server executable as Bun.',
+    )
+  }
+  try {
+    const runtimeStat = statSync(process.execPath)
+    if (
+      !runtimeStat.isFile() ||
+      (process.getuid && runtimeStat.uid !== process.getuid()) ||
+      (runtimeStat.mode & 0o022) !== 0
+    ) {
+      throw new Error('Bun runtime has unsafe ownership or permissions.')
+    }
+    accessSync(process.execPath, constants.X_OK)
+    return process.execPath
+  } catch {
+    throw new Error(
+      'filesystem_bash could not verify the development Bun runtime.',
+    )
+  }
+}
+
+function getLinuxSandboxArgs(
+  cwd: string,
+  resourcesDir?: string | null,
+): string[] {
   const root = realpathSync(resolve(cwd))
   if (root === '/' || root === '/tmp')
     throw new Error('Shell workspace cannot be a filesystem root.')
@@ -93,14 +162,9 @@ function getLinuxSandboxArgs(cwd: string): string[] {
   }
   args.push('--dir', root, '--bind', root, root, '--chdir', root)
 
-  // The server runtime may live outside /usr. Expose only its Bun executable,
-  // not the user's home directory or PATH entries.
-  const runtimeStat = existsSync(process.execPath)
-    ? statSync(process.execPath)
-    : undefined
-  if (runtimeStat && runtimeStat.uid === process.getuid?.()) {
-    args.push('--ro-bind', process.execPath, '/tmp/bin/bun')
-  }
+  // Expose only a verified Bun executable, never the compiled server ELF,
+  // the user's home directory, or host PATH entries.
+  args.push('--ro-bind', resolveBashRuntime(resourcesDir), '/tmp/bin/bun')
   args.push(
     '--setenv',
     'PATH',
@@ -126,6 +190,7 @@ function getLinuxSandboxArgs(cwd: string): string[] {
 function getShellInvocation(
   cwd: string,
   command: string,
+  resourcesDir?: string | null,
 ): { command: string[]; cwd?: string; env?: Record<string, string> } {
   if (process.platform === 'win32') {
     return {
@@ -143,7 +208,7 @@ function getShellInvocation(
     return {
       command: [
         bwrap,
-        ...getLinuxSandboxArgs(cwd),
+        ...getLinuxSandboxArgs(cwd, resourcesDir),
         '--',
         '/bin/sh',
         '-c',
@@ -189,7 +254,10 @@ function formatBashResult(
   return { text: result || '(no output)' }
 }
 
-export function createBashTool(cwd: string): Tool {
+export function createBashTool(
+  cwd: string,
+  options: { resourcesDir?: string | null } = {},
+): Tool {
   return tool({
     description:
       'Execute a shell command and return its output. Commands run in a shell (sh/bash on Unix, cmd on Windows). Output is truncated to the last 2000 lines if too large.',
@@ -206,7 +274,11 @@ export function createBashTool(cwd: string): Tool {
         const resolvedCwd = resolve(cwd)
         let invocation: ReturnType<typeof getShellInvocation>
         try {
-          invocation = getShellInvocation(resolvedCwd, params.command)
+          invocation = getShellInvocation(
+            resolvedCwd,
+            params.command,
+            options.resourcesDir,
+          )
         } catch (error) {
           return {
             text: error instanceof Error ? error.message : String(error),

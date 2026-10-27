@@ -1,19 +1,14 @@
 import { chmod, lstat, mkdir, realpath, writeFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { PATHS } from '@browseros/shared/constants/paths'
+import { getProductStateDir } from '@browseros/shared/utils/browseros-dir'
 
 export const TOOL_OUTPUT_DIR_MODE = 0o700
 export const TOOL_OUTPUT_FILE_MODE = 0o600
 
 export function getBrowserosDir(): string {
-  const override = process.env.BROWSEROS_DIR?.trim()
-  if (override) return override
-  const dirName =
-    process.env.NODE_ENV === 'development'
-      ? PATHS.DEV_BROWSEROS_DIR_NAME
-      : PATHS.BROWSEROS_DIR_NAME
-  return join(homedir(), dirName)
+  // Standalone MCP development honors ASTER_SERVER_BUILD when explicitly set;
+  // compiled servers receive its fixed value through Bun's env inlining.
+  return getProductStateDir()
 }
 
 /** Returns the ready-to-use directory for large generated browser outputs. */

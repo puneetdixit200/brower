@@ -261,3 +261,26 @@ Follow the reviewed batches in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md
 - Recorded the cost-conscious model policy and next execution order in `NEXT_STEPS.md`. All current Aster source and Markdown changes are included in the requested source checkpoint. This is not a complete/release-ready browser.
 - T04 normal headed consent, cross-tab revoke, page reload and origin-denial checks pass with explicit isolated server/browser state and valid dummy telemetry configuration; state permissions are 0600. Workspace typecheck passes. Latest advanced harness still timed out waiting for initial OFF, so error/retry and sidecar restart gates remain open.
 - The test harness initially omitted `BROWSEROS_DIR`; that run was stopped and its test-created consent file removed from the default directory. Subsequent evidence uses an explicit disposable override. No personal profiles or credentials were used for the headed browser fixtures.
+
+### Model policy refinement — 2026-10-28
+
+- User now requests Luna for the majority of implementation and Terra as the primary planner/judge/reviewer. Sol is reserved for exceptional unresolved cases only. This supersedes the earlier routine Sol planning/review policy; current implementation work continues.
+
+### T04 development runtime verification — 2026-10-28
+
+- Terra completed the headed checks with a fresh disposable BrowserOS profile and explicit disposable `BROWSEROS_DIR`: blocked revoke leaves canonical and peer consent ON, offline load exposes retry without mislabeling a normal window, retry restores the confirmed state, and a confirmed revoke updates both tabs. Sidecar restart preserves granted consent and UI state; a subsequent revoke and restart preserve OFF. The file mode is 0600 and originless/foreign requests return 403.
+- The earlier advanced timeout was a test harness problem: it used an overly broad switch selector and could navigate before the extension was registered (`ERR_BLOCKED_BY_CLIENT`). Exact aria-label selection and a bounded DOM/navigation wait resolved it without application changes. Evidence is in `evidence/aster-privacy-2026-10-28.json`.
+- Luna added a portable smoke client under `scripts/dev/aster_privacy_smoke.py`, with expected-state/restart validation options and caller-owned process lifecycle. Syntax/help checks pass; the already-verified headed run used the original harness. Test processes were stopped.
+- S04 remains PARTIAL: this verifies the development extension/sidecar, not a native Aster package, remote telemetry processing/retention, or the broad provider/log-sink audit.
+
+### Usage stop request — 2026-10-28
+
+- User requested a commit/push of all work and updated next steps when usage reaches 5% remaining, followed by stopping. Account usage will be checked at batch boundaries; the goal will be paused at that condition rather than marked complete.
+
+### Aster development server bundle — 2026-10-28
+
+- Luna implemented distinct Aster server component/bundle paths and a Linux x64 local-only builder, with no BrowserOS CI telemetry defaults or OTA-feed fallback. The archive includes the pinned Bun 1.4.2 executable and checksum provenance plus migrations. Duplicate target options are rejected; Terra verified that the target gate matches the actual argument parser.
+- Review exposed two runtime gaps: the compiled server ELF cannot serve as a Bun interpreter, and independent MCP output resolution still selected BrowserOS state. Luna added explicit resource-directory plumbing and a validated packaged Bun resolver, plus a shared product-state helper used for server readback and MCP writes. Compiled Aster uses ASTER_DIR/.aster and ignores BROWSEROS_DIR; legacy BrowserOS behavior remains.
+- Full Python discovery passes (1,333 tests run, three skipped), with builder Bun checks 7/7, state checks 16/16 and filesystem checks 22/22. The filesystem regression uses an actual compiled fixture and Bubblewrap. Parent workspace typecheck passes. Product-definition doctor reports Aster healthy.
+- Terra independently started the rebuilt artifact against disposable headless Chromium in a loopback-only namespace: health OK, CDP connected, telemetry off, state under ASTER_DIR and the poisoned BROWSEROS_DIR absent. Bun executes JavaScript and its checksum matches the recorded provenance. Processes were stopped. Evidence and limitations are in `evidence/aster-server-development-2026-10-28.json`; usage is documented in `ASTER_SERVER_DEVELOPMENT.md`.
+- No native Aster Chromium binary or end-to-end packaged MCP output is verified. Extension/CRX and onboarding source producers, native sidecar launch integration and release provisioning remain open.

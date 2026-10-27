@@ -9,6 +9,7 @@ import { createWriteTool } from './write'
 
 export interface FilesystemToolSetOptions {
   read?: ReadToolOptions
+  resourcesDir?: string | null
 }
 
 export function buildFilesystemToolSet(
@@ -19,7 +20,9 @@ export function buildFilesystemToolSet(
     filesystem_read: createReadTool(cwd, options.read),
     filesystem_write: createWriteTool(cwd),
     filesystem_edit: createEditTool(cwd),
-    filesystem_bash: createBashTool(cwd),
+    filesystem_bash: createBashTool(cwd, {
+      resourcesDir: options.resourcesDir,
+    }),
     filesystem_grep: createGrepTool(cwd),
     filesystem_find: createFindTool(cwd),
     filesystem_ls: createLsTool(cwd),

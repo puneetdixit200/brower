@@ -4,6 +4,8 @@
 import hashlib
 import json
 import os
+import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -86,6 +88,26 @@ class ServerTargetTest(unittest.TestCase):
                 self.assertIn(("--target", triple), tuple(zip(command, command[1:])))
                 self.assertEqual(artifact, target_root / triple / "release" / filename)
 
+    def test_aster_uses_its_own_bun_builder_and_output_root(self) -> None:
+        root = Path("/repo/packages/browseros-agent")
+        command, artifact = server_build_command(
+            "aster", "linux-x64", root, root / "target"
+        )
+        self.assertEqual(
+            command,
+            (
+                "bun",
+                "scripts/build/aster-server.ts",
+                "--target=linux-x64",
+                "--no-upload",
+            ),
+        )
+        self.assertEqual(
+            artifact, root / "dist/prod/aster-server/linux-x64"
+        )
+        with self.assertRaisesRegex(ValueError, "does not support target windows-x64"):
+            server_build_command("aster", "windows-x64", root, root / "target")
+
 
 class ServerResourceBuilderTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -99,11 +121,16 @@ class ServerResourceBuilderTest(unittest.TestCase):
         server_manifest = self.agent / "apps/server/package.json"
         server_manifest.parent.mkdir(parents=True)
         server_manifest.write_text('{"version":"0.0.128"}\n')
+        (self.agent / "package.json").write_text(
+            '{"engines":{"bun":"1.4.2"}}\n'
+        )
         claw_manifest = self.agent / "apps/claw-server/Cargo.toml"
         claw_manifest.parent.mkdir(parents=True)
         claw_manifest.write_text(
             '[package]\nname = "claw-server"\nversion = "0.0.18"\n'
         )
+        # The development Aster bundle shares the source package, with an
+        # independently versioned resource component identity.
         skill = self.agent / "resources/skills/browserclaw/SKILL.md"
         skill.parent.mkdir(parents=True)
         skill.write_text("browserclaw skill")
@@ -190,6 +217,68 @@ class ServerResourceBuilderTest(unittest.TestCase):
             ],
             SOURCE_SHA,
         )
+
+    def test_aster_stages_into_its_own_resource_root(self) -> None:
+        (self.agent / "apps/server/package.json").write_text(
+            '{"version":"0.0.128"}\n'
+        )
+        bun_source = shutil.which("bun")
+        self.assertIsNotNone(bun_source)
+        output = self.agent / "dist/prod/aster-server/linux-x64"
+        bun_path = output / "resources/bin/third_party/bun"
+        provenance_path = output / "resources/bin/third_party/bun.provenance.json"
+        files = {
+            "resources/bin/aster_server": b"aster-server",
+            "resources/bin/third_party/bun": Path(bun_source).read_bytes(),
+        }
+        bun_sha = hashlib.sha256(files["resources/bin/third_party/bun"]).hexdigest()
+        provenance = {
+            "schemaVersion": 1,
+            "version": "1.4.2",
+            "platform": "linux",
+            "arch": "x64",
+            "sha256": bun_sha,
+        }
+        files["resources/bin/third_party/bun.provenance.json"] = (
+            json.dumps(provenance).encode()
+        )
+
+        def run(command, cwd, env):
+            for relative, content in files.items():
+                path = output / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+            bun_path.chmod(0o755)
+            (output / "artifact-metadata.json").write_text(
+                json.dumps(_metadata("0.0.128", "linux-x64", files))
+            )
+
+        builder = ServerResourceBuilder(
+            self.repo,
+            host_platform="linux",
+            run=run,
+            which=lambda name: f"/usr/bin/{name}",
+        )
+        result = builder.prepare(
+            product="aster",
+            target="linux-x64",
+            version="0.0.128",
+            source_sha=SOURCE_SHA,
+        )
+        self.assertEqual(
+            result.destination,
+            (self.browseros / "resources/binaries/aster_server/linux-x64").resolve(),
+        )
+        self.assertTrue((result.destination / "resources/bin/aster_server").is_file())
+        staged_bun = result.destination / "resources/bin/third_party/bun"
+        self.assertEqual(
+            subprocess.run(
+                [str(staged_bun), "--version"], check=True, capture_output=True, text=True
+            ).stdout.strip(),
+            "1.4.2",
+        )
+        staged_provenance = json.loads(provenance_path.read_text())
+        self.assertEqual(staged_provenance["sha256"], bun_sha)
 
     def test_incompatible_host_and_missing_toolchain_fail_preflight(self) -> None:
         builder = ServerResourceBuilder(

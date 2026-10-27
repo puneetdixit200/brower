@@ -17,6 +17,8 @@
 export const INLINED_ENV = {
   SENTRY_DSN: process.env.SENTRY_DSN,
   POSTHOG_API_KEY: process.env.POSTHOG_API_KEY,
+  // Product identity must be fixed by the build descriptor for compiled servers.
+  ASTER_SERVER_BUILD: process.env.ASTER_SERVER_BUILD,
 } as const
 
 export const REQUIRED_FOR_PRODUCTION =

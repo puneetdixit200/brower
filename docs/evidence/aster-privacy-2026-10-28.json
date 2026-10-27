@@ -18,6 +18,29 @@
   "state_file_mode": "0600",
   "workspace_typecheck": "passed",
   "independent_review": "Latest app peer-revoke delta cleared; 11 targeted tests passed",
-  "advanced_headed": "Incomplete: timeout waiting for initial OFF in advanced harness. Offline/retry and sidecar restart gates remain open.",
-  "native_package_verified": false
+  "native_package_verified": false,
+  "advanced_headed": {
+    "scope": "headed BrowserOS dev extension with isolated server/browser state",
+    "checks": {
+      "failed_revoke_server_remains_on": true,
+      "peer_does_not_claim_server_off": true,
+      "offline_has_retry": true,
+      "normal_window_not_mislabeled_incognito": true,
+      "retry_recovers_profile_choice": true,
+      "confirmed_revoke_updates_both": true,
+      "grant_ready_for_sidecar_restart": true
+    }
+  },
+  "restart_headed": {
+    "restart_preserves_grant": true,
+    "ui_shows_persisted_grant": true,
+    "originless_denied": true,
+    "foreign_origin_denied": true,
+    "consent_file_mode_600": true,
+    "final_off": true,
+    "restart_preserves_final_off": true
+  },
+  "harness_resolution": "Exact privacy switch selector and bounded wait for extension registration/DOM; chrome-error startup was a harness timing issue. No application source fix required.",
+  "process_cleanup": "Disposable sidecar, browser process group and namespace stopped by test runner.",
+  "repeatable_harness": "packages/browseros-agent/scripts/dev/aster_privacy_smoke.py (portable version syntax/help checked; verified headed run used its original harness)"
 }

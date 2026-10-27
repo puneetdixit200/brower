@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Aster product identity for native build planning and Linux packaging."""
 
+from pathlib import Path
+
 from ...core.products import (
     ASTER_EXTENSION_ID,
     MacProductIdentity,
     ProductDescriptor,
     WindowsProductIdentity,
 )
+from ..server_binaries import ServerBundle
 
 
 ASTER_PRODUCT = ProductDescriptor.define(
@@ -23,7 +26,7 @@ ASTER_PRODUCT = ProductDescriptor.define(
     support_url="",
     bugtracker_url="",
     required_extensions=((ASTER_EXTENSION_ID, "Aster app"),),
-    server_bundle_ids=(),
+    server_bundle_ids=("aster-server",),
     artifact_prefix="Aster_Browser",
     supported_platforms=("linux",),
     mac=MacProductIdentity(
@@ -44,4 +47,31 @@ ASTER_PRODUCT = ProductDescriptor.define(
         (r"(?<!The )Chromium", "Aster Browser"),
         (r"Chrome", "Aster Browser"),
     ),
+)
+
+# Aster's Linux development server is built from the shared compiled bootstrap,
+# but owns distinct output and staged-resource identities. Release publication
+# stays disabled until Aster's external release identity is provisioned.
+ASTER_SERVER_BUNDLE = ServerBundle(
+    id="aster-server",
+    name="Aster Server",
+    product_ids=("aster",),
+    chromium_output_root="AsterServer",
+    local_resources_root=Path("resources/binaries/aster_server"),
+    chromium_resources_root=Path(
+        "chrome/browser/browseros/aster_server/resources"
+    ),
+    macos_bundle_resources_root=Path(
+        "Contents/Resources/AsterServer/default/resources"
+    ),
+    windows_bundle_resources_root=Path("AsterServer/default/resources"),
+    macos_binaries={},
+    windows_binaries=(),
+    source_builder="bun",
+    source_component="aster-server",
+    runtime_binary_name="aster_server",
+    unsigned_artifact_prefix="artifacts/aster-server",
+    unsigned_artifact_base_name="aster-server-resources",
+    supported_targets=("linux-x64",),
+    ota_enabled=False,
 )

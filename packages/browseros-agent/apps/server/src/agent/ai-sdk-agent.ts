@@ -56,6 +56,7 @@ export interface AiSdkAgentConfig {
   browserosId?: string
   aiSdkDevtoolsEnabled?: boolean
   outputFileAccess?: BrowserOutputFileAccess
+  resourcesDir?: string | null
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -117,7 +118,10 @@ function summarizeToolResultError(
 /** Builds filesystem tools for model-backed sessions, with scoped readback outside full workspace mode. */
 export function buildAgentFilesystemToolSet(
   resolvedConfig: ResolvedAgentConfig,
-  options: { outputFileAccess?: BrowserOutputFileAccess } = {},
+  options: {
+    outputFileAccess?: BrowserOutputFileAccess
+    resourcesDir?: string | null
+  } = {},
 ): ToolSet {
   if (resolvedConfig.chatMode || !resolvedConfig.workingDir) {
     return {
@@ -126,7 +130,9 @@ export function buildAgentFilesystemToolSet(
       }),
     }
   }
-  return buildFilesystemToolSet(resolvedConfig.workingDir)
+  return buildFilesystemToolSet(resolvedConfig.workingDir, {
+    resourcesDir: options.resourcesDir,
+  })
 }
 
 export class AiSdkAgent {
@@ -269,6 +275,7 @@ export class AiSdkAgent {
         config.resolvedConfig,
         {
           outputFileAccess,
+          resourcesDir: config.resourcesDir,
         },
       )
       const workspaceDirForPrompt =

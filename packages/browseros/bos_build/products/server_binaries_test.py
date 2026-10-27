@@ -14,6 +14,7 @@ from .server_binaries import (
 )
 from .browserclaw.product import BROWSERCLAW_SERVER_BUNDLE
 from .browseros.product import BROWSEROS_SERVER_BUNDLE
+from .aster.product import ASTER_SERVER_BUNDLE
 
 SERVER_BUNDLES = all_server_bundles()
 MACOS_SERVER_BINARIES = {
@@ -30,7 +31,11 @@ class MacosServerBinariesTest(unittest.TestCase):
     def test_server_bundles_use_rust_claw_for_browser_builds(self):
         self.assertEqual(
             all_server_bundles(),
-            (BROWSEROS_SERVER_BUNDLE, BROWSERCLAW_SERVER_BUNDLE),
+            (
+                BROWSEROS_SERVER_BUNDLE,
+                BROWSERCLAW_SERVER_BUNDLE,
+                ASTER_SERVER_BUNDLE,
+            ),
         )
 
     def test_server_bundles_have_separate_resource_roots(self):
@@ -95,11 +100,24 @@ class MacosServerBinariesTest(unittest.TestCase):
             server_bundles_for_product("browserclaw"),
             (BROWSERCLAW_SERVER_BUNDLE,),
         )
+        self.assertEqual(server_bundles_for_product("aster"), (ASTER_SERVER_BUNDLE,))
 
     def test_server_ota_bundles_use_the_active_rust_claw_bundle(self):
         self.assertEqual(
             server_ota_bundles_for_product("browserclaw"),
             (BROWSERCLAW_SERVER_BUNDLE,),
+        )
+        self.assertEqual(server_ota_bundles_for_product("aster"), ())
+
+    def test_aster_bundle_has_separate_development_identity_and_linux_target(self):
+        self.assertEqual(ASTER_SERVER_BUNDLE.source_builder, "bun")
+        self.assertEqual(ASTER_SERVER_BUNDLE.source_component, "aster-server")
+        self.assertEqual(ASTER_SERVER_BUNDLE.runtime_binary_name, "aster_server")
+        self.assertEqual(ASTER_SERVER_BUNDLE.supported_targets, ("linux-x64",))
+        self.assertFalse(ASTER_SERVER_BUNDLE.ota_enabled)
+        self.assertEqual(
+            ASTER_SERVER_BUNDLE.unsigned_artifact_key("linux-x64"),
+            "artifacts/aster-server/latest/aster-server-resources-linux-x64.zip",
         )
 
     def test_every_entry_has_identifier_and_options(self):

@@ -1,0 +1,34 @@
+{
+  "resources": [
+    {
+      "name": "Pinned Bun runtime",
+      "source": {
+        "type": "local",
+        "path": "dist/prod/aster-server/.inputs/bun"
+      },
+      "destination": "resources/bin/third_party/bun",
+      "executable": true,
+      "os": ["linux"],
+      "arch": ["x64"]
+    },
+    {
+      "name": "Pinned Bun runtime provenance",
+      "source": {
+        "type": "local",
+        "path": "dist/prod/aster-server/.inputs/bun-provenance.json"
+      },
+      "destination": "resources/bin/third_party/bun.provenance.json",
+      "os": ["linux"],
+      "arch": ["x64"]
+    },
+    {
+      "name": "Server database migrations",
+      "source": {
+        "type": "local",
+        "path": "apps/server/src/lib/db/migrations"
+      },
+      "destination": "resources/db/migrations",
+      "recursive": true
+    }
+  ]
+}

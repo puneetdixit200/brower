@@ -179,7 +179,7 @@ class RegistryTest(unittest.TestCase):
         self.assertEqual(
             product.required_extension_ids, ((ASTER_EXTENSION_ID, "Aster app"),)
         )
-        self.assertEqual(product.server_bundle_ids, ())
+        self.assertEqual(product.server_bundle_ids, ("aster-server",))
         self.assertEqual(product.homepage_url, "")
         self.assertEqual(product.support_url, "")
         self.assertEqual(product.bugtracker_url, "")

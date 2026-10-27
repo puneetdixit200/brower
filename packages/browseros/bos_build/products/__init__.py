@@ -10,7 +10,7 @@ from typing import Dict
 from ..core.products import ProductDescriptor
 from .browseros.product import BROWSEROS_PRODUCT, BROWSEROS_SERVER_BUNDLE
 from .browserclaw.product import BROWSERCLAW_PRODUCT, BROWSERCLAW_SERVER_BUNDLE
-from .aster.product import ASTER_PRODUCT
+from .aster.product import ASTER_PRODUCT, ASTER_SERVER_BUNDLE
 
 DEFAULT_PRODUCT_ID = BROWSEROS_PRODUCT.id
 
@@ -20,6 +20,9 @@ for _product in (BROWSEROS_PRODUCT, BROWSERCLAW_PRODUCT, ASTER_PRODUCT):
         raise ValueError(f"Duplicate product id: {_product.id}")
     PRODUCTS[_product.id] = _product
 
+# Release feed and OTA tooling consumes this provisioned set. Aster's local
+# development bundle is registered through products.server_binaries but is
+# deliberately excluded until its release identity exists.
 SERVER_BUNDLES = (BROWSEROS_SERVER_BUNDLE, BROWSERCLAW_SERVER_BUNDLE)
 
 __all__ = [
@@ -30,4 +33,5 @@ __all__ = [
     "BROWSERCLAW_PRODUCT",
     "BROWSERCLAW_SERVER_BUNDLE",
     "ASTER_PRODUCT",
+    "ASTER_SERVER_BUNDLE",
 ]

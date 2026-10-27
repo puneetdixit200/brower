@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import {
+  chmod,
+  copyFile,
+  mkdir,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createBashTool } from '../../../src/tools/filesystem/bash'
@@ -139,6 +146,54 @@ describe('filesystem_bash', () => {
     const result = await exec({ command: 'bun --version' })
     expect(result.isError).toBeUndefined()
     expect(result.text.trim()).toMatch(/^\d+\.\d+\.\d+/)
+  })
+
+  it('uses the bundled Bun runtime when the server executable is compiled', async () => {
+    if (process.platform !== 'linux' || process.getuid?.() === 0) return
+    const resourcesDir = join(tmpDir, 'resources')
+    const bunDir = join(resourcesDir, 'bin', 'third_party')
+    await mkdir(bunDir, { recursive: true })
+    const bundledBun = join(bunDir, 'bun')
+    await copyFile(process.execPath, bundledBun)
+    await chmod(bundledBun, 0o755)
+
+    // Compile a small Bun executable to model the packaged server's distinct
+    // process.execPath, then exercise the real tool factory and Bubblewrap
+    // invocation from that compiled process.
+    const harnessSource = join(tmpDir, 'compiled-server-fixture.ts')
+    const harnessExecutable = join(tmpDir, 'compiled-server-fixture')
+    const bashModule = join(
+      import.meta.dir,
+      '../../../src/tools/filesystem/bash.ts',
+    )
+    await writeFile(
+      harnessSource,
+      `import { createBashTool } from ${JSON.stringify(bashModule)}
+const tool = createBashTool(process.argv[2]!, { resourcesDir: process.argv[3] })
+// biome-ignore lint/suspicious/noExplicitAny: compiled fixture
+const result = await (tool as any).execute({ command: "bun -e 'console.log(process.cwd())'" })
+console.log(JSON.stringify(result))
+process.exitCode = result.isError ? 1 : 0
+`,
+    )
+    const build = await Bun.build({
+      entrypoints: [harnessSource],
+      compile: { outfile: harnessExecutable },
+      target: 'bun',
+    })
+    expect(build.success).toBe(true)
+    const fixture = Bun.spawn([harnessExecutable, tmpDir, resourcesDir], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(fixture.stdout).text(),
+      new Response(fixture.stderr).text(),
+      fixture.exited,
+    ])
+    expect(exitCode).toBe(0)
+    expect(stderr).toBe('')
+    expect(JSON.parse(stdout.trim()).text.trim()).toBe(tmpDir)
   })
 
   it('fails closed when Bubblewrap is unavailable', async () => {
