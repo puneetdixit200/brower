@@ -81,7 +81,7 @@
 
 - Source review found BrowserOS Chromium patch integration for the native split-view new-tab URL and a default-pinned Split Tab toolbar action. Aster does not currently own split-state UI or controls; two live panes and resize/swap/close/restart behavior have not been verified. Native Chromium compilation remains deferred on this 14 GiB host against the project's 16 GiB guidance.
 - Existing selection capture is per tab and selected text can be attached to chat. Added explicit Summarize and Translate prompt buttons to the selected-text card; they only populate the composer, so no provider request occurs until the user submits. Translation asks for a target language when one is missing.
-- The selection prompt tests pass (2/2), app typecheck passes, and targeted Biome passes. A headed isolated BrowserOS smoke selected text from the local health page, opened the side panel, and verified that Summarize and Translate populate the composer without sending a provider request. A streamed answer is still untested. U11 and U12 remain PARTIAL; screenshot/lasso tools (U13) are not implemented.
+- The selection prompt tests pass (2/2), app typecheck passes, and targeted Biome passes. A headed isolated BrowserOS smoke selected text from the local health page, opened the side panel for that tab, and verified the selection appeared there and both Summarize and Translate populated the composer without sending a provider request. A streamed answer is still untested. U11, U12, and U14 remain PARTIAL; screenshot/lasso tools (U13) are not implemented.
 
 ### Phase 7 — approval gate and response path (partial)
 
