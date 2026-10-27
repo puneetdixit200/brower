@@ -2,6 +2,7 @@
 """Stage bundled extension CRXs from published or prepared resources."""
 
 import json
+import re
 import shutil
 import zipfile
 import sys
@@ -121,6 +122,11 @@ class BundledExtensionsModule(Step):
         )
         if tuple(sorted(relative_files)) != result.files:
             raise ValueError("Staged Aster development extension differs from archive")
+        # GN input generation cannot interpolate arbitrary filenames into its
+        # source language; reject anything outside a bounded build-safe subset.
+        for item in result.files:
+            if not re.fullmatch(r"[A-Za-z0-9._@+/-]+", item):
+                raise ValueError(f"Unpacked extension contains unsafe GN filename: {item!r}")
         # GN's sources list must enumerate the WXT output deterministically.
         # The generated .gni is consumed only when the debug buildflag is true.
         gn_lines = ['aster_unpacked_dev_sources = [']
