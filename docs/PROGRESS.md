@@ -2,7 +2,7 @@
 
 ## Current phase: Phase 3 — Aster UI foundation and performance harness
 
-**Status: PARTIAL.** Phase 0 is complete against the upstream BrowserOS baseline. Phase 1 dependency installation, static checks, and the development extension build are complete; the full upstream test run has failures. Phase 2's Linux supervisor flow is now verified end-to-end. Phase 3 is next; no Aster-branded browser binary or release package exists yet.
+**Status: PARTIAL.** Phase 0 is complete against the upstream BrowserOS baseline. Phase 1 dependency installation, static checks, and the development extension build are complete; the full upstream test run has failures. Phase 2's Linux supervisor flow is verified end-to-end. Phase 3 has an Aster home visual foundation and a headed Search/Ask smoke. No Aster-branded browser binary or release package exists.
 
 ### Host and pinned source
 
@@ -23,7 +23,7 @@
 - Installed user-local Bun 1.4.2 and `bunx` alias from checksum-verified official release; frozen dependency install succeeded (1,858 packages).
 - `bun run check`: exit 0; upstream Biome schema-version warnings and fallow report remain.
 - Raw `bun test` before the Linux integration fixes: exit 1, 3,105 tests: 2,838 pass, 157 skip, 110 fail, 9 error. Failures included a hard-coded macOS BrowserOS path, timeout/resource-sensitive tests, and live catalogue/provider expectations. These were pinned-upstream baseline results, not Aster regression results.
-- `NODE_OPTIONS=--max-old-space-size=4096 bun run build:agent:dev`: exit 0 in 72.84 s. WXT emitted unresolved font-reference and upstream Rollup annotation warnings. Generated `apps/app/dist/chrome-mv3-dev/manifest.json` is BrowserOS-branded and is only an unpacked development extension.
+- `NODE_OPTIONS=--max-old-space-size=4096 bun run build:agent:dev`: exit 0 in 72.84 s at initial baseline. WXT emitted unresolved font-reference and upstream Rollup annotation warnings. The current dev manifest carries Aster display name/icons, but still inherits BrowserOS extension identity and updater assumptions.
 
 ### Aster implementation changes
 
@@ -37,10 +37,19 @@
 ### Phase 2 — Linux dev launcher (complete for the current source build)
 
 - Added `packages/browseros-agent/tools/dev/linux/run.sh` and `README.md`. The runner uses the pinned manual dev mode and can use the user-local Go/Bun installs.
-- Go supervisor derives the extension ID from the built manifest, opens the extension home directly, uses a worktree-specific profile under the user cache with mode 700, and stores agent state in that profile tree in another mode-700 directory.
+- Go supervisor derives the extension ID from the built manifest, waits for the extension service worker before opening its home through CDP on Linux, uses a worktree-specific profile under the user cache with mode 700, and stores agent state in that profile tree in another mode-700 directory.
 - Linux watch mode reserves available loopback ports without terminating unrelated listeners. Agent HTTP API binds to `127.0.0.1`; Chromium sandbox remains enabled.
 - Live verification in a network-isolated namespace: BrowserOS window opened under Wayland; CDP came up on loopback; extension home rendered; extension-page `fetch()` to `/system/health` returned `{"status":"ok","cdpConnected":true}`; Ctrl+C shut down browser/server cleanly. Klavis access was blocked by the deliberately isolated network and produced retry logs.
 - `go test ./...` passes across the dev supervisor packages; `bun test apps/server/tests/main.test.ts apps/server/tests/test-runtime.test.ts` passes (10/10).
+
+### Phase 3 — home interface foundation (partial)
+
+- Added scoped light/dark Aster home colors, original star mark and toolbar icons, Search / Ask AI mode controls, full-bleed home layout, and Aster display labels in the sidebar and extension manifest/action.
+- Search opens explicit HTTP(S) URLs and bare hostnames; other text becomes an encoded Google search. Non-web schemes never navigate directly. Search is user-submitted and opens a new browser tab.
+- Ask AI retains BrowserOS's existing provider/agent composer and selected-tab/file context controls. Recent sites and scheduled tasks remain; upstream promotional cards were removed from the Aster home screen.
+- `go test ./...` passes, including CDP-deferred extension opening tests. Six Search parser tests pass; app typecheck and targeted Biome pass. The updated extension build passes as the desktop user with `NODE_OPTIONS=--max-old-space-size=4096`. Existing unresolved-font, Rollup-annotation, and large-chunk warnings remain.
+- The cold-start race is resolved in Linux manual mode: it waits for the unpacked extension worker then opens the home through CDP. Headed BrowserOS v0.51.0 smoke verified Aster branding and Ask composer, switched to Search, submitted `aster isolated search smoke`, and observed the encoded Google URL in a new tab. The namespace had no external network. Captured [`screenshots/aster-home.png`](screenshots/aster-home.png).
+- Updated `FEATURE_MATRIX.md`, `UI_REFERENCE.md`, `KNOWN_LIMITATIONS.md`, and the Linux runner guide. U04/U05 are PASS for the verified home mode/search flow; full agent task behavior remains unverified.
 
 ### Current blockers / limits
 
@@ -51,4 +60,4 @@
 
 ### Next action
 
-Start Phase 3: trace the shared theme/layout primitives, define an original Aster visual system, implement shell states without changing normal browsing, and add a matched startup/idle baseline harness. Do not distribute an Aster build until upstream extension updater and identity assumptions are removed.
+Exercise light/dark mode and investigate the provider-loading state in the isolated profile. Continue the remaining Phase 3 shell states and matched startup/idle baseline harness. Do not distribute an Aster build until upstream extension updater and identity assumptions are removed.

@@ -16,6 +16,7 @@ const COLLAPSE_DELAY = 150
 const SidebarLayoutContent: FC = () => {
   const location = useLocation()
   const isChatPage = location.pathname === '/home/chat'
+  const isHomePage = location.pathname === '/home'
   const isMobile = useIsMobile()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -74,10 +75,14 @@ const SidebarLayoutContent: FC = () => {
             >
               <Menu className="size-4" />
             </Button>
-            <span className="font-semibold">BrowserOS</span>
+            <span className="font-semibold">Aster Browser</span>
           </header>
           {isChatPage ? (
             <main className="relative min-h-0 flex-1 overflow-hidden">
+              <Outlet />
+            </main>
+          ) : isHomePage ? (
+            <main className="flex-1 overflow-y-auto">
               <Outlet />
             </main>
           ) : (
@@ -137,6 +142,10 @@ const SidebarLayoutContent: FC = () => {
               sidebarOpen && 'ml-[200px]',
             )}
           >
+            <Outlet />
+          </main>
+        ) : isHomePage ? (
+          <main className="min-h-screen overflow-y-auto">
             <Outlet />
           </main>
         ) : (

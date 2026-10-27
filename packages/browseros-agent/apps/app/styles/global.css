@@ -85,6 +85,38 @@
   --accent-orange-bright: oklch(0.7531 0.1963 43.21);
 }
 
+/* Original Aster palette, limited to the new-tab/home surface. */
+.aster-home {
+  --aster-ink: #173b35;
+  --aster-muted: #647772;
+  --aster-accent: #267564;
+  --aster-card: #fffefa;
+  --aster-line: #dce6df;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(214, 237, 220, 0.65), transparent 55%),
+    #f5f7f1;
+}
+
+.dark .aster-home {
+  --aster-ink: #e3efe8;
+  --aster-muted: #a6b8b0;
+  --aster-accent: #79c8ad;
+  --aster-card: #202d2a;
+  --aster-line: #354640;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(37, 83, 68, 0.42), transparent 58%),
+    #18211f;
+}
+
+.aster-mark {
+  color: #267564;
+  font-size: 1rem;
+}
+
+.dark .aster-mark {
+  color: #b9e473;
+}
+
 .dark {
   --background: oklch(0.25 0.01 265);
   --foreground: oklch(0.92 0 0);
