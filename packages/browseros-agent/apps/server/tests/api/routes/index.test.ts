@@ -37,13 +37,14 @@ function createTestConfig() {
 function createTestApp(
   agentRoutes = new Hono<Env>(),
   onShutdown: () => void = () => {},
+  tokenManager: unknown = null,
 ) {
   return createApiRoutes({
     agentRoutes,
     config: createTestConfig(),
     klavis: new KlavisService({ browserosId: null }),
     onShutdown,
-    tokenManager: null,
+    tokenManager: tokenManager as never,
   })
 }
 
@@ -133,7 +134,16 @@ describe('createApiRoutes', () => {
   })
 
   it('preserves the OAuth unavailable fallback', async () => {
-    const response = await createTestApp().request('/oauth/openai/status')
+    const response = await createTestApp().request(
+      '/oauth/openai/status',
+      {
+        headers: {
+          Host: 'localhost',
+          Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+        },
+      },
+      localServer,
+    )
 
     expect(response.status).toBe(503)
     await expect(response.json()).resolves.toEqual({
@@ -142,14 +152,32 @@ describe('createApiRoutes', () => {
   })
 
   it('mounts the MCP manager routes', async () => {
-    const response = await createTestApp().request('/mcp-manager/agents')
+    const response = await createTestApp().request(
+      '/mcp-manager/agents',
+      {
+        headers: {
+          Host: 'localhost',
+          Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+        },
+      },
+      localServer,
+    )
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({ agents: [] })
   })
 
   it('serves the tool catalogue for the settings UI', async () => {
-    const response = await createTestApp().request('/mcp-manager/tools')
+    const response = await createTestApp().request(
+      '/mcp-manager/tools',
+      {
+        headers: {
+          Host: 'localhost',
+          Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+        },
+      },
+      localServer,
+    )
 
     expect(response.status).toBe(200)
     const body = (await response.json()) as {
@@ -162,6 +190,64 @@ describe('createApiRoutes', () => {
       expect(typeof tool.name).toBe('string')
       expect(typeof tool.description).toBe('string')
     }
+  })
+
+  it('protects connector installs and OAuth state with trusted app origin', async () => {
+    const app = createTestApp()
+    const blockedInstall = await app.request(
+      '/mcp-manager/agents/fixture/install',
+      { method: 'POST', headers: { Host: 'localhost' } },
+      localServer,
+    )
+    expect(blockedInstall.status).toBe(403)
+    const allowedInstall = await app.request(
+      '/mcp-manager/agents/fixture/install',
+      {
+        method: 'POST',
+        headers: {
+          Host: 'localhost',
+          Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+        },
+      },
+      localServer,
+    )
+    expect(allowedInstall.status).toBe(200)
+
+    const blockedOAuth = await createTestApp(undefined, undefined, {
+      getStatus: () => ({ connected: false }),
+    }).request(
+      '/oauth/openai/status',
+      { headers: { Host: 'localhost' } },
+      localServer,
+    )
+    expect(blockedOAuth.status).toBe(403)
+    const blockedOAuthStart = await createTestApp(undefined, undefined, {
+      startDeviceCodeFlow: mock(async () => ({
+        userCode: 'fixture',
+        verificationUri: 'https://example.test',
+        expiresIn: 60,
+      })),
+    }).request(
+      '/oauth/openai/start',
+      { headers: { Host: 'localhost' } },
+      localServer,
+    )
+    expect(blockedOAuthStart.status).toBe(403)
+
+    const allowedOAuth = await createTestApp(undefined, undefined, {
+      getStatus: () => ({ connected: false }),
+    }).request(
+      '/oauth/openai/status',
+      {
+        headers: {
+          Host: 'localhost',
+          Origin: 'chrome-extension://bflpfmnmnokmjhmgnolecpppdbdophmk',
+        },
+      },
+      localServer,
+    )
+    expect(allowedOAuth.status).toBe(200)
+    await expect(allowedOAuth.json()).resolves.toEqual({ connected: false })
   })
 
   it('keeps injected agent routes behind app-origin auth', async () => {

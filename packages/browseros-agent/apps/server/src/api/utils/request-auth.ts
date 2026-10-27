@@ -24,9 +24,14 @@ export function isTrustedAppOrigin(origin: string | undefined): boolean {
   }
 }
 
-export function requireTrustedAppOrigin(): MiddlewareHandler {
+export function requireTrustedAppOrigin(
+  options: { requireOrigin?: boolean } = {},
+): MiddlewareHandler {
   return async (c, next) => {
-    if (isTrustedAppRequest(c)) {
+    if (
+      (!options.requireOrigin || c.req.header('origin')) &&
+      isTrustedAppRequest(c)
+    ) {
       return next()
     }
 

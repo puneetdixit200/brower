@@ -75,6 +75,19 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
     new Hono<Env>()
       .use('/*', cors(defaultCorsConfig))
       .use('/*', requireTrustedOrigin())
+      // Register path guards before mounting routes; Hono middleware is
+      // evaluated in registration order.
+      .use('/acpx/probe/*', requireTrustedAppOrigin())
+      .use('/agents/*', requireTrustedAppOrigin())
+      .use('/conversations/*', requireTrustedAppOrigin())
+      .use('/mcp-manager/*', requireTrustedAppOrigin())
+      .use('/oauth/*', requireTrustedAppOrigin({ requireOrigin: true }))
+      .use('/providers/*', requireTrustedAppOrigin())
+      .use('/test-provider/*', requireTrustedAppOrigin())
+      .use('/refine-prompt/*', requireTrustedAppOrigin())
+      .use('/klavis/*', requireTrustedAppOrigin())
+      .use('/scheduled-jobs/*', requireTrustedAppOrigin())
+      .use('/scheduled-job-runs/*', requireTrustedAppOrigin())
       .route('/system/health', createHealthRoute({ browser }))
       .route('/system/diagnostics', createDiagnosticsRoute(version))
       .route('/system/shutdown', createShutdownRoute({ onShutdown }))
@@ -112,26 +125,6 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
           conversationRuns,
         }),
       )
-      // Protected routes. The extension-origin auth middleware is applied per
-      // path prefix (Hono's `/prefix/*` also matches the bare list route), so
-      // unregistered paths stay 404 and public routes are untouched. Routes are
-      // mounted directly; the typed client derives per-route types from the
-      // factories (see rpc.ts), not from this composition.
-      .use('/acpx/probe/*', requireTrustedAppOrigin())
-      .use('/agents/*', requireTrustedAppOrigin())
-      .use('/conversations/*', requireTrustedAppOrigin())
-      // These carry provider credentials in the clear, so they need the
-      // localhost + extension-origin check. The blanket requireTrustedOrigin
-      // above only rejects a request that carries a disallowed Origin header;
-      // one with no Origin at all passes it. /test-provider reuses a saved
-      // credential server-side and /refine-prompt drives an outbound LLM call,
-      // so they belong here too.
-      .use('/providers/*', requireTrustedAppOrigin())
-      .use('/test-provider/*', requireTrustedAppOrigin())
-      .use('/refine-prompt/*', requireTrustedAppOrigin())
-      .use('/klavis/*', requireTrustedAppOrigin())
-      .use('/scheduled-jobs/*', requireTrustedAppOrigin())
-      .use('/scheduled-job-runs/*', requireTrustedAppOrigin())
       .route('/klavis', createKlavisRoutes({ klavis }))
       .route('/acpx/probe', createAcpxProbeRoutes({ resourcesDir }))
       .route('/agents', resolvedAgentRoutes)
