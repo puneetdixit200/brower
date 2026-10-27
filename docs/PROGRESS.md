@@ -68,6 +68,14 @@
 - The real home submit path navigated to the chat surface, sent the selected tab context through the extension/server chat route, and rendered the full canned response. Server logs recorded the chat request and `Agent execution complete`; provider row was deleted before shutdown. No real credential or external model request was used.
 - A01 is PARTIAL: transport and page-context display pass, but the mock response does not establish page comprehension, browser tool execution, approvals, or real provider behavior.
 
+### Phase 5 follow-up — deterministic browser-tool fixture (partial)
+
+- Added an opt-in `BROWSEROS_MOCK_TOOL_CALL=tabs.list` fixture path to the mock language model. It can emit only the fixed read-only `tabs` list call, runs once per model instance, then returns the existing canned response. It is disabled by default and accepts no caller-supplied tool name or arguments.
+- Headed Linux verification used a disposable profile in a network-isolated namespace. A chat request went through the real agent loop and its required loopback MCP lease; the stream showed `tool-input-available`, then `tool-output-available` with the live `[1] chrome://newtab/ (New Tab)` result, and completed with the canned follow-up response. Server logs independently showed the `tabs` call and `Agent execution complete`.
+- A disposable dummy provider row was used only to exercise the setup surface and deleted before shutdown. No external model request or real credential was used. Browser and server stopped cleanly.
+- The focused fixture test passes (1/1). The first package typecheck retry hit TS2589 (excessive type instantiation); the earlier repo-wide typecheck before this change had passed. The fixture test and Biome formatting are clean.
+- This proves one read-only tool dispatch end to end. It does not prove page comprehension, mutation approvals, cancellation, retries, multi-step tasks, or real-provider behavior.
+
 ### Privacy hardening — remote connector opt-in (partial)
 
 - Removed automatic Klavis proxy startup. Home/sidebar no longer fetch remote integration status on mount; opening Connect Apps activates the optional connector service. The dedicated Apps settings screen is also an explicit activation point.
@@ -84,4 +92,4 @@
 
 ### Next action
 
-Add deterministic local fixture tasks that exercise browser tools and approval boundaries; then audit every local control route and third-party network path. Continue U06 history/file/memory context, matched browser benchmarks, shell regressions, and inherited extension identity/updater cleanup before any distribution work.
+Extend deterministic local fixtures to cover guarded mutations and approval boundaries; then audit every local control route and third-party network path. Continue U06 history/file/memory context, matched browser benchmarks, shell regressions, and inherited extension identity/updater cleanup before any distribution work.

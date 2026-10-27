@@ -25,6 +25,12 @@ const MOCK_USAGE: LanguageModelV3Usage = {
   },
 }
 
+/** A deliberately narrow fixture hook for isolated, local browser-tool smokes. */
+function mockToolCall(): { toolName: string; input: string } | undefined {
+  if (process.env.BROWSEROS_MOCK_TOOL_CALL !== 'tabs.list') return undefined
+  return { toolName: 'tabs', input: JSON.stringify({ action: 'list' }) }
+}
+
 function createMockResult(): LanguageModelV3GenerateResult {
   return {
     content: [{ type: 'text', text: MOCK_LLM_RESPONSE_TEXT }],
@@ -58,6 +64,7 @@ export function resolveMockLLMConfig(config: LLMConfig): ResolvedLLMConfig {
 }
 
 export function createMockLanguageModel(): LanguageModel {
+  let toolCallPending = Boolean(mockToolCall())
   const chunks: LanguageModelV3StreamPart[] = [
     { type: 'text-start', id: 'text-1' },
     {
@@ -74,9 +81,38 @@ export function createMockLanguageModel(): LanguageModel {
   ]
 
   return new MockLanguageModelV3({
-    doGenerate: async () => createMockResult(),
-    doStream: async () => ({
-      stream: simulateReadableStream({ chunks }),
-    }),
+    doGenerate: async () => {
+      const call = mockToolCall()
+      if (!toolCallPending || !call) return createMockResult()
+      toolCallPending = false
+      return {
+        content: [
+          { type: 'tool-call', toolCallId: 'fixture-tabs-list', ...call },
+        ],
+        finishReason: { unified: 'tool-calls', raw: 'tool_calls' },
+        usage: MOCK_USAGE,
+        warnings: [],
+      }
+    },
+    doStream: async () => {
+      const call = mockToolCall()
+      if (toolCallPending && call) {
+        toolCallPending = false
+        const toolChunks: LanguageModelV3StreamPart[] = [
+          {
+            type: 'tool-call',
+            toolCallId: 'fixture-tabs-list',
+            ...call,
+          },
+          {
+            type: 'finish',
+            finishReason: { unified: 'tool-calls', raw: 'tool_calls' },
+            usage: MOCK_USAGE,
+          },
+        ]
+        return { stream: simulateReadableStream({ chunks: toolChunks }) }
+      }
+      return { stream: simulateReadableStream({ chunks }) }
+    },
   }) as LanguageModel
 }
