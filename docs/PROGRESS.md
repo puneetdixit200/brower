@@ -127,7 +127,7 @@
 
 ### Next action
 
-Investigate A05 durable task state and crash recovery using the existing server-owned run/session path before expanding more agent behaviors. Release blockers remain Aster extension identity/update ownership, telemetry and outbound-traffic audit, external send/payment classification, Guard/Full policy configuration, native packaging, and matched stock/Aster browser performance.
+Continue with the S05 extension identity/update ownership blocker, beginning with a safe design and identity migration plan. Release blockers remain S05 ownership, telemetry and outbound-traffic audit, external send/payment classification, Guard/Full policy configuration, native packaging, and matched stock/Aster browser performance.
 
 
 ### Phase 7 follow-up — persistent external MCP authentication (implemented; packaged verification pending)
@@ -198,6 +198,11 @@ Investigate A05 durable task state and crash recovery using the existing server-
 
 - Added a Task History sidebar page with `/tasks` and `/tasks/:taskId` routes. It reads local execution history only after the browser window is confirmed non-incognito, lists status/time/counts, and shows task UUID, bounded response preview, and ordered tool-step timeline. Common credential-shaped prompts, results, tool names, and displayed step previews are filtered heuristically.
 - The current task record schema has no downloadable artifact descriptors, so the detail page reports an empty artifacts state; full transcripts and artifact rendering are not implemented. Timeline helper tests pass (4/4), app typecheck and targeted Biome pass. Headed BrowserOS v0.51.0 smoke in the network-isolated disposable profile verified task selection, exact task ID, ordered step preview, hidden credential-shaped fixture, and empty-artifacts state. U16 remains PARTIAL.
+
+### A05 follow-up — interrupted task visibility recovery (partial)
+
+- Task History checks each distinct conversation with a locally stored `running` task against `/chat/:conversationId/state`. It creates idempotent task-scoped recovery markers only after HTTP 404; HTTP 200, server errors, and network failures create no marker. The UI overlays `interrupted` only while the matching stored task still exists and remains `running`, so terminal records and deletions take precedence. Markers use separate extension storage keys; recovery never rewrites the task-history object. No schema migration or transcript copy was added.
+- Focused recovery tests pass (13/13 app; 23/23 server auth/chat route), app/server typechecks and targeted Biome pass. The headed disposable-profile recovery smoke and a true BrowserOS plus Bun sidecar SIGKILL/restart smoke both pass. The server's originless state-read exception is limited to headerless localhost extension GETs for `/chat/:id/state`; other chat routes continue to require trusted extension origin. This recovers task status visibility only: active streams, partial transcripts, and tool side effects are not resumed, and server run state remains in memory.
 
 ### Security follow-up — filesystem path boundaries (partial)
 

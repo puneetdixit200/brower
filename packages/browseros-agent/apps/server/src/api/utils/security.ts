@@ -8,6 +8,10 @@ import type { Context } from 'hono'
 import type { Env } from '../types'
 
 const LOCALHOST_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
+const EXTENSION_REFERER_PROTOCOLS = new Set([
+  'chrome-extension:',
+  'moz-extension:',
+])
 
 export function isLocalhostRequest(c: Context<Env>): boolean {
   const server = c.env?.server
@@ -28,7 +32,18 @@ export function isLocalhostRequest(c: Context<Env>): boolean {
   if (referer) {
     try {
       const url = new URL(referer)
-      if (url.hostname !== '127.0.0.1' && url.hostname !== 'localhost') {
+      if (EXTENSION_REFERER_PROTOCOLS.has(url.protocol)) {
+        const origin = c.req.header('origin')
+        const refererOrigin = `${url.protocol}//${url.host}`
+        if (
+          !origin ||
+          refererOrigin !== origin ||
+          url.username.length > 0 ||
+          url.password.length > 0
+        ) {
+          return false
+        }
+      } else if (url.hostname !== '127.0.0.1' && url.hostname !== 'localhost') {
         return false
       }
     } catch {

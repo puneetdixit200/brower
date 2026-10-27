@@ -9,11 +9,18 @@ import { type FC, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { useIncognitoWindow } from '@/lib/browseros/use-incognito-window'
+import {
+  applyExecutionRecoveryMarkers,
+  executionRecoveryMarkerKey,
+  isExecutionRecoveryMarker,
+  reconcileInterruptedExecutionTasks,
+} from '@/lib/execution-history/recovery'
 import type {
   ExecutionHistoryByConversation,
   ExecutionStepRecord,
   ExecutionTaskRecord,
 } from '@/lib/execution-history/types'
+import { resolveAgentServerUrl } from '@/modules/browseros/agent-server-url.helpers'
 import { flattenExecutionHistory, getTaskResult } from './task-history'
 
 function formatDate(value?: string): string {
@@ -113,6 +120,102 @@ function StepTimeline({ steps }: { steps: ExecutionStepRecord[] }) {
   )
 }
 
+async function persistMissingRunMarkers(
+  history: ExecutionHistoryByConversation,
+): Promise<void> {
+  const runningTasks = Object.values(history).flatMap((item) =>
+    item.tasks.filter((task) => task.status === 'running'),
+  )
+  if (runningTasks.length === 0) return
+
+  const serverUrl = await resolveAgentServerUrl()
+  const candidates = await reconcileInterruptedExecutionTasks(history, {
+    serverUrl,
+  })
+  if (candidates.length === 0) return
+
+  const latest = await chrome.storage.local.get(
+    'executionHistoryByConversation',
+  )
+  const latestHistory = latest.executionHistoryByConversation as
+    | ExecutionHistoryByConversation
+    | undefined
+  const stillRunning = new Set(
+    Object.values(latestHistory ?? {}).flatMap((conversation) =>
+      conversation.tasks
+        .filter((task) => task.status === 'running')
+        .map((task) => `${conversation.conversationId}:${task.id}`),
+    ),
+  )
+  const eligibleMarkers = candidates.filter((marker) =>
+    stillRunning.has(`${marker.conversationId}:${marker.taskId}`),
+  )
+  const keys = eligibleMarkers.map((marker) =>
+    executionRecoveryMarkerKey(marker.taskId),
+  )
+  if (keys.length === 0) return
+
+  const existing = await chrome.storage.local.get(keys)
+  const newMarkerEntries = Object.fromEntries(
+    eligibleMarkers.flatMap((marker) => {
+      const key = executionRecoveryMarkerKey(marker.taskId)
+      const existingMarker = existing[key]
+      return isExecutionRecoveryMarker(existingMarker) &&
+        existingMarker.taskId === marker.taskId &&
+        existingMarker.conversationId === marker.conversationId
+        ? []
+        : [[key, marker]]
+    }),
+  )
+  if (Object.keys(newMarkerEntries).length > 0) {
+    await chrome.storage.local.set(newMarkerEntries)
+  }
+}
+
+async function loadExecutionHistoryTasks(): Promise<ExecutionTaskRecord[]> {
+  const initial = await chrome.storage.local.get(
+    'executionHistoryByConversation',
+  )
+  const history = initial.executionHistoryByConversation as
+    | ExecutionHistoryByConversation
+    | undefined
+  if (history) {
+    try {
+      await persistMissingRunMarkers(history)
+    } catch {
+      // A server startup or URL failure does not prove a task stopped.
+    }
+  }
+
+  const latest = await chrome.storage.local.get(
+    'executionHistoryByConversation',
+  )
+  const visibleHistory =
+    (latest.executionHistoryByConversation as
+      | ExecutionHistoryByConversation
+      | undefined) ?? {}
+  const runningTasks = Object.values(visibleHistory).flatMap((item) =>
+    item.tasks.filter((task) => task.status === 'running'),
+  )
+  const markerKeys = runningTasks.map((task) =>
+    executionRecoveryMarkerKey(task.id),
+  )
+  const markerValues = markerKeys.length
+    ? await chrome.storage.local.get(markerKeys)
+    : {}
+  const markers = runningTasks.flatMap((task) => {
+    const marker = markerValues[executionRecoveryMarkerKey(task.id)]
+    return isExecutionRecoveryMarker(marker) &&
+      marker.taskId === task.id &&
+      marker.conversationId === task.conversationId
+      ? [marker]
+      : []
+  })
+  return flattenExecutionHistory(
+    applyExecutionRecoveryMarkers(visibleHistory, markers),
+  )
+}
+
 export const TaskHistoryPage: FC = () => {
   const incognito = useIncognitoWindow()
   const { taskId } = useParams<{ taskId?: string }>()
@@ -127,13 +230,7 @@ export const TaskHistoryPage: FC = () => {
       return
     }
     try {
-      const stored = await chrome.storage.local.get(
-        'executionHistoryByConversation',
-      )
-      const history = stored.executionHistoryByConversation as
-        | ExecutionHistoryByConversation
-        | undefined
-      setTasks(flattenExecutionHistory(history))
+      setTasks(await loadExecutionHistoryTasks())
       setError(null)
     } catch (reason) {
       setError(

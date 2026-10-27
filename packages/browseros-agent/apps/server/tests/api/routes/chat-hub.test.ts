@@ -31,6 +31,7 @@ describe('/chat server-owned run routes', () => {
     const stateResponse = await requestFromExtension(
       app,
       `/${conversationId}/state`,
+      { headers: { Referer: 'chrome-extension://assistant/app.html' } },
     )
     expect(stateResponse.status).toBe(200)
     expect(await stateResponse.json()).toMatchObject({
@@ -165,11 +166,97 @@ describe('/chat server-owned run routes', () => {
     }
     const stop = await app.request(
       `/${conversationId}/stop`,
-      { method: 'POST' },
+      {
+        method: 'POST',
+        headers: { Host: 'localhost', 'Sec-Fetch-Site': 'none' },
+      },
       localServer,
     )
     expect(stop.status).toBe(403)
     expect(runs.getSnapshot(conversationId)?.status).toBe('running')
+    await runs.stop(conversationId)
+  })
+
+  it('allows actual headerless extension GET metadata for state only', async () => {
+    const runs = new ConversationRuns()
+    const conversationId = crypto.randomUUID()
+    await runs.start({
+      conversationId,
+      messages: [],
+      createStream: () => new ReadableStream<UIMessageChunk>(),
+    })
+    const app = route(runs)
+    const state = await app.request(
+      `/${conversationId}/state`,
+      {
+        headers: { Host: 'localhost', 'Sec-Fetch-Site': 'none' },
+      },
+      localServer,
+    )
+    expect(state.status).toBe(200)
+
+    const stream = await app.request(
+      `/${conversationId}/stream`,
+      {
+        headers: { Host: 'localhost', 'Sec-Fetch-Site': 'none' },
+      },
+      localServer,
+    )
+    const panels = await app.request(
+      '/panels',
+      {
+        headers: { Host: 'localhost', 'Sec-Fetch-Site': 'none' },
+      },
+      localServer,
+    )
+    const post = await app.request(
+      '/',
+      {
+        method: 'POST',
+        headers: { Host: 'localhost', 'Sec-Fetch-Site': 'none' },
+      },
+      localServer,
+    )
+    expect(stream.status).toBe(403)
+    expect(panels.status).toBe(403)
+    expect(post.status).toBe(403)
+    await runs.stop(conversationId)
+  })
+
+  it('rejects remote Origin and Referer metadata on state reads', async () => {
+    const runs = new ConversationRuns()
+    const conversationId = crypto.randomUUID()
+    await runs.start({
+      conversationId,
+      messages: [],
+      createStream: () => new ReadableStream<UIMessageChunk>(),
+    })
+    const app = route(runs)
+    const remoteOrigin = await app.request(
+      `/${conversationId}/state`,
+      {
+        headers: {
+          Host: 'localhost',
+          Origin: 'https://example.com',
+          Referer: 'https://example.com/page',
+          'Sec-Fetch-Site': 'cross-site',
+        },
+      },
+      localServer,
+    )
+    const remoteReferer = await app.request(
+      `/${conversationId}/state`,
+      {
+        headers: {
+          Host: 'localhost',
+          Referer: 'https://example.com/page',
+          'Sec-Fetch-Site': 'none',
+        },
+      },
+      localServer,
+    )
+    expect(remoteOrigin.status).toBe(403)
+    expect(remoteReferer.status).toBe(403)
     await runs.stop(conversationId)
   })
 })

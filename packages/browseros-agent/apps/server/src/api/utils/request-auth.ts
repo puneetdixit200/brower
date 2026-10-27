@@ -25,9 +25,21 @@ export function isTrustedAppOrigin(origin: string | undefined): boolean {
 }
 
 export function requireTrustedAppOrigin(
-  options: { requireOrigin?: boolean } = {},
+  options: {
+    requireOrigin?: boolean
+    allowOriginlessTaskStateRead?: boolean
+  } = {},
 ): MiddlewareHandler {
   return async (c, next) => {
+    if (
+      options.allowOriginlessTaskStateRead &&
+      isChatTaskStateRead(c) &&
+      !c.req.header('origin')
+    ) {
+      if (isHeaderlessExtensionStateRead(c)) return next()
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+
     if (
       (!options.requireOrigin || c.req.header('origin')) &&
       isTrustedAppRequest(c)
@@ -37,6 +49,25 @@ export function requireTrustedAppOrigin(
 
     return c.json({ error: 'Forbidden' }, 403)
   }
+}
+
+function isChatTaskStateRead(c: Context<Env>): boolean {
+  if (c.req.method !== 'GET') return false
+  const segments = new URL(c.req.url).pathname.split('/').filter(Boolean)
+  return (
+    (segments.length === 2 && segments[1] === 'state') ||
+    (segments.length === 3 && segments[0] === 'chat' && segments[2] === 'state')
+  )
+}
+
+function isHeaderlessExtensionStateRead(c: Context<Env>): boolean {
+  return (
+    c.req.method === 'GET' &&
+    !c.req.header('origin') &&
+    !c.req.header('referer') &&
+    c.req.header('sec-fetch-site') === 'none' &&
+    isLocalhostRequest(c)
+  )
 }
 
 export function isTrustedAppRequest(c: Context<Env>): boolean {

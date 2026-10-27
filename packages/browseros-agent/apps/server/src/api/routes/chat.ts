@@ -85,7 +85,13 @@ export function createChatRoutes(deps: ChatRouteDeps): Hono<Env> {
   })
 
   const app = new Hono<Env>()
-  app.use('/*', requireTrustedAppOrigin({ requireOrigin: true }))
+  app.use(
+    '/*',
+    requireTrustedAppOrigin({
+      requireOrigin: true,
+      allowOriginlessTaskStateRead: true,
+    }),
+  )
   app.post('/', zValidator('json', ChatRequestSchema), async (c) => {
     const parsed = c.req.valid('json')
     if (
