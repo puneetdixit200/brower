@@ -6,6 +6,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
@@ -16,9 +17,15 @@ from typing import Mapping, Protocol, cast
 
 import requests
 
-from ..core.products import BROWSEROS_BUG_REPORTER_EXTENSION_ID
+from ..core.products import ASTER_EXTENSION_ID, BROWSEROS_BUG_REPORTER_EXTENSION_ID
 from ..products.resource_sources import source_resources_for_product
 from .extensions.build import build_extension_crx
+from .extensions.aster_unpacked_dev import (
+    require_aster_unpacked_debug,
+    validate_aster_unpacked_debug,
+    MAX_BYTES as MAX_DEV_EXTENSION_BYTES,
+    MAX_FILES as MAX_DEV_EXTENSION_FILES,
+)
 from .extensions.crx import find_chrome_binary, read_crx_extension_id
 from .extensions.specs import spec_by_name
 
@@ -51,6 +58,7 @@ class PreparedResourcesManifest:
     browser_version: str
     component_versions: Mapping[str, str]
     files: Mapping[str, PreparedFile]
+    extension_mode: str = "signed"
     schema: str = PREPARED_RESOURCES_SCHEMA
 
     def to_dict(self) -> dict[str, object]:
@@ -61,6 +69,7 @@ class PreparedResourcesManifest:
             "source_sha": self.source_sha,
             "browser_version": self.browser_version,
             "component_versions": dict(self.component_versions),
+            **({"extension_mode": self.extension_mode} if self.extension_mode != "signed" else {}),
             "files": {
                 role: asdict(prepared_file)
                 for role, prepared_file in self.files.items()
@@ -121,6 +130,7 @@ class PreparedResourcesManifest:
             browser_version=cast(str, fields["browser_version"]),
             component_versions=versions,
             files=files,
+            extension_mode=str(document.get("extension_mode", "signed")),
         )
 
 
@@ -135,10 +145,15 @@ class PreparationRequest:
     component_versions: Mapping[str, str]
     output_dir: Path
     manifest_url: str = DEFAULT_BUNDLED_MANIFEST_URL
+    aster_unpacked_dev: bool = False
 
 
 class PreparationOperations(Protocol):
     def build_product_extension(
+        self, request: PreparationRequest, destination: Path
+    ) -> None: ...
+
+    def build_product_unpacked(
         self, request: PreparationRequest, destination: Path
     ) -> None: ...
 
@@ -223,6 +238,63 @@ def _validate_onboarding_archive(path: Path, version: str) -> None:
             raise ValueError(str(exc)) from exc
 
 
+
+def _validate_unpacked_zip(
+    archive_path: Path, *, expected_version: str, expected_id: str
+) -> None:
+    """Validate every ZIP member before extraction; never unzip arbitrary paths."""
+    if expected_id != ASTER_EXTENSION_ID:
+        raise ValueError("Aster development extension ID is incorrect")
+    total = 0
+    try:
+        with tempfile.TemporaryDirectory(prefix="aster-unpacked-inspect-") as temporary:
+            root = Path(temporary)
+            with zipfile.ZipFile(archive_path) as archive:
+                members = archive.infolist()
+                if not members or len(members) > MAX_DEV_EXTENSION_FILES:
+                    raise ValueError("Unpacked development extension ZIP has invalid file count")
+                seen: set[str] = set()
+                for entry in members:
+                    name = entry.filename
+                    member = PurePosixPath(name)
+                    if (
+                        not name
+                        or "\\" in name
+                        or member.is_absolute()
+                        or ".." in member.parts
+                        or member == PurePosixPath(".")
+                        or entry.is_dir()
+                        or member.as_posix() != name
+                        or name in seen
+                    ):
+                        raise ValueError("Unpacked development extension ZIP has unsafe paths")
+                    seen.add(name)
+                    mode = (entry.external_attr >> 16)
+                    if mode and stat.S_IFMT(mode) not in (0, stat.S_IFREG):
+                        raise ValueError("Unpacked development extension ZIP has special files")
+                    total += entry.file_size
+                    if total > MAX_DEV_EXTENSION_BYTES:
+                        raise ValueError("Unpacked development extension ZIP exceeds size limits")
+                    destination = root.joinpath(*member.parts)
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    with archive.open(entry) as input_stream, destination.open("wb") as out:
+                        shutil.copyfileobj(input_stream, out, length=1024 * 1024)
+                    if destination.stat().st_size != entry.file_size:
+                        raise ValueError("Unpacked development extension ZIP truncated member")
+            validated = validate_aster_unpacked_debug(
+                root,
+                product="aster",
+                platform="linux",
+                build_type="debug",
+                is_official_build=False,
+                expected_version=expected_version,
+            )
+            if validated.extension_id != expected_id:
+                raise ValueError("Unpacked development extension ZIP has wrong ID")
+    except (OSError, zipfile.BadZipFile) as exc:
+        raise ValueError("Unpacked development extension ZIP is invalid") from exc
+
+
 def load_prepared_resources(root: Path) -> PreparedResourcesManifest:
     """Load one prepared-resource manifest."""
     path = root / PREPARED_RESOURCES_NAME
@@ -272,7 +344,18 @@ def validate_prepared_resources(
             raise ValueError(f"Prepared-resource {field} does not match")
     if dict(manifest.component_versions) != dict(expected.component_versions):
         raise ValueError("Prepared-resource component versions do not match")
-    required_roles = {"product_crx", "bug_reporter_crx", "onboarding"}
+    if expected.aster_unpacked_dev:
+        require_aster_unpacked_debug(
+            product=expected.product, platform="linux",
+            build_type="debug", is_official_build=False,
+        )
+    extension_mode = "unpacked-dev" if expected.aster_unpacked_dev else "signed"
+    if manifest.extension_mode != extension_mode:
+        raise ValueError("Prepared-resource extension mode does not match the build")
+    required_roles = (
+        {"product_unpacked_zip", "onboarding"} if expected.aster_unpacked_dev
+        else {"product_crx", "bug_reporter_crx", "onboarding"}
+    )
     if set(manifest.files) != required_roles:
         raise ValueError("Prepared-resource managed file set is incomplete")
 
@@ -295,17 +378,29 @@ def validate_prepared_resources(
                 raise ValueError(f"Prepared-resource extension identity mismatch: {role}")
 
     source = source_resources_for_product(expected.product)
-    product_spec = spec_by_name(source.extension_name)
-    product_file = manifest.files["product_crx"]
-    if (
-        product_file.extension_id != product_spec.extension_id
-        or product_file.version
-        != expected.component_versions[source.extension_component]
-    ):
-        raise ValueError("Prepared product extension identity does not match")
-    bug_reporter = manifest.files["bug_reporter_crx"]
-    if bug_reporter.extension_id != BROWSEROS_BUG_REPORTER_EXTENSION_ID:
-        raise ValueError("Prepared bug reporter identity does not match")
+    if expected.aster_unpacked_dev:
+        product_file = manifest.files["product_unpacked_zip"]
+        if (
+            product_file.extension_id != ASTER_EXTENSION_ID
+            or product_file.version != expected.component_versions[source.extension_component]
+        ):
+            raise ValueError("Prepared Aster unpacked extension identity does not match")
+        _validate_unpacked_zip(
+            root / product_file.path,
+            expected_version=product_file.version,
+            expected_id=product_file.extension_id,
+        )
+    else:
+        product_spec = spec_by_name(source.extension_name)
+        product_file = manifest.files["product_crx"]
+        if (
+            product_file.extension_id != product_spec.extension_id
+            or product_file.version != expected.component_versions[source.extension_component]
+        ):
+            raise ValueError("Prepared product extension identity does not match")
+        bug_reporter = manifest.files["bug_reporter_crx"]
+        if bug_reporter.extension_id != BROWSEROS_BUG_REPORTER_EXTENSION_ID:
+            raise ValueError("Prepared bug reporter identity does not match")
     onboarding = manifest.files["onboarding"]
     _validate_onboarding_archive(
         root / onboarding.path,
@@ -344,7 +439,12 @@ def prepare_common_resources(
         return validate_prepared_resources(output, request)
 
     source = source_resources_for_product(request.product)
-    product_spec = spec_by_name(source.extension_name)
+    if request.aster_unpacked_dev:
+        require_aster_unpacked_debug(
+            product=request.product, platform="linux",
+            build_type="debug", is_official_build=False,
+        )
+    product_spec = None if request.aster_unpacked_dev else spec_by_name(source.extension_name)
     product_version = request.component_versions[source.extension_component]
     onboarding_version = request.component_versions[source.onboarding_component]
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -354,19 +454,42 @@ def prepare_common_resources(
     try:
         extension_dir = staging / "extensions"
         extension_dir.mkdir(parents=True)
-        product_crx = extension_dir / f"{product_spec.extension_id}.crx"
-        operations.build_product_extension(request, product_crx)
-        if read_crx_extension_id(product_crx.read_bytes()) != product_spec.extension_id:
-            raise ValueError("Built product CRX identity does not match its product")
+        if request.aster_unpacked_dev:
+            unpacked_zip = extension_dir / "aster-unpacked-development.zip"
+            operations.build_product_unpacked(request, unpacked_zip)
+            _validate_unpacked_zip(
+                unpacked_zip,
+                expected_version=product_version,
+                expected_id=ASTER_EXTENSION_ID,
+            )
+            extension_files = {
+                "product_unpacked_zip": _prepared_file(
+                    staging, unpacked_zip, product_version, ASTER_EXTENSION_ID
+                ),
+            }
+        else:
+            assert product_spec is not None
+            product_crx = extension_dir / f"{product_spec.extension_id}.crx"
+            operations.build_product_extension(request, product_crx)
+            if read_crx_extension_id(product_crx.read_bytes()) != product_spec.extension_id:
+                raise ValueError("Built product CRX identity does not match its product")
 
-        manifest_xml = operations.fetch_manifest(request.manifest_url)
-        bug_version, bug_url = _resolve_manifest_extension(
-            manifest_xml, BROWSEROS_BUG_REPORTER_EXTENSION_ID
-        )
-        bug_crx = extension_dir / f"{BROWSEROS_BUG_REPORTER_EXTENSION_ID}.crx"
-        bug_crx.write_bytes(operations.download(bug_url))
-        if read_crx_extension_id(bug_crx.read_bytes()) != BROWSEROS_BUG_REPORTER_EXTENSION_ID:
-            raise ValueError("Downloaded bug reporter CRX identity does not match")
+            manifest_xml = operations.fetch_manifest(request.manifest_url)
+            bug_version, bug_url = _resolve_manifest_extension(
+                manifest_xml, BROWSEROS_BUG_REPORTER_EXTENSION_ID
+            )
+            bug_crx = extension_dir / f"{BROWSEROS_BUG_REPORTER_EXTENSION_ID}.crx"
+            bug_crx.write_bytes(operations.download(bug_url))
+            if read_crx_extension_id(bug_crx.read_bytes()) != BROWSEROS_BUG_REPORTER_EXTENSION_ID:
+                raise ValueError("Downloaded bug reporter CRX identity does not match")
+            extension_files = {
+                "product_crx": _prepared_file(
+                    staging, product_crx, product_version, product_spec.extension_id
+                ),
+                "bug_reporter_crx": _prepared_file(
+                    staging, bug_crx, bug_version, BROWSEROS_BUG_REPORTER_EXTENSION_ID
+                ),
+            }
 
         onboarding_dir = staging / "onboarding"
         onboarding_dir.mkdir()
@@ -383,24 +506,12 @@ def prepare_common_resources(
             browser_version=request.browser_version,
             component_versions=dict(request.component_versions),
             files={
-                "product_crx": _prepared_file(
-                    staging,
-                    product_crx,
-                    product_version,
-                    product_spec.extension_id,
-                ),
-                "bug_reporter_crx": _prepared_file(
-                    staging,
-                    bug_crx,
-                    bug_version,
-                    BROWSEROS_BUG_REPORTER_EXTENSION_ID,
-                ),
+                **extension_files,
                 "onboarding": _prepared_file(
-                    staging,
-                    onboarding,
-                    onboarding_version,
+                    staging, onboarding, onboarding_version,
                 ),
             },
+            extension_mode="unpacked-dev" if request.aster_unpacked_dev else "signed",
         )
         (staging / PREPARED_RESOURCES_NAME).write_text(
             prepared.to_json(), encoding="utf-8"
@@ -445,6 +556,51 @@ class LocalPreparationOperations:
             chrome_binary=chrome,
             stamp_version=False,
         )
+
+    def build_product_unpacked(
+        self, request: PreparationRequest, destination: Path
+    ) -> None:
+        """Build WXT with the fixed public dev identity and ZIP regular files."""
+        require_aster_unpacked_debug(
+            product=request.product, platform="linux",
+            build_type="debug", is_official_build=False,
+        )
+        workspace = self.repo_root / "packages/browseros-agent"
+        manifest_source = workspace / "apps/app/package.json"
+        lockfile = workspace / "bun.lock"
+        original = (manifest_source.read_bytes(), lockfile.read_bytes())
+        environment = dict(os.environ)
+        for secret in (
+            "ASTER_EXTENSION_PUBLIC_KEY", "ASTER_EXTENSION_UPDATE_URL",
+            "ASTER_REPORTER_EXTENSION_ID", "ASTER_COMPAT_EXTENSION_ID",
+            "ASTER_PRODUCT_WEB_URL", "SENTRY_AUTH_TOKEN",
+            "SENTRY_ORG", "SENTRY_PROJECT",
+        ):
+            environment.pop(secret, None)
+        environment["NODE_ENV"] = "development"
+        subprocess.run(
+            ["bun", "run", "build:agent:dev"],
+            cwd=workspace, env=environment, check=True,
+        )
+        if (manifest_source.read_bytes(), lockfile.read_bytes()) != original:
+            raise RuntimeError("Unpacked Aster build modified version/lock files")
+        source = workspace / "apps/app/dist/chrome-mv3-dev"
+        # WXT's actual output folder is version-dependent; never stage an
+        # arbitrary stale release artifact as a development extension.
+        if not source.is_dir():
+            raise FileNotFoundError(
+                f"Expected WXT development output missing: {source}"
+            )
+        result = validate_aster_unpacked_debug(
+            source,
+            product="aster", platform="linux", build_type="debug",
+            is_official_build=False,
+            expected_version=request.component_versions["aster-app"],
+        )
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:
+            for relative in result.files:
+                archive.write(source / relative, relative)
 
     def fetch_manifest(self, url: str) -> str:
         response = requests.get(url, timeout=30)
