@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..d552dedddb9ef13569fc18b00b604e04728e3d2f
 --- /dev/null
 +++ b/chrome/browser/browseros/extensions/browseros_extension_loader.h
-@@ -0,0 +1,135 @@
+@@ -0,0 +1,138 @@
 +// Copyright 2024 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -74,6 +74,7 @@ index 0000000000000000000000000000000000000000..d552dedddb9ef13569fc18b00b604e04
 +  friend class base::RefCountedThreadSafe<extensions::ExternalLoader>;
 +
 +  void EnsureReady(ReadyCallback callback);
++  void MaybeStartAsterUnpackedDevelopmentInstall();
 +  void OnLocalDiscoveryComplete(BundleDiscoveryResult result);
 +  void BeginReadiness();
 +  void AdvanceReadiness();
@@ -114,6 +115,8 @@ index 0000000000000000000000000000000000000000..d552dedddb9ef13569fc18b00b604e04
 +  // Failed packages remain in bundled_prefs_ for an explicit local Retry.
 +  std::set<std::string> failed_bundles_;
 +  bool started_ = false;
++  bool unpacked_development_started_ = false;
++  bool unpacked_development_missing_ = false;
 +  bool local_discovery_complete_ = false;
 +  bool waiting_for_ready_ = false;
 +  bool remote_requested_ = false;
