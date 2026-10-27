@@ -1,25 +1,72 @@
-import { DiagnosticsPage } from '@browseros/diagnostics/view'
-import type { FC } from 'react'
+import { lazy, Suspense, type FC } from 'react'
 import { HashRouter, Navigate, Route, Routes, useParams } from 'react-router'
 import { AsterCommandPalette } from '@/components/layout/AsterCommandPalette'
 import { SettingsSidebarLayout } from '@/components/layout/SettingsSidebarLayout'
 import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { AgentCommandHome } from '@/screens/agent-command/AgentCommandHome'
-import { AISettingsPage } from '@/screens/ai-settings/AISettingsPage'
-import { ConnectMCP } from '@/screens/connect-mcp/ConnectMCP'
-import { CustomizationPage } from '@/screens/customization/CustomizationPage'
-import { FeaturesPage } from '@/screens/features/Features'
-import { SurveyPage } from '@/screens/jtbd-agent/SurveyPage'
-import { LlmHubPage } from '@/screens/llm-hub/LlmHubPage'
-import { MCPSettingsPage } from '@/screens/mcp-settings/MCPSettingsPage'
-import { MemoryPage } from '@/screens/memory/MemoryPage'
-import { NewTabChat } from '@/screens/newtab/index/NewTabChat'
 import { NewTabLayout } from '@/screens/newtab/layout/NewTabLayout'
-import { Personalize } from '@/screens/newtab/personalize/Personalize'
-import { OnboardingAiPage } from '@/screens/onboarding-ai/OnboardingAiPage'
-import { PrivacySettingsPage } from '@/screens/privacy/PrivacySettingsPage'
-import { ScheduledTasksPage } from '@/screens/scheduled-tasks/ScheduledTasksPage'
-import { TaskHistoryPage } from '@/screens/task-history/TaskHistoryPage'
+
+// Keep the main composer eager. Heavy secondary routes load only when visited.
+// This reduces initial new-tab JavaScript parsing and avoids idle settings work.
+const DiagnosticsPage = lazy(() =>
+  import('@browseros/diagnostics/view').then((module) => ({ default: module.DiagnosticsPage })),
+)
+
+const AISettingsPage = lazy(() =>
+  import('@/screens/ai-settings/AISettingsPage').then((module) => ({ default: module.AISettingsPage })),
+)
+
+const ConnectMCP = lazy(() =>
+  import('@/screens/connect-mcp/ConnectMCP').then((module) => ({ default: module.ConnectMCP })),
+)
+
+const CustomizationPage = lazy(() =>
+  import('@/screens/customization/CustomizationPage').then((module) => ({ default: module.CustomizationPage })),
+)
+
+const FeaturesPage = lazy(() =>
+  import('@/screens/features/Features').then((module) => ({ default: module.FeaturesPage })),
+)
+
+const SurveyPage = lazy(() =>
+  import('@/screens/jtbd-agent/SurveyPage').then((module) => ({ default: module.SurveyPage })),
+)
+
+const LlmHubPage = lazy(() =>
+  import('@/screens/llm-hub/LlmHubPage').then((module) => ({ default: module.LlmHubPage })),
+)
+
+const MCPSettingsPage = lazy(() =>
+  import('@/screens/mcp-settings/MCPSettingsPage').then((module) => ({ default: module.MCPSettingsPage })),
+)
+
+const MemoryPage = lazy(() =>
+  import('@/screens/memory/MemoryPage').then((module) => ({ default: module.MemoryPage })),
+)
+
+const NewTabChat = lazy(() =>
+  import('@/screens/newtab/index/NewTabChat').then((module) => ({ default: module.NewTabChat })),
+)
+
+const Personalize = lazy(() =>
+  import('@/screens/newtab/personalize/Personalize').then((module) => ({ default: module.Personalize })),
+)
+
+const OnboardingAiPage = lazy(() =>
+  import('@/screens/onboarding-ai/OnboardingAiPage').then((module) => ({ default: module.OnboardingAiPage })),
+)
+
+const PrivacySettingsPage = lazy(() =>
+  import('@/screens/privacy/PrivacySettingsPage').then((module) => ({ default: module.PrivacySettingsPage })),
+)
+
+const ScheduledTasksPage = lazy(() =>
+  import('@/screens/scheduled-tasks/ScheduledTasksPage').then((module) => ({ default: module.ScheduledTasksPage })),
+)
+
+const TaskHistoryPage = lazy(() =>
+  import('@/screens/task-history/TaskHistoryPage').then((module) => ({ default: module.TaskHistoryPage })),
+)
 
 function getSurveyParams(): { maxTurns?: number; experimentId?: string } {
   const params = new URLSearchParams(window.location.search)
@@ -54,7 +101,14 @@ export const App: FC = () => {
   return (
     <HashRouter>
       <AsterCommandPalette />
-      <Routes>
+      <Suspense
+        fallback={
+          <div role="status" className="px-6 py-8 text-muted-foreground text-sm">
+            Loading Aster page…
+          </div>
+        }
+      >
+        <Routes>
         <Route element={<SidebarLayout />}>
           <Route path="home" element={<NewTabLayout />}>
             <Route index element={<AgentCommandHome />} />
@@ -122,7 +176,8 @@ export const App: FC = () => {
         <Route path="/options/*" element={<OptionsRedirect />} />
 
         <Route path="*" element={<Navigate to="/home" replace />} />
-      </Routes>
+        </Routes>
+      </Suspense>
     </HashRouter>
   )
 }
