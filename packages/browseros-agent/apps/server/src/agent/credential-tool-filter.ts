@@ -12,7 +12,7 @@ const EXPOSE_ACTION = /(?:read|list|retrieve|get|fetch|export|dump|copy|reveal|s
 // A generic browser tool may mention passwords only to warn that it never
 // exposes them. A description must claim actual vault export/retrieval,
 // not merely mention a security term elsewhere in a long paragraph.
-const EXPLICIT_SECRET_EXPORT = /(?:read|retrieve|list|export|reveal|dump|decrypt|autofill)\\b.{0,56}\\b(?:saved|stored|vault)\\s+(?:browser\\s+)?(?:passwords?|credentials?|passkeys?)/i
+const EXPLICIT_SECRET_EXPORT = /(?:read|retrieve|list|export|reveal|dump|decrypt|autofill)\b.{0,56}\b(?:saved|stored|vault)\s+(?:browser\s+)?(?:passwords?|credentials?|passkeys?)/i
 
 export function isCredentialAccessTool(
   name: string,
