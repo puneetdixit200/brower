@@ -209,3 +209,17 @@ UIMessage parts do not identify their MCP server, so attribution depends on the 
 ### T26.2 A12 fresh-turn continuation — 2026-10-29
 
 The handoff UI offers “Continue after I’m done” after Stop and takeover. It submits a fresh message to the same conversation, validates attached tabs against the live current window, and falls back to the live active HTTP(S) page. For this continuation only, browser context keeps tab IDs but omits active/selected tab URLs and titles. Its prompt asks the model to inspect current state and avoid repeating the stopped action or requesting/inserting login secrets; that request is advisory, not enforced. The context filter does not establish exclusion of all page-derived data in downstream browser tools. Accepted sends may be queued; rejected sends keep the stopped run stopped and show retry guidance. Focused helper/UI/request-context tests cover prompt, target-page selection and metadata omission. A12 remains PARTIAL: automatic challenge detection, same-run pause/resume, a dummy local challenge fixture, and headed acceptance remain open.
+
+
+## Current verified source checkpoint — 2026-10-29
+
+The branch has new, focused source changes for R02/R03 and A11. GitHub Actions [40787505020](https://github.com/puneetdixit200/brower/actions/runs/40787505020) passed 19 scheduler tests, app typecheck, Biome and whitespace; [40786688768](https://github.com/puneetdixit200/brower/actions/runs/40786688768) passed 22 research tests and the same checks. The source evidence is recorded in [aster-github-continuation-2026-10-29.md](evidence/aster-github-continuation-2026-10-29.md).
+
+**Next implementation batches:**
+1. **T30.2 real restart/overlap fixture:** start a heartbeat with a long-running server tool, restart the extension worker, verify its persisted run is not failed or replayed, then exercise server crash and a verified terminal/missing state. Reconcile the ten-candidate cleanup cap and ensure no hidden side effects; protect server authorization/approval identities. This cannot be declared done from liveness unit tests.
+2. **T26.3 research support:** require claim-scoped supporting source text, independent of model narrative; preserve unverified and ambiguity labels and enforce server trust provenance. Add a live-provider research fixture; literal quote presence alone is not support.
+3. **T20a native bootstrap:** on a permitted local pinned Chromium checkout, build remaining loader/crash-reporter/linked binaries with low concurrency and verify disposable profile, sandbox, Aster extension READY, sidecar and controls. Cloud GitHub-only source checks cannot substitute for this.
+4. Continue all remaining 103 subtasks, full 72-row acceptance tests, performance comparison, privacy/security reviews, release-signing custody and owned update feed. Preserve P03 NOT_STARTED and S05 PARTIAL/BLOCKED without a native credential broker and release ownership.
+5. Check the user's **actual account allowance** at batch boundaries using an authorized account meter when available; the current toolset provides no such meter, so no 5%-remaining claim can be made. No Luna subagent execution tool was exposed; do not substitute other models. No local Chromium/test processes or agents were started in this session.
+
+**Status: not complete.** Do not mark more feature rows PASS based on these source-level fixtures.
