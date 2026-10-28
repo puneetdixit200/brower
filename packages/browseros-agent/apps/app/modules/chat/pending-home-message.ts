@@ -7,6 +7,7 @@ interface PendingHomeMessage {
   token: string
   text: string
   files: FileUIPart[]
+  tabIds?: number[]
   createdAt: number
 }
 
@@ -16,6 +17,7 @@ let expiration: ReturnType<typeof setTimeout> | null = null
 export function stagePendingHomeMessage(input: {
   text: string
   attachments: StagedAttachment[]
+  tabIds?: readonly number[]
 }): string {
   clearPending()
   const token = crypto.randomUUID()
@@ -23,6 +25,13 @@ export function stagePendingHomeMessage(input: {
     token,
     text: input.text,
     files: input.attachments.map(toFilePart),
+    ...(input.tabIds
+      ? {
+          tabIds: [...new Set(
+            input.tabIds.filter((id) => Number.isSafeInteger(id) && id >= 0),
+          )].slice(0, 32),
+        }
+      : {}),
     createdAt: Date.now(),
   }
   expiration = setTimeout(clearPending, MAX_AGE_MS)
@@ -36,7 +45,11 @@ export function consumePendingHomeMessage(
   const message = pending
   clearPending()
   if (Date.now() - message.createdAt > MAX_AGE_MS) return null
-  return { text: message.text, files: message.files }
+  return {
+    text: message.text,
+    files: message.files,
+    ...(message.tabIds ? { tabIds: message.tabIds } : {}),
+  }
 }
 
 function clearPending(): void {
