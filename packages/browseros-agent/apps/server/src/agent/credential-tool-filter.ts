@@ -31,7 +31,7 @@ export function excludeCredentialAccessTools(
   const allowed: ToolSet = {}
   const blocked: string[] = []
   for (const [name, tool] of Object.entries(tools)) {
-    if (isCredentialAccessTool(name, tool.description ?? '')) blocked.push(name)
+    if (isCredentialAccessTool(name, typeof tool.description === 'string' ? tool.description : '')) blocked.push(name)
     else allowed[name] = tool
   }
   return { allowed, blocked }
