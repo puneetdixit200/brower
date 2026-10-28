@@ -658,3 +658,15 @@
 .dark .mdx-editor-themed .mdxeditor [class*="linkDialogPopover"] {
   filter: drop-shadow(0 4px 16px rgb(0 0 0 / 0.4));
 }
+
+
+/* User-selected low-motion mode is local to Aster extension pages only.
+   It does not override website styles or native Chromium rendering. */
+html[data-aster-reduced-motion='true'] *,
+html[data-aster-reduced-motion='true'] *::before,
+html[data-aster-reduced-motion='true'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
