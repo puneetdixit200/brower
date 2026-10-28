@@ -66,7 +66,7 @@ jobs:
         if: always()
         run: |
           cd "$GITHUB_WORKSPACE"
-          git diff --name-only -- apps/app apps/server > "${RUNNER_TEMP}/aster-formatted-files"
+          git diff --name-only > "${RUNNER_TEMP}/aster-formatted-files"
           if [ -s "${RUNNER_TEMP}/aster-formatted-files" ]; then
             while IFS= read -r file; do
               printf 'ASTER_FORMATTED_FILE:%s:%s\n' "$file" "$(base64 -w0 "$file")"
