@@ -1,7 +1,13 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test'
+import { mkdtempSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { UIMessageChunk } from 'ai'
 import * as _ai from 'ai'
 import type { KlavisProxyStatus } from '../../../src/api/services/klavis'
+import { DbConversationStore } from '../../../src/lib/conversations/conversation-store'
+import { closeDb, initializeDb } from '../../../src/lib/db'
 
 interface MockMessage {
   id: string
@@ -1000,6 +1006,16 @@ describe('ChatService single-rebuild reconciliation', () => {
 })
 
 describe('ChatService history persistence', () => {
+  const tempDirs: string[] = []
+
+  afterEach(async () => {
+    closeDb()
+    await Promise.all(
+      tempDirs.map((dir) => rm(dir, { recursive: true, force: true })),
+    )
+    tempDirs.length = 0
+  })
+
   beforeEach(() => {
     resolveLLMConfigSpy.mockImplementation(async () => ({
       provider: 'openai',
@@ -1218,5 +1234,132 @@ describe('ChatService history persistence', () => {
     expect(
       agent.messages.every((m) => m.parts[0]?.text !== 'acp history'),
     ).toBe(true)
+  })
+
+  it('continues a persisted heartbeat after SQLite restart while ordinary scheduled tasks stay out of chat history', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'browseros-heartbeat-chat-service-'))
+    tempDirs.push(dir)
+    const dbPath = join(dir, 'db', 'browseros.sqlite')
+    const firstDb = initializeDb({ dbPath })
+    const firstStore = new DbConversationStore({ db: firstDb.db })
+    const heartbeatId = crypto.randomUUID()
+    const firstAgent = createFakeAgent()
+    agentToReturn = firstAgent
+    streamResponseHandler = async ({ onFinish, uiMessages }) => {
+      await onFinish({
+        messages: [
+          ...(uiMessages ?? firstAgent.messages),
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            parts: [{ type: 'text', text: 'heartbeat answer one' }],
+          },
+        ],
+      })
+      return new Response('ok')
+    }
+
+    const firstService = new ChatService({
+      sessionStore: createSessionStore() as never,
+      klavis: createKlavisStub() as never,
+      browser: persistenceBrowser() as never,
+      conversationStore: firstStore,
+    })
+    await firstService.processMessage(
+      {
+        ...browserOsRequest(heartbeatId, true),
+        isScheduledTask: true,
+        persistScheduledTask: true,
+        message: 'heartbeat question one',
+      } as never,
+      new AbortController().signal,
+    )
+    expect(
+      (await firstStore.get(heartbeatId))?.messages.map((m) => m.role),
+    ).toEqual(['user', 'assistant'])
+
+    closeDb()
+    const reopenedDb = initializeDb({ dbPath })
+    const reopenedStore = new DbConversationStore({ db: reopenedDb.db })
+    const resumedAgent = createFakeAgent()
+    agentToReturn = resumedAgent
+    let resumedPrompt: MockMessage[] | undefined
+    streamResponseHandler = async ({ onFinish, uiMessages }) => {
+      resumedPrompt = uiMessages
+      await onFinish({
+        messages: [
+          ...(uiMessages ?? resumedAgent.messages),
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            parts: [{ type: 'text', text: 'heartbeat answer two' }],
+          },
+        ],
+      })
+      return new Response('ok')
+    }
+    const resumedService = new ChatService({
+      sessionStore: createSessionStore(),
+      klavis: createKlavisStub() as never,
+      browser: persistenceBrowser() as never,
+      conversationStore: reopenedStore,
+    })
+    await resumedService.processMessage(
+      {
+        ...browserOsRequest(heartbeatId, true),
+        isScheduledTask: true,
+        persistScheduledTask: true,
+        message: 'heartbeat question two',
+      } as never,
+      new AbortController().signal,
+    )
+
+    expect(resumedPrompt?.map((m) => m.parts[0]?.text)).toEqual([
+      'heartbeat question one',
+      'heartbeat answer one',
+      expect.stringContaining('heartbeat question two'),
+    ])
+    expect(
+      (await reopenedStore.get(heartbeatId))?.messages.map(
+        (m) => m.parts[0]?.text,
+      ),
+    ).toEqual([
+      'heartbeat question one',
+      'heartbeat answer one',
+      'heartbeat question two',
+      'heartbeat answer two',
+    ])
+
+    const taskId = crypto.randomUUID()
+    const taskAgent = createFakeAgent()
+    agentToReturn = taskAgent
+    streamResponseHandler = async ({ onFinish, uiMessages }) => {
+      await onFinish({
+        messages: [
+          ...(uiMessages ?? taskAgent.messages),
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            parts: [{ type: 'text', text: 'ordinary task answer' }],
+          },
+        ],
+      })
+      return new Response('ok')
+    }
+    const taskService = new ChatService({
+      sessionStore: createSessionStore() as never,
+      klavis: createKlavisStub() as never,
+      browser: persistenceBrowser() as never,
+      conversationStore: reopenedStore,
+    })
+    await taskService.processMessage(
+      {
+        ...browserOsRequest(taskId, true),
+        isScheduledTask: true,
+        message: 'ordinary scheduled task',
+      } as never,
+      new AbortController().signal,
+    )
+    expect(await reopenedStore.get(taskId)).toBeNull()
   })
 })

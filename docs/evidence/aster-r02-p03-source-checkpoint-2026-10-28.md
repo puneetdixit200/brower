@@ -10,6 +10,18 @@ This checkpoint describes the current uncommitted source changes in the local `f
 - Disposable SQLite fresh creation and the actual v18-to-0019 upgrade passed, retaining legacy rows/defaults; a `DbConversationStore` transcript survived close/reopen. An existing database rewind-test fixture initially failed because rollback left 0019 columns behind; the fixture was fixed and rerun. The expanded server suite passes 61/61 and server typecheck passes on rerun; an earlier intermittent TS2589 did not recur.
 - No native compile or browser test was run for these new changes. In-flight tool replay, distributed leases/ownership, approval recovery, and restart acceptance are not implemented or verified. A failed/interrupted run deliberately requires review; it is not automatically resumed. Therefore R02 is PARTIAL, not PASS.
 
+### Heartbeat history-loss hardening — 2026-10-28
+
+- The continuation guard now distinguishes a true first run from missing history for an existing conversation: no prior run is allowed only when the job has no `conversationId`; if a conversation ID exists but its run record is missing, the heartbeat fails closed. This avoids beginning another turn when the prior turn's completion cannot be established.
+- Validation for this follow-up: heartbeat continuation helper tests pass (4/4). The focused `ChatService` test file passes (18/18), including a synthetic-model integration test that persists a heartbeat transcript in SQLite, closes and reopens the database, continues that same conversation, and confirms ordinary scheduled tasks do not enter chat history. Independent review passed.
+- Native/browser validation for this follow-up is pending. No native compile or live browser acceptance is claimed. Interrupted-execution replay remains intentionally unimplemented; in-flight tool replay, distributed leases/ownership, approval recovery, and restart acceptance remain open. R02 stays PARTIAL.
+
+### Pinned Chromium staging check — 2026-10-28
+
+- The pinned Chromium checkout now contains only the exact committed guard/test hunks applied to two pre-existing dirty files. Reconstructed expected patched files byte-match the checkout.
+- Aster Debug GN regeneration succeeded. The requested single-object Ninja target was not recognized, and no archive or browser-test binary was available; therefore no C++ compile or browser test ran. No broad build was started.
+- This verifies staging/provenance and GN generation only. Native compilation and browser acceptance remain pending; do not treat this as a native pass.
+
 ## P03 — automated origin-safe blind autofill (NOT_STARTED)
 
 - The Aster-only Chromium patch guard rejects direct Autofill `list`, `add`, and `fill` operations with `approval_unavailable`; the legacy BrowserOS behavior remains outside this Aster guard. This is a fail-closed boundary, not an autofill implementation or user-consent flow.

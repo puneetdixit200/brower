@@ -133,7 +133,7 @@ export const scheduledJobRuns = async () => {
         const previous = previousRuns
           .filter((run) => run.jobId === jobId)
           .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))[0]
-        if (!mayContinueHeartbeat(previous?.status)) {
+        if (!mayContinueHeartbeat(previous?.status, job.conversationId)) {
           throw new Error(
             'Heartbeat paused because its previous run did not complete; review the run before resuming',
           )
