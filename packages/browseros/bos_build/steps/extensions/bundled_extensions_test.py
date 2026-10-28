@@ -47,6 +47,7 @@ class BundledExtensionsTest(unittest.TestCase):
             extension_files = {
                 "manifest.json": b'{"manifest_version":3}',
                 "assets/app.js": b"console.log('aster')",
+                "geist-mono/GeistMono-Italic[wght].woff2": b"font",
             }
             with zipfile.ZipFile(archive_path, "w") as archive:
                 for name, content in extension_files.items():
@@ -122,6 +123,7 @@ class BundledExtensionsTest(unittest.TestCase):
             self.assertEqual(
                 (output / "aster_unpacked_dev_sources.gni").read_text(),
                 'aster_unpacked_dev_sources = [\n  "aster_unpacked_dev/assets/app.js",\n'
+                '  "aster_unpacked_dev/geist-mono/GeistMono-Italic[wght].woff2",\n'
                 '  "aster_unpacked_dev/manifest.json",\n]\n',
             )
             self.assertEqual(
@@ -134,6 +136,73 @@ class BundledExtensionsTest(unittest.TestCase):
             self.assertEqual(
                 ctx.artifact_registry.get("common_manifest_digest"), manifest.digest()
             )
+
+    def test_aster_unpacked_rejects_gn_string_injection_filenames(self) -> None:
+        for unsafe_name in (
+            'bad"name.js',
+            "bad\\name.js",
+            "$evil.js",
+            "bad\nname.js",
+            "bad\x01name.js",
+        ):
+            with self.subTest(filename=unsafe_name), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                chromium = root / "chromium"
+                chromium.mkdir()
+                prepared = root / "prepared"
+                prepared.mkdir()
+                archive_path = prepared / "aster.zip"
+                files = {"manifest.json": b"{}", unsafe_name: b"payload"}
+                with zipfile.ZipFile(archive_path, "w") as archive:
+                    for name, content in files.items():
+                        archive.writestr(name, content)
+                archive_file = PreparedFile(
+                    path="aster.zip",
+                    size=archive_path.stat().st_size,
+                    sha256=hashlib.sha256(archive_path.read_bytes()).hexdigest(),
+                    version="0.1.0",
+                )
+                manifest = PreparedResourcesManifest(
+                    product="aster",
+                    parent_sha="1" * 40,
+                    source_sha=SOURCE_SHA,
+                    browser_version="0.0.1",
+                    component_versions={"aster-app": "0.1.0"},
+                    files={"product_unpacked_zip": archive_file},
+                    extension_mode="unpacked-dev",
+                )
+                ctx = Context(
+                    root_dir=root,
+                    chromium_src=chromium,
+                    architecture="x64",
+                    build_type="debug",
+                    product=get_product_descriptor("aster"),
+                    resource_mode="source",
+                    aster_unpacked_dev=True,
+                    prepared_resources=prepared,
+                    source_sha=SOURCE_SHA,
+                    chromium_version="1.0.0.0",
+                    browseros_build_offset="1",
+                    browseros_version_parts=(1, 0, 0, 1),
+                    browseros_chromium_version="1.0.0.1",
+                    semantic_version="0.0.1",
+                )
+                validated = AsterUnpackedDevelopmentExtension(
+                    directory=Path("/validated"),
+                    extension_id=ASTER_EXTENSION_ID,
+                    version="0.1.0",
+                    files=tuple(sorted(files)),
+                    bytes_total=sum(map(len, files.values())),
+                )
+                with (
+                    patch(f"{MODULE}._validate_unpacked_zip"),
+                    patch(
+                        f"{MODULE}.validate_aster_unpacked_debug",
+                        return_value=validated,
+                    ),
+                ):
+                    with self.assertRaisesRegex(ValueError, "unsafe GN filename"):
+                        BundledExtensionsModule()._stage_aster_unpacked(ctx, manifest)
 
     def test_manifest_url_defaults_to_live_bundled_manifest(self) -> None:
         with patch.dict(os.environ, {}, clear=True):

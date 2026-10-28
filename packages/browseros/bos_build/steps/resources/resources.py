@@ -227,7 +227,7 @@ def write_aster_server_gn_manifest(chromium_src: Path) -> None:
             raise ValueError(f"Unsafe Aster server resource: {path}")
         if path.is_file():
             relative = path.relative_to(root).as_posix()
-            if not re.fullmatch(r"[A-Za-z0-9._@+/-]+", relative):
+            if not re.fullmatch(r"[A-Za-z0-9._@+/\[\]-]+", relative):
                 raise ValueError(f"Unsafe Aster server GN filename: {relative!r}")
             files.append(relative)
     for required in ("bin/aster_server", "bin/third_party/bun"):

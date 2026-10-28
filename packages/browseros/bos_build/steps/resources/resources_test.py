@@ -615,7 +615,12 @@ class AsterServerManifestTest(unittest.TestCase):
             src = Path(tmp)
             parent = src / "chrome/browser/browseros/aster_server"
             resources = parent / "resources"
-            for name in ("bin/aster_server", "bin/third_party/bun", "migrations/0001.sql"):
+            for name in (
+                "bin/aster_server",
+                "bin/third_party/bun",
+                "migrations/0001.sql",
+                "fonts/GeistMono-Italic[wght].woff2",
+            ):
                 file = resources / name
                 file.parent.mkdir(parents=True, exist_ok=True)
                 file.write_text("fixture")
@@ -628,6 +633,12 @@ class AsterServerManifestTest(unittest.TestCase):
             self.assertIn('"bin/aster_server"', manifest)
             self.assertIn('"bin/third_party/bun"', manifest)
             self.assertIn('"migrations/0001.sql"', manifest)
+            self.assertIn('"fonts/GeistMono-Italic[wght].woff2"', manifest)
+            unsafe = resources / 'bad"name.txt'
+            unsafe.write_text("injection")
+            with self.assertRaisesRegex(ValueError, "GN filename"):
+                write_aster_server_gn_manifest(src)
+            unsafe.unlink()
             (resources / "unsafe").symlink_to(resources / "bin/aster_server")
             with self.assertRaisesRegex(ValueError, "Unsafe"):
                 write_aster_server_gn_manifest(src)
