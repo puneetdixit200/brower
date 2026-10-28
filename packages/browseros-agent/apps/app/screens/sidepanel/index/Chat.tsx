@@ -30,6 +30,7 @@ import { ChatFooter } from './ChatFooter'
 import { ChatMessages } from './ChatMessages'
 import { IncognitoNotice } from './IncognitoNotice'
 import { HumanLoginHandoff } from './HumanLoginHandoff'
+import { prepareSourceResearch } from './research-request'
 
 /**
  * @public
@@ -253,6 +254,27 @@ export const Chat = () => {
     setAttachedTabs([])
   }
 
+  const researchWithSources = () => {
+    const request = prepareSourceResearch({
+      question: input,
+      tabs: attachedTabs,
+      mode,
+    })
+    if (!request || !canSend || status !== 'ready') return
+    const sent = sendMessage({
+      text: request,
+      action: createBrowserOSAction({
+        mode: 'agent',
+        message: request,
+        tabs: attachedTabs,
+      }),
+    })
+    if (sent) {
+      setInput('')
+      setAttachedTabs([])
+    }
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (messages.length === 0) {
@@ -341,6 +363,22 @@ export const Chat = () => {
         </section>
       )}
       {isIncognito && <IncognitoNotice />}
+      {mode === 'agent' && input.trim() && (
+        <div className="px-3 text-xs">
+          <button
+            type="button"
+            disabled={!canSend || status !== 'ready'}
+            onClick={researchWithSources}
+            className="rounded-md border px-2 py-1.5 disabled:opacity-50"
+          >
+            Research with source URLs
+          </button>
+          <p className="mt-1 text-muted-foreground">
+            Uses selected tabs as source leads. Aster does not independently
+            verify every citation; review sources before relying on results.
+          </p>
+        </div>
+      )}
       {mode === 'agent' && (
         <HumanLoginHandoff
           onStop={handleStop}
