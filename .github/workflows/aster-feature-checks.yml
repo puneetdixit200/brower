@@ -1,19 +1,8 @@
 name: Aster focused development checks
 
+# User requested source-only implementation and tests in a later session.
+# Keep CI runnable on demand but do not automatically spend runner time on pushes.
 on:
-  push:
-    branches:
-      - feat/aster-linux-ui
-    paths:
-      - ".github/workflows/aster-feature-checks.yml"
-      - "packages/browseros-agent/apps/app/components/sidebar/**"
-      - "packages/browseros-agent/apps/app/components/layout/command-palette-tabs.ts"
-      - "packages/browseros-agent/apps/app/screens/sidepanel/index/ToolBatch.tsx"
-      - "packages/browseros-agent/apps/app/screens/sidepanel/index/approval-preview*"
-      - "packages/browseros-agent/apps/app/screens/task-history/export-task-report*"
-      - "packages/browseros-agent/apps/app/screens/task-history/TaskHistoryPage.tsx"
-      - "packages/browseros-agent/apps/server/src/agent/tool-approval-policy.ts"
-      - "packages/browseros-agent/apps/server/tests/agent/tool-approval-policy.test.ts"
   workflow_dispatch:
 
 permissions:
