@@ -197,3 +197,8 @@ User resumed the project. The cloud session could not clone through container Gi
 ## Focused browser and approval feature batch — 2026-10-28
 
 After the prior remote checkpoint, commits on `feat/aster-linux-ui` added bounded Chromium bookmark tree paths, current-window tab pin/unpin/close actions, stricter server approval for mutating tabs/history, credential-redacted human tool-review previews, and explicit local Markdown export of real task summaries without raw tool input/output. The [focused Linux GitHub Actions run](https://github.com/puneetdixit200/brower/actions/runs/40682050699) passed extension TypeScript, server TypeScript, 12 focused Bun tests, and pinned Biome. No native binary, Omarchy GUI session, full workspace suite or release verification was executed. The canonical feature accounting is **2 PASS / 32 PARTIAL / 38 NOT_STARTED**. U17 is PARTIAL, not PASS. See [batch evidence](evidence/aster-feature-batch2-2026-10-28.md).
+
+
+## Most recent source-only checkpoint — 2026-10-28
+
+User asked to partially implement all 38 untouched feature rows and defer testing. The authenticated GitHub continuation added source-level foundations for 36 of those 38, with two remaining NOT_STARTED because an honest safe implementation is not available yet: R02 durable heartbeat continuation and P03 native origin-bound blind autofill. **Matrix is now 2 PASS, 67 PARTIAL, 1 PARTIAL/BLOCKED, 2 NOT_STARTED.** No tests, native builds, or GUI acceptance were run on the new source. See [foundation batch evidence](evidence/aster-source-foundations-38-2026-10-28.md). Earlier feature-table snapshots in this document are historical; use `FEATURE_MATRIX.md` for current values. Do not equate source partials with passing tests or full Aside parity.
