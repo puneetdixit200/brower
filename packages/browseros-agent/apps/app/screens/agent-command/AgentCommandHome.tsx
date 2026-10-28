@@ -18,6 +18,7 @@ import {
   ConversationInput,
   type ConversationInputSendInput,
 } from './ConversationInput'
+import { BrowserQuickControls } from './BrowserQuickControls'
 import { withSelectedHistoryContext } from './history-context'
 import { resolveHomeLlmRoutingMode } from './home-compose.helpers'
 import { resolveHomeSearchUrl } from './home-search'
@@ -214,6 +215,7 @@ export const AgentCommandHome: FC = () => {
         </div>
 
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 pb-12">
+          <BrowserQuickControls />
           <RecentTasks />
           <RecentSites />
           <ScheduleResults />
