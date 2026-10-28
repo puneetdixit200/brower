@@ -58,3 +58,18 @@ This is a deterministic provenance check, not semantic claim support, live-provi
 2. T26.3: Implement actual, trust-bounded claim-to-source support and user-visible uncertainty; do not mistake URL visits or literal quote matches for truth. Test against a live configured provider and real returned page evidence.
 3. Continue T20a native Chromium linking/launch/extension READY/sandbox against pinned source on an eligible Linux host, then run complete packaged smoke tests, release identity and ownership checks.
 4. Keep the full 103-subtask plan active and all 72 feature rows evidence-based. P03 stays NOT_STARTED and S05 PARTIAL/BLOCKED pending real native credential trust boundaries and release signing/update ownership.
+
+
+## T30.2 source follow-up: cross-worker heartbeat liveness before stale cleanup
+
+After the first owner-aware cleanup passed, added `server-conversation-liveness.ts` and five focused tests. A service worker may lose its in-memory AbortController when it restarts while the server still has an active model run. The background cleanup now performs a short, bounded read-only request to the configured `http://127.0.0.1:<port>/chat/:conversationId/state` route before failing an old heartbeat record.
+
+- Only a correctly formed UUID, strict loopback HTTP destination and explicit trusted chat/state response are considered.
+- `running` protects the old heartbeat claim; `completed`, `failed`, `aborted`, `interrupted`, or the endpoint's exact conversation-not-found 404 permits age-based cleanup.
+- Unreachable server, timeout, malformed response, changed API, mismatched conversation, other errors or missing port retain the claim rather than assert abandonment.
+- The cleanup visits at most ten stale candidates per pass; it does not attempt to rewrite tool/approval state or replay an interrupted mutation.
+- This is a *server conversation liveness* check, not full cross-process/external-tool liveness or an atomic guarantee between state read and durable status write. The existing partial unique index remains the cross-worker job-start authority.
+
+Final focused GitHub Actions [run 40787505020](https://github.com/puneetdixit200/brower/actions/runs/40787505020) **PASSED**: app TypeScript, 19 scheduler regression tests (including five new server-liveness cases), pinned Biome and whitespace check. Early intermediate runs had TypeScript/formatting errors and were corrected; only the final run is claimed green.
+
+R02/R03 remain PARTIAL. The highest-priority remaining acceptance work is a real forced service-worker restart while a long sidecar task runs, cancellation/timeout and cross-process overlap fixtures, a crash/restart policy for more than ten stale records, and packaged native Aster acceptance.
