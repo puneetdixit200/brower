@@ -352,3 +352,10 @@ The extension app router now lazily loads 15 secondary views (settings, task his
 ### Five-percent allowance pause — 2026-10-28
 
 The configured account allowance reached 5% remaining. Per the user instruction, the complete source/docs checkpoint and next implementation plan are pushed, owned builds/tests are stopped and agents are complete. The goal is paused, not complete. Continue from CONTINUATION_HANDOFF.md on a resume request.
+
+
+### Remote continuation: genuine sidebar/tasks and private handoff — 2026-10-28
+
+Starting at checkpoint `3f701328392b03c4df1aab1f5f542c28aa2f1333`, the GitHub-connected session implemented resizable persistent width (U01 PARTIAL), live tab/bookmark/chat groups (U02 PARTIAL), and real recent local task statuses (U03 PARTIAL). The agent handoff now stages message/attachment/tab context with a short-lived one-use token and limits legacy tab ID lookup to the current browser window. No cross-window selection, guessed terminal task status, or leaked raw message in the URL is intentionally introduced. The existing sidebar conversation history, private-by-default window check, and credential-shaped execution-history filtering are reused.
+
+A normal Git clone failed because the isolated workspace could not resolve `github.com`; files were fetched/updated through the authenticated GitHub connector. An isolated copy of the sidebar data helper passed strict global TypeScript 5.8.3 typechecking and three Node.js assertions. **No full WXT build, app typecheck, Bun tests, native Chromium compilation or headed runtime verification ran here.** The canonical matrix is now 2 PASS, 31 PARTIAL (including one blocked), 39 NOT_STARTED. Evidence and exact limitations: [2026-10-28 remote implementation checkpoint](evidence/aster-remote-implementation-2026-10-28.md). The complete project remains incomplete, with no verified linked native Aster binary or release.
