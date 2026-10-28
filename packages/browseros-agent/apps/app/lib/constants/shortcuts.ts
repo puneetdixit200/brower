@@ -39,3 +39,28 @@ export const SHORTCUTS_LIST = [
     },
   },
 ]
+
+type CommandPaletteKeyEvent = Pick<
+  KeyboardEvent,
+  'key' | 'repeat' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'
+>
+
+/** Matches Ctrl/Meta+Alt+K without consuming repeated or modified chords. */
+export function isCommandPaletteShortcut(
+  event: CommandPaletteKeyEvent,
+  isOnboarding: boolean,
+  isMac: boolean | undefined,
+): boolean {
+  const hasExpectedPrimaryModifier =
+    isMac === true
+      ? event.metaKey && !event.ctrlKey
+      : isMac === false && event.ctrlKey && !event.metaKey
+  return (
+    !isOnboarding &&
+    !event.repeat &&
+    hasExpectedPrimaryModifier &&
+    event.altKey &&
+    !event.shiftKey &&
+    event.key.toLowerCase() === 'k'
+  )
+}

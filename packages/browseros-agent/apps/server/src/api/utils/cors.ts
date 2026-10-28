@@ -84,4 +84,5 @@ export const defaultCorsConfig: CorsOptions = {
   allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'Accept'],
   credentials: true,
+  exposeHeaders: ['X-BrowserOS-Run-Id'],
 }

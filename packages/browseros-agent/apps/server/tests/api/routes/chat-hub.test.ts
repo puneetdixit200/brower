@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'bun:test'
+import { createHash } from 'node:crypto'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { createBrowserOutputFileAccess } from '@browseros/browser-mcp/output-file'
 import type { UIMessageChunk } from 'ai'
 import type { Hono } from 'hono'
+import { SessionStore } from '../../../src/agent/session-store'
 import { createChatRoutes } from '../../../src/api/routes/chat'
 import { ConversationRuns } from '../../../src/api/services/conversation-runs'
 import type { Env } from '../../../src/api/types'
+import { getToolOutputDir } from '../../../src/lib/browseros-dir'
 
 const localServer = {
   server: {
@@ -12,17 +19,105 @@ const localServer = {
 } as never
 
 describe('/chat server-owned run routes', () => {
+  it('requires a trusted app origin and a live conversation capability for artifact reads', async () => {
+    const conversationId = crypto.randomUUID()
+    const artifactId = crypto.randomUUID()
+    const app = route(new ConversationRuns())
+    const unauthorized = await app.request(
+      `/${conversationId}/artifacts/${artifactId}`,
+      { headers: { Host: 'localhost' } },
+      localServer,
+    )
+    expect(unauthorized.status).toBe(403)
+
+    const missing = await requestFromExtension(
+      app,
+      `/${conversationId}/artifacts/${artifactId}`,
+    )
+    expect(missing.status).toBe(404)
+  })
+
+  it('serves only a verified artifact capability owned by the requested conversation', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'chat-artifact-route-'))
+    const previousBrowserosDir = process.env.BROWSEROS_DIR
+    const previousAsterDir = process.env.ASTER_DIR
+    process.env.BROWSEROS_DIR = root
+    process.env.ASTER_DIR = root
+    try {
+      const outputRoot = await getToolOutputDir()
+      const path = join(outputRoot, 'artifact.bin')
+      const contents = Buffer.from('verified response body')
+      await writeFile(path, contents)
+      const access = createBrowserOutputFileAccess()
+      const artifactId = access.recordArtifact({
+        path,
+        filename: 'artifact.bin',
+        sizeBytes: contents.byteLength,
+        sha256: createHash('sha256').update(contents).digest('hex'),
+      })
+      const conversationId = crypto.randomUUID()
+      const otherConversationId = crypto.randomUUID()
+      const sessions = new SessionStore()
+      sessions.set(conversationId, { outputFileAccess: access } as never)
+      const app = route(new ConversationRuns(), sessions)
+
+      const response = await requestFromExtension(
+        app,
+        `/${conversationId}/artifacts/${artifactId}`,
+      )
+      expect(response.status).toBe(200)
+      expect(Buffer.from(await response.arrayBuffer())).toEqual(contents)
+      expect(response.headers.get('content-disposition')).toContain(
+        'artifact.bin',
+      )
+
+      const wrongOwner = await requestFromExtension(
+        app,
+        `/${otherConversationId}/artifacts/${artifactId}`,
+      )
+      expect(wrongOwner.status).toBe(404)
+      sessions.remove(conversationId)
+      const afterSessionRemoval = await requestFromExtension(
+        app,
+        `/${conversationId}/artifacts/${artifactId}`,
+      )
+      expect(afterSessionRemoval.status).toBe(404)
+    } finally {
+      if (previousBrowserosDir === undefined) delete process.env.BROWSEROS_DIR
+      else process.env.BROWSEROS_DIR = previousBrowserosDir
+      if (previousAsterDir === undefined) delete process.env.ASTER_DIR
+      else process.env.ASTER_DIR = previousAsterDir
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
   it('returns persisted interruption metadata from state without exposing a stream', async () => {
+    const runId = crypto.randomUUID()
     const lifecycleStore = {
       start: () => {},
       finish: () => {},
+      appendTraceEvent: () => {},
+      getTraceEvents: () => [],
+      ensureInterruptionTraceEvent: (
+        _conversationId: string,
+        taskId: string,
+        at: number,
+      ) => ({
+        version: 1,
+        taskId,
+        eventId: crypto.randomUUID(),
+        at,
+        kind: 'task_interrupted',
+      }),
       get: (conversationId: string) => ({
         conversationId,
-        runId: 'interrupted-run',
+        runId,
         status: 'interrupted' as const,
         startedAt: 100,
         finishedAt: 200,
+        tracePersistenceDegraded: false,
       }),
+      markTracePersistenceDegraded: () => {},
     }
     const runs = new ConversationRuns({ lifecycleStore })
     const conversationId = crypto.randomUUID()
@@ -31,7 +126,7 @@ describe('/chat server-owned run routes', () => {
     expect(state.status).toBe(200)
     expect(await state.json()).toMatchObject({
       conversationId,
-      runId: 'interrupted-run',
+      runId,
       status: 'interrupted',
       chunkCount: 0,
       startedAt: 100,
@@ -291,12 +386,13 @@ describe('/chat server-owned run routes', () => {
   })
 })
 
-function route(runs: ConversationRuns) {
+function route(runs: ConversationRuns, sessionStore?: SessionStore) {
   return createChatRoutes({
     browser: {} as never,
     browserMcp: {} as never,
     serverPort: 9000,
     conversationRuns: runs,
+    sessionStore,
   })
 }
 

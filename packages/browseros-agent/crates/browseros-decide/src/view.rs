@@ -23,7 +23,7 @@
 use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::hash::{Hash, Hasher};
 
-use browseros_core::snapshot::{AxNode, RefMap};
+use browseros_core::snapshot::{AxNode, RefMap, RenderOptions, render_snapshot};
 
 /// Roles that can be acted on, and so can be offered as a candidate.
 ///
@@ -233,7 +233,7 @@ impl PageView {
     pub fn from_ax(
         url: impl Into<String>,
         title: impl Into<String>,
-        text: impl Into<String>,
+        _text: impl Into<String>,
         nodes: &[AxNode],
         refs: &RefMap,
     ) -> Self {
@@ -264,23 +264,82 @@ impl PageView {
                 clickable: false,
                 role: role.clone(),
                 name,
-                value: text_of(node.value.as_ref()).filter(|value| !value.is_empty()),
+                // CDP AX does not reliably identify the underlying input type:
+                // a password input can arrive as a textbox without a property
+                // that distinguishes it from ordinary text. Keep AX values out
+                // of Control because space serializes Control.value into the
+                // model-facing `holds` candidate field.
+                value: None,
                 options: options_of(node, &by_node_id),
                 state,
                 guard: 0,
                 group: None,
                 // The typed path has no rendered tree to find a card in.
             };
-            controls.push(control);
+            controls.push((control, node));
         }
-        for control in &mut controls {
-            control.guard = guard_of(control);
+        for (control, node) in &mut controls {
+            control.guard = guard_of_ax(control, node);
         }
+        let controls = controls
+            .into_iter()
+            .map(|(control, _)| control)
+            .collect();
+
+        // Never trust a separately supplied text buffer on the typed AX path.
+        // It may contain AX values (including passwords) that the snapshot
+        // renderer deliberately omits. Derive the decision text from the same
+        // nodes through that renderer. Reconcile its temporary fallback refs
+        // to the capture's refs below, since stable refs need document context.
+        let mut render_refs = RefMap::new();
+        let rendered = render_snapshot(
+            nodes,
+            &mut RenderOptions {
+                refs: &mut render_refs,
+                frame_id: None,
+                document_id: None,
+                cursor_hits: None,
+                base_depth: 0,
+            },
+        );
+        let existing_refs_by_backend: HashMap<i64, String> = refs
+            .entries_in_order()
+            .into_iter()
+            .map(|entry| (entry.backend_node_id, entry.ref_id.to_string()))
+            .collect();
+        let rendered_ref_map: HashMap<String, String> = render_refs
+            .entries_in_order()
+            .into_iter()
+            .filter_map(|rendered_entry| {
+                existing_refs_by_backend
+                    .get(&rendered_entry.backend_node_id)
+                    .map(|reference| (rendered_entry.ref_id.to_string(), reference.clone()))
+            })
+            .collect();
+        let rendered_text = rendered
+            .text
+            .lines()
+            .map(|line| {
+                let line = without_link_url(line);
+                if let Some(rendered_reference) = reference_in(line) {
+                    let old = format!("[ref={rendered_reference}]");
+                    if let Some(existing_reference) = rendered_ref_map.get(rendered_reference) {
+                        let new = format!("[ref={existing_reference}]");
+                        line.replace(old.as_str(), new.as_str())
+                    } else {
+                        line.replace(old.as_str(), "")
+                    }
+                } else {
+                    line.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
 
         let mut view = Self {
             url: url.into(),
             title: title.into(),
-            text: text.into(),
+            text: rendered_text,
             controls,
             fingerprint: 0,
             arrangement: 0,
@@ -616,6 +675,15 @@ fn guard_of(control: &Control) -> u64 {
     control.state.expanded.hash(&mut hasher);
     control.state.selected.hash(&mut hasher);
     control.state.disabled.hash(&mut hasher);
+    hasher.finish()
+}
+
+/// Extends a control guard with its AX value without retaining that value in
+/// the model-facing control fields or debug representation.
+fn guard_of_ax(control: &Control, node: &AxNode) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    guard_of(control).hash(&mut hasher);
+    text_of(node.value.as_ref()).hash(&mut hasher);
     hasher.finish()
 }
 
@@ -1200,6 +1268,140 @@ mod tests {
         );
     }
 
+    #[test]
+    fn ax_values_never_reach_controls_or_model_candidates() {
+        let sentinel = "decide-password-sentinel-10cd";
+        let mut password = ax("password", 21, "textbox", "Password");
+        password.value = Some(AxValue {
+            value_type: "string".to_string(),
+            value: Some(serde_json::json!(sentinel)),
+        });
+        let mut search = ax("search", 22, "searchbox", "Search");
+        search.value = Some(AxValue {
+            value_type: "string".to_string(),
+            value: Some(serde_json::json!("ordinary search text")),
+        });
+        let view = view_of(&[password, search]);
+
+        for control in &view.controls {
+            assert_eq!(control.value, None);
+            let candidate = crate::space::describe(control).to_string();
+            assert!(!candidate.contains(sentinel));
+            assert!(!candidate.contains("ordinary search text"));
+            assert!(!candidate.contains("holds"));
+        }
+    }
+
+    #[test]
+    fn ax_control_value_changes_move_the_guard_without_exposing_the_value() {
+        let before_value = "private-before-AX-value";
+        let after_value = "private-after-AX-value";
+        let mut before_node = ax("1", 11, "textbox", "Email");
+        before_node.value = Some(AxValue::string(before_value));
+        let mut after_node = ax("1", 11, "textbox", "Email");
+        after_node.value = Some(AxValue::string(after_value));
+
+        let before = view_of(&[before_node]);
+        let after = view_of(&[after_node]);
+
+        assert_eq!(before.controls[0].value, None);
+        assert_eq!(after.controls[0].value, None);
+        assert_ne!(before.controls[0].guard, after.controls[0].guard);
+        assert!(!format!("{before:?}").contains(before_value));
+        assert!(!format!("{after:?}").contains(after_value));
+    }
+
+    #[test]
+    fn ax_text_argument_cannot_bypass_safe_snapshot_renderer() {
+        let sentinel = "unsafe-ax-text-password-7f31";
+        let mut password = ax("1", 11, "textbox", "Password");
+        password.value = Some(AxValue::string(sentinel));
+        let nodes = vec![password];
+        let refs = refs_for(&nodes);
+
+        let view = PageView::from_ax(
+            "https://example.com",
+            "Example",
+            format!("page copy {sentinel}"),
+            &nodes,
+            &refs,
+        );
+
+        assert!(!view.text.contains(sentinel));
+        assert!(view.text.contains("textbox \"Password\""));
+        assert!(!format!("{view:?}").contains(sentinel));
+    }
+
+    #[test]
+    fn ax_rendered_control_line_uses_the_capture_reference() {
+        let node = ax("button", 22, "button", "Continue");
+        let orphan = ax("unmapped", 23, "button", "Unmapped");
+        let root = AxNode {
+            node_id: "root".to_string(),
+            role: Some(AxValue::role("RootWebArea")),
+            child_ids: Some(vec!["button".to_string(), "unmapped".to_string()]),
+            ..AxNode::default()
+        };
+        let nodes = vec![root, node, orphan];
+        let mut refs = RefMap::new();
+        refs.mint(MintRef {
+            backend_node_id: 11,
+            role: "button",
+            name: "Earlier",
+            document_id: Some("frame:document"),
+            frame_id: None,
+        });
+        refs.begin_snapshot();
+        let reference = refs.mint(MintRef {
+            backend_node_id: 22,
+            role: "button",
+            name: "Continue",
+            document_id: Some("frame:document"),
+            frame_id: None,
+        });
+
+        let view = PageView::from_ax(
+            "https://example.com",
+            "Example",
+            "ignored",
+            &nodes,
+            &refs,
+        );
+
+        assert_eq!(view.controls[0].reference, reference.to_string());
+        assert!(view.text.contains(&format!("[ref={reference}]")));
+        assert!(!view.text.contains("[ref=e1]"));
+        let unmapped_line = view
+            .text
+            .lines()
+            .find(|line| line.contains("Unmapped"))
+            .expect("the AX node still renders");
+        assert!(!unmapped_line.contains("[ref="));
+    }
+
+    #[test]
+    fn ax_rendered_link_drops_its_url_attribute() {
+        let url = "https://example.com/account?token=link-secret-291a";
+        let mut link = ax("link", 31, "link", "Account");
+        link.properties = Some(vec![AxProperty {
+            name: "url".into(),
+            value: AxValue::string(url),
+        }]);
+        let refs = refs_for(&[link.clone()]);
+
+        let view = PageView::from_ax(
+            "https://example.com",
+            "Example",
+            "",
+            &[link],
+            &refs,
+        );
+
+        assert!(view.text.contains("link \"Account\""));
+        assert!(!view.text.contains("account?token"));
+        assert!(!view.text.contains("link-secret-291a"));
+    }
+
     /// A styled facet label is what a person clicks, and its role is not one of
     /// the interactive ones. The renderer marks it with a pointer cursor, and
     /// ignoring that mark meant a whole filter panel reached the snapshot
@@ -1386,18 +1588,16 @@ mod tests {
     fn a_page_whose_text_changed_is_not_the_same_page() {
         let nodes = vec![ax("1", 11, "button", "Continue")];
         let refs = refs_for(&nodes);
-        let before = PageView::from_ax(
+        let before = PageView::from_snapshot(
             "https://example.com/cart",
             "Cart",
             "Item added to your cart",
-            &nodes,
             &refs,
         );
-        let after = PageView::from_ax(
+        let after = PageView::from_snapshot(
             "https://example.com/cart",
             "Cart",
             "Out of stock",
-            &nodes,
             &refs,
         );
         assert_eq!(before.url, after.url);
@@ -1418,8 +1618,18 @@ mod tests {
     fn unrelated_text_does_not_move_a_controls_guard() {
         let nodes = vec![ax("1", 11, "button", "Continue")];
         let refs = refs_for(&nodes);
-        let before = PageView::from_ax("https://example.com", "T", "one story", &nodes, &refs);
-        let after = PageView::from_ax("https://example.com", "T", "another story", &nodes, &refs);
+        let before = PageView::from_snapshot(
+            "https://example.com",
+            "T",
+            "- button \"Continue\" [ref=e1]\none story",
+            &refs,
+        );
+        let after = PageView::from_snapshot(
+            "https://example.com",
+            "T",
+            "- button \"Continue\" [ref=e1]\nanother story",
+            &refs,
+        );
         assert_eq!(
             before.controls[0].guard, after.controls[0].guard,
             "the control is the same control"
@@ -1450,11 +1660,10 @@ mod tests {
     fn trimming_the_text_moves_the_fingerprint() {
         let nodes = vec![ax("1", 11, "button", "Continue")];
         let refs = refs_for(&nodes);
-        let mut view = PageView::from_ax(
+        let mut view = PageView::from_snapshot(
             "https://example.com",
             "T",
             "first\nsecond\nthird",
-            &nodes,
             &refs,
         );
         let before = view.fingerprint;
@@ -1471,18 +1680,16 @@ mod tests {
         let nodes = vec![ax("1", 11, "button", "Continue")];
         let refs = refs_for(&nodes);
         let head = "visible\n".repeat(PageView::TEXT_BUDGET / 8 + 10);
-        let one = PageView::from_ax(
+        let one = PageView::from_snapshot(
             "https://e.com",
             "T",
-            format!("{head}tail one"),
-            &nodes,
+            &format!("{head}tail one"),
             &refs,
         );
-        let two = PageView::from_ax(
+        let two = PageView::from_snapshot(
             "https://e.com",
             "T",
-            format!("{head}tail two"),
-            &nodes,
+            &format!("{head}tail two"),
             &refs,
         );
         assert_eq!(

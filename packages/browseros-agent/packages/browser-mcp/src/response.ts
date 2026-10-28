@@ -128,12 +128,9 @@ export class ToolResponse {
         return
       }
       case 'screenshot': {
-        const { session: pageSession } = await session.pages.getSession(
-          action.page,
-        )
-        const result = await pageSession.Page.captureScreenshot({
+        const result = await session.screenshot(action.page, {
           format: 'png',
-          captureBeyondViewport: false,
+          fullPage: false,
         })
         this.text(`[Page ${action.page} screenshot]`)
         this.image(result.data, 'image/png')

@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'bun:test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { BrowserSession } from '@browseros/browser-core/core/session'
 import type { WindowInfo } from '@browseros/browser-core/core/windows'
 import { executeTool } from './framework'
+import {
+  createBrowserOutputFileAccess,
+  withBrowserOutputFileAccess,
+} from './output-file'
 import { BROWSER_TOOLS } from './registry'
 
 const page = {
@@ -60,7 +65,14 @@ function createContractSession(): BrowserSession {
       printToPDF: async () => ({
         data: Buffer.from('pdf').toString('base64'),
       }),
-      setDownloadBehavior: async () => {},
+      setDownloadBehavior: async (params: { downloadPath?: string }) => {
+        if (params.downloadPath) {
+          writeFileSync(
+            join(params.downloadPath, 'report.txt'),
+            'fixture download',
+          )
+        }
+      },
       on: (event: string, callback: (params: never) => void): (() => void) => {
         if (event === 'downloadWillBegin') {
           downloadBegin = callback as typeof downloadBegin
@@ -196,11 +208,16 @@ describe('browser tool structured contract', () => {
     try {
       const session = createContractSession()
       const byName = new Map(BROWSER_TOOLS.map((tool) => [tool.name, tool]))
+      let downloadMetadata: unknown
       const call = async (name: string, args: Record<string, unknown>) => {
         const tool = byName.get(name)
         if (!tool) throw new Error(`missing browser tool: ${name}`)
-        const result = await executeTool(tool, args, { session })
+        const result = await withBrowserOutputFileAccess(
+          createBrowserOutputFileAccess(),
+          () => executeTool(tool, args, { session }),
+        )
         expect(result.isError, `${name} should succeed`).toBeFalsy()
+        if (name === 'download') downloadMetadata = result.structuredContent
         return structuredKeys(result.structuredContent)
       }
 
@@ -292,7 +309,7 @@ describe('browser tool structured contract', () => {
         snapshot: ['contentLength', 'page', 'tokenEstimate', 'writtenToFile'],
         diff: ['added', 'changed', 'removed'],
         act: ['changed', 'kind'],
-        download: ['filename', 'page', 'path', 'ref'],
+        download: ['artifact'],
         upload: ['files', 'page', 'ref', 'uploaded'],
         read: ['contentLength', 'format', 'page', 'writtenToFile'],
         grep: ['count', 'matches', 'over', 'page'],
@@ -306,6 +323,13 @@ describe('browser tool structured contract', () => {
         'windows.activate': ['action', 'windowId'],
         evaluate: ['page', 'value'],
         run: ['logs', 'ok', 'value'],
+      })
+      expect(downloadMetadata).toMatchObject({
+        artifact: {
+          filename: 'report.txt',
+          sizeBytes: Buffer.byteLength('fixture download'),
+          sha256: createHash('sha256').update('fixture download').digest('hex'),
+        },
       })
     } finally {
       if (previous === undefined) {

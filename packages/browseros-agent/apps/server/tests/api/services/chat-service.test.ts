@@ -33,6 +33,7 @@ const BROWSEROS_TARGET = { type: 'browseros', providerId: 'browseros' } as const
 interface StreamResponseOptions {
   uiMessages?: MockMessage[]
   abortSignal?: AbortSignal
+  options?: { taskId: string }
   onFinish(args: { messages: MockMessage[] }): Promise<void>
 }
 
@@ -196,7 +197,7 @@ function createFakeAgent() {
   const messages: MockMessage[] = []
   return {
     toolLoopAgent: {},
-    toolNames: new Set<string>(),
+    toolNames: new Set(['probe']),
     messages,
     appendUserMessage(text: string) {
       // Mirror production's id-per-call: a hardcoded constant would
@@ -213,6 +214,58 @@ function createFakeAgent() {
 }
 
 describe('ChatService activity tracking', () => {
+  it('passes each run UUID into tool execution context on a shared conversation agent', async () => {
+    resolveLLMConfigSpy.mockImplementation(async () => ({
+      provider: 'openai',
+      model: 'gpt-5',
+      apiKey: 'test-key',
+    }))
+    const fakeAgent = createFakeAgent()
+    agentToReturn = fakeAgent
+    const taskIds: Array<string | undefined> = []
+    streamResponseHandler = async ({ onFinish, uiMessages, options }) => {
+      taskIds.push(options?.taskId)
+      await onFinish({ messages: uiMessages ?? fakeAgent.messages })
+      return new Response('ok')
+    }
+
+    const service = new ChatService({
+      sessionStore: createSessionStore() as never,
+      klavis: createKlavisStub() as never,
+      browser: {
+        resolveTabIds: mock(async () => new Map<number, number>()),
+        closePage: mock(async () => {}),
+      } as never,
+      serverPort: 32123,
+    })
+    const conversationId = crypto.randomUUID()
+    const request = {
+      target: BROWSEROS_TARGET,
+      persist: false,
+      conversationId,
+      message: 'same conversation, separate run',
+      isScheduledTask: false,
+      mode: 'agent',
+      origin: 'sidepanel',
+    } as never
+
+    const runIds: string[] = []
+    for (let index = 0; index < 2; index += 1) {
+      const response = await service.processMessage(
+        request,
+        new AbortController().signal,
+      )
+      runIds.push(response.headers.get('x-browseros-run-id') ?? '')
+      await response.text()
+    }
+
+    expect(runIds[0]).toMatch(/^[0-9a-f-]{36}$/i)
+    expect(runIds[1]).toMatch(/^[0-9a-f-]{36}$/i)
+    expect(runIds[0]).not.toBe(runIds[1])
+    expect(taskIds).toEqual(runIds)
+    expect(agentToReturn).toBe(fakeAgent)
+  })
+
   it('stays busy when a subscriber disconnects and idles on explicit stop', async () => {
     resolveLLMConfigSpy.mockImplementation(async () => ({
       provider: 'openai',
@@ -268,6 +321,11 @@ describe('ChatService activity tracking', () => {
     )
 
     expect(activity.isBusy()).toBe(true)
+    const serverRunId = response.headers.get('x-browseros-run-id')
+    expect(serverRunId).toBeTruthy()
+    expect((await service.getRunSnapshot(conversationId))?.runId).toBe(
+      serverRunId,
+    )
     const reader = response.body?.getReader()
     await reader?.read()
 

@@ -6,7 +6,6 @@ import {
   lastAssistantMessageIsCompleteWithApprovalResponses,
   type UIMessage,
 } from 'ai'
-import { compact } from 'es-toolkit/array'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import useDeepCompareEffect from 'use-deep-compare-effect'
@@ -31,8 +30,8 @@ import {
 } from '@/lib/constants/analyticsEvents'
 import { formatConversationHistory } from '@/lib/conversations/formatConversationHistory'
 import { declinedAppsStorage } from '@/lib/declined-apps/storage'
+import { createExecutionHistoryFetch } from '@/lib/execution-history/server-run-id'
 import { resolveChatProvider } from '@/lib/llm-providers/provider-runtime'
-import type { ChatRequestBrowserContext } from '@/lib/messaging/server/buildChatRequestBody'
 import { track } from '@/lib/metrics/track'
 import { searchActionsStorage } from '@/lib/search-actions/searchActionsStorage'
 import { selectedTextStorage } from '@/lib/selected-text/selectedTextStorage'
@@ -53,6 +52,7 @@ import {
   shouldPersistHistory,
 } from './chat-session-persistence'
 import {
+  buildRequestBrowserContext,
   getOwnerTabSelection,
   getToolApprovalResponse,
   prepareSidepanelSendMessagesRequest,
@@ -143,51 +143,6 @@ const getUserSystemPrompt = (
   origin === 'newtab'
     ? [personalization, NEWTAB_SYSTEM_PROMPT].filter(Boolean).join('\n\n')
     : personalization
-
-const buildRequestBrowserContext = ({
-  activeTab,
-  action,
-  enabledMcpServers,
-  customMcpServers,
-}: {
-  activeTab?: chrome.tabs.Tab
-  action?: ChatAction
-  enabledMcpServers: Array<string | undefined>
-  customMcpServers: {
-    name: string
-    url?: string
-  }[]
-}): ChatRequestBrowserContext | undefined => {
-  const browserContext: ChatRequestBrowserContext = {}
-
-  if (activeTab) {
-    browserContext.windowId = activeTab.windowId
-    browserContext.activeTab = {
-      id: activeTab.id,
-      url: activeTab.url,
-      title: activeTab.title,
-    }
-  }
-
-  if (action?.tabs?.length) {
-    browserContext.selectedTabs = action.tabs.map((tab) => ({
-      id: tab.id,
-      url: tab.url,
-      title: tab.title,
-    }))
-  }
-
-  const managedMcpServers = compact(enabledMcpServers)
-  if (managedMcpServers.length) {
-    browserContext.enabledMcpServers = managedMcpServers
-  }
-
-  if (customMcpServers.length) {
-    browserContext.customMcpServers = customMcpServers
-  }
-
-  return Object.keys(browserContext).length ? browserContext : undefined
-}
 
 export const useChatSession = (options?: ChatSessionOptions) => {
   const {
@@ -309,9 +264,12 @@ export const useChatSession = (options?: ChatSessionOptions) => {
 
   const {
     startTask: startExecutionTask,
+    associateServerRunId,
     syncFromMessages: syncExecutionHistory,
     finishTask: finishExecutionTask,
   } = useExecutionHistoryTracker({ enabled: persistHistory })
+  const associateServerRunIdRef = useRef(associateServerRunId)
+  associateServerRunIdRef.current = associateServerRunId
 
   const onClickLike = (messageId: string) => {
     track(MESSAGE_LIKE_EVENT)
@@ -387,6 +345,9 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   const transportRef = useRef<DefaultChatTransport<UIMessage> | null>(null)
   if (!transportRef.current) {
     transportRef.current = new DefaultChatTransport<UIMessage>({
+      fetch: createExecutionHistoryFetch((runId) =>
+        associateServerRunIdRef.current(runId),
+      ),
       prepareReconnectToStreamRequest: async ({ body }) => {
         const serverUrl = await resolveAgentServerUrl()
         return {

@@ -202,8 +202,20 @@ export async function openPosixRelative(
       ownedDirectories.push(directory)
     }
     const leafPath = fdPath(directory.fd, components.at(-1))
+    // O_NOFOLLOW prevents symlink substitution, but portable POSIX cannot
+    // atomically require the opened inode to be regular. Keep fallback opens
+    // nonblocking (and prevent a tty from becoming the process control tty)
+    // so a raced FIFO cannot hang the caller. The descriptor is still checked
+    // with fstat before any file contents are consumed or modified.
     return new NodeFileHandle(
-      await open(leafPath, flags | constants.O_NOFOLLOW, mode),
+      await open(
+        leafPath,
+        flags |
+          constants.O_NOFOLLOW |
+          constants.O_NONBLOCK |
+          (constants.O_NOCTTY ?? 0),
+        mode,
+      ),
     )
   } finally {
     for (const handle of ownedDirectories.reverse()) await handle.close()

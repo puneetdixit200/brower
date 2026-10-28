@@ -60,10 +60,20 @@ export function createScheduledJobRunRoutes(
       zValidator('param', IdParamSchema),
       zValidator('json', UpsertRunSchema),
       async (c) => {
-        const run = await store.upsert({
+        const input = {
           ...c.req.valid('json'),
           id: c.req.valid('param').runId,
-        })
+        }
+        const run =
+          input.status === 'running'
+            ? await store.start(input)
+            : await store.finish(input)
+        if (!run) {
+          return c.json(
+            { error: 'Run identity is invalid or the run is no longer active' },
+            409,
+          )
+        }
         // Every write, not just the first: a run is written twice, when it
         // starts and when it finishes, and pruning is bounded and idempotent.
         // The import path deliberately does not prune, so it stays additive.
@@ -72,8 +82,14 @@ export function createScheduledJobRunRoutes(
       },
     )
     .delete('/:runId', zValidator('param', IdParamSchema), async (c) => {
-      const deleted = await store.remove(c.req.valid('param').runId)
-      if (!deleted) return c.json({ error: 'Unknown run' }, 404)
+      const result = await store.remove(c.req.valid('param').runId)
+      if (result === 'running') {
+        return c.json(
+          { error: 'Cannot delete a running scheduled job run' },
+          409,
+        )
+      }
+      if (result === 'missing') return c.json({ error: 'Unknown run' }, 404)
       return c.json({ success: true })
     })
 }

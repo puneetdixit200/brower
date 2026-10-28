@@ -22,6 +22,7 @@ import type {
   ExecutionTaskRecord,
 } from '@/lib/execution-history/types'
 import { resolveAgentServerUrl } from '@/modules/browseros/agent-server-url.helpers'
+import { fetchTaskArtifact } from './download-task-artifact'
 import {
   downloadTaskReport,
   saveTaskReportToChosenDirectory,
@@ -420,11 +421,77 @@ export const TaskHistoryPage: FC = () => {
 
                 <section className="space-y-2">
                   <h3 className="font-medium">Artifacts</h3>
-                  <p className="text-muted-foreground text-sm">
-                    No downloadable artifact descriptors were recorded for this
-                    run. Task history does not turn arbitrary tool text or paths
-                    into file links.
-                  </p>
+                  {(selectedTask.artifacts ?? []).length === 0 ? (
+                    <p className="text-muted-foreground text-sm">
+                      No downloadable artifacts were recorded for this run.
+                    </p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {selectedTask.artifacts?.map((artifact) => (
+                        <li
+                          key={`${artifact.sha256}:${artifact.filename}`}
+                          className="rounded-md border p-3 text-sm"
+                        >
+                          <p className="break-all font-medium">
+                            {artifact.filename}
+                          </p>
+                          <p className="text-muted-foreground text-xs">
+                            {artifact.sizeBytes.toLocaleString()} bytes ·
+                            SHA-256
+                          </p>
+                          <code className="block break-all text-xs">
+                            {artifact.sha256}
+                          </code>
+                          {artifact.artifactId ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="mt-2"
+                              onClick={() => {
+                                const artifactId = artifact.artifactId
+                                if (!artifactId) return
+                                void (async () => {
+                                  try {
+                                    const serverUrl =
+                                      await resolveAgentServerUrl()
+                                    const blob = await fetchTaskArtifact({
+                                      serverUrl,
+                                      conversationId:
+                                        selectedTask.conversationId,
+                                      artifactId,
+                                    })
+                                    const url = URL.createObjectURL(blob)
+                                    const link = document.createElement('a')
+                                    link.href = url
+                                    link.download = artifact.filename
+                                    link.click()
+                                    window.setTimeout(
+                                      () => URL.revokeObjectURL(url),
+                                      1000,
+                                    )
+                                    setError(null)
+                                  } catch {
+                                    setError(
+                                      'This artifact is no longer available from the active agent session.',
+                                    )
+                                  }
+                                })()
+                              }}
+                            >
+                              <Download className="mr-2 size-4" />
+                              Download {artifact.filename}
+                            </Button>
+                          ) : (
+                            <p className="mt-2 text-muted-foreground text-xs">
+                              This saved record has no active download
+                              capability.
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </section>
 
                 <section className="space-y-2">

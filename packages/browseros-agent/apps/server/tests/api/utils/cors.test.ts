@@ -4,7 +4,10 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { Hono } from 'hono'
+import { cors } from 'hono/cors'
 import {
+  defaultCorsConfig,
   isAllowedOrigin,
   resetAllowedOriginsForTesting,
 } from '../../../src/api/utils/cors'
@@ -112,5 +115,37 @@ describe('isAllowedOrigin', () => {
     process.env.BROWSEROS_TRUSTED_ORIGINS = 'chrome-extension://abc,,, ,'
     expect(isAllowedOrigin('chrome-extension://abc')).toBe(true)
     expect(isAllowedOrigin('')).toBe(false)
+  })
+})
+
+describe('run identity CORS exposure', () => {
+  const previousTrustedOrigins = process.env.BROWSEROS_TRUSTED_ORIGINS
+
+  afterEach(() => {
+    if (previousTrustedOrigins === undefined) {
+      delete process.env.BROWSEROS_TRUSTED_ORIGINS
+    } else {
+      process.env.BROWSEROS_TRUSTED_ORIGINS = previousTrustedOrigins
+    }
+    resetAllowedOriginsForTesting()
+  })
+
+  it('exposes the server run id response header to the extension', async () => {
+    process.env.BROWSEROS_TRUSTED_ORIGINS = 'chrome-extension://test-extension'
+    resetAllowedOriginsForTesting()
+    const app = new Hono()
+    app.use('/*', cors(defaultCorsConfig))
+
+    const response = await app.request('/chat', {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'chrome-extension://test-extension',
+        'Access-Control-Request-Method': 'POST',
+      },
+    })
+
+    expect(response.headers.get('access-control-expose-headers')).toContain(
+      'X-BrowserOS-Run-Id',
+    )
   })
 })

@@ -20,6 +20,13 @@ export interface ExecutionStepApproval {
   reason?: string
 }
 
+export interface ExecutionArtifactDescriptor {
+  artifactId?: string
+  filename: string
+  sizeBytes: number
+  sha256: string
+}
+
 export interface ExecutionStepRecord {
   id: string
   toolName: string
@@ -31,12 +38,15 @@ export interface ExecutionStepRecord {
   output?: unknown
   errorText?: string
   previewText: string
+  artifact?: ExecutionArtifactDescriptor
   approval?: ExecutionStepApproval
 }
 
 export interface ExecutionTaskRecord {
   id: string
   conversationId: string
+  /** Server-owned run identity used to reconcile this local task after restart. */
+  serverRunId?: string
   promptText: string
   promptMessageId?: string
   assistantMessageId?: string
@@ -50,6 +60,7 @@ export interface ExecutionTaskRecord {
   deniedCount: number
   errorCount: number
   steps: ExecutionStepRecord[]
+  artifacts?: ExecutionArtifactDescriptor[]
 }
 
 export interface ConversationExecutionHistory {

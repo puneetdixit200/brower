@@ -1,11 +1,17 @@
-import type { FC } from 'react'
+import { type FC, useState } from 'react'
 import { useNavigate } from 'react-router'
+import { openBrowserDataImport } from '@/lib/onboarding/browser-data-import'
 import { useLlmProviders } from '@/modules/llm-providers/llm-providers.hooks'
 import { AddProviderSection } from '@/screens/ai-settings/AddProviderSection'
 import {
   AddProviderDialogs,
   useAddProvider,
 } from '@/screens/ai-settings/add-provider.hooks'
+import {
+  OnboardingPrivacyGate,
+  PRIVACY_CHECKPOINTS,
+} from './OnboardingPrivacyGate'
+import { advancePrivacyWalkthrough } from './privacy-walkthrough'
 
 /**
  * First-run setup, reached from the native onboarding rather than the sidebar.
@@ -22,6 +28,7 @@ import {
 export const OnboardingAiPage: FC = () => {
   const navigate = useNavigate()
   const { providers, saveProvider, setDefaultProvider } = useLlmProviders()
+  const [acknowledgedSteps, setAcknowledgedSteps] = useState(0)
 
   const goHome = () => navigate('/home', { replace: true })
 
@@ -51,33 +58,28 @@ export const OnboardingAiPage: FC = () => {
         <p className="mb-8 text-muted-foreground">
           BrowserOS runs on the provider you bring. Connect an LLM provider or a
           coding agent harness you already use. You can change this any time in
-          settings.
+          settings. Nothing connects until you choose and configure it.
         </p>
 
-        <section
-          aria-label="Privacy and model-routing explanation"
-          className="mb-6 space-y-2 rounded-xl border border-border bg-muted/30 p-4 text-muted-foreground text-sm"
-        >
-          <h2 className="font-semibold text-foreground">Where your AI requests go</h2>
-          <p>
-            Aster runs the browser on your device. AI tasks use your selected model
-            provider or coding-agent runtime. Cloud providers may receive your
-            prompts and explicitly attached page content. Ollama and LM Studio
-            can run locally, but only if you configure a local endpoint.
-          </p>
-          <p>
-            Browser passwords, passkeys and one-time codes must stay in Chromium's
-            native login flow, not in an AI prompt. You can change or remove
-            providers in AI Settings. No model is connected automatically.
-          </p>
-        </section>
-        <AddProviderSection
-          onCreateAgent={addProvider.onCreateAgent}
-          onCreateCustomAgent={addProvider.onCreateCustomAgent}
-          onUseTemplate={addProvider.onUseTemplate}
+        <OnboardingPrivacyGate
+          acknowledgedSteps={acknowledgedSteps}
+          onImportData={() => openBrowserDataImport(chrome.tabs.create)}
+          onAcknowledge={() =>
+            setAcknowledgedSteps((current) =>
+              advancePrivacyWalkthrough(current, PRIVACY_CHECKPOINTS.length),
+            )
+          }
+          providerSetup={
+            <>
+              <AddProviderSection
+                onCreateAgent={addProvider.onCreateAgent}
+                onCreateCustomAgent={addProvider.onCreateCustomAgent}
+                onUseTemplate={addProvider.onUseTemplate}
+              />
+              <AddProviderDialogs controller={addProvider} />
+            </>
+          }
         />
-
-        <AddProviderDialogs controller={addProvider} />
       </div>
     </div>
   )

@@ -7,6 +7,14 @@ describe('BrowserSession target-bound screenshots', () => {
   it('discards pixels when the page id is rebound during capture', async () => {
     let targetId = 'target-a'
     const pageSession = {
+      DOM: {
+        getDocument: async () => ({
+          root: { nodeType: 9, nodeName: '#document' },
+        }),
+      },
+      Runtime: {
+        evaluate: async () => ({ result: { value: true } }),
+      },
       Page: {
         captureScreenshot: async () => {
           targetId = 'target-b'

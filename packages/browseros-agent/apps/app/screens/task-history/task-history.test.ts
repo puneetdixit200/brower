@@ -104,6 +104,64 @@ describe('task history helpers', () => {
     expect(tasks.map((item) => item.id)).toEqual(['safe'])
   })
 
+  test('omits tasks with credential-shaped artifact filenames', () => {
+    const tasks = flattenExecutionHistory({
+      history: {
+        conversationId: 'history',
+        updatedAt: 1,
+        tasks: [
+          task('safe', '2026-10-27T00:00:00.000Z'),
+          task('unsafe-step-artifact', '2026-10-26T00:00:00.000Z', {
+            steps: [
+              {
+                id: 'download',
+                toolName: 'download',
+                order: 1,
+                state: 'output-available',
+                startedAt: '2026-10-26T00:00:00.000Z',
+                previewText: 'Downloaded file',
+                artifact: {
+                  filename: 'Bearer abcdefghijklmnopqrstuvwxyz0123456789',
+                  sizeBytes: 10,
+                  sha256: 'b'.repeat(64),
+                },
+              },
+            ],
+          }),
+        ],
+      },
+    })
+
+    expect(tasks.map((item) => item.id)).toEqual(['safe'])
+  })
+
+  test('omits artifacts with credential-shaped or path-like filenames', () => {
+    const descriptor = {
+      artifactId: '00000000-0000-4000-8000-000000000001',
+      filename: 'report.csv',
+      sizeBytes: 8,
+      sha256: 'a'.repeat(64),
+    }
+    const tasks = flattenExecutionHistory({
+      history: {
+        conversationId: 'history',
+        updatedAt: 1,
+        tasks: [
+          task('safe-artifact', '2026-10-27T00:00:00.000Z', {
+            artifacts: [descriptor],
+          }),
+          task('credential-filename', '2026-10-26T00:00:00.000Z', {
+            artifacts: [{ ...descriptor, filename: 'api_key=fixture.txt' }],
+          }),
+          task('path-filename', '2026-10-25T00:00:00.000Z', {
+            artifacts: [{ ...descriptor, filename: '../outside.txt' }],
+          }),
+        ],
+      },
+    })
+    expect(tasks.map((item) => item.id)).toEqual(['safe-artifact'])
+  })
+
   test('uses only the bounded response preview', () => {
     expect(
       getTaskResult(

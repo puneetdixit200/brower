@@ -49,11 +49,13 @@ function createTestApp(
   })
 }
 
-const localServer = {
-  server: {
-    requestIP: () => ({ address: '127.0.0.1' }),
-  },
-} as never
+const serverWithPeer = (address: string) =>
+  ({
+    server: {
+      requestIP: () => ({ address }),
+    },
+  }) as never
+const localServer = serverWithPeer('127.0.0.1')
 
 describe('createApiRoutes', () => {
   it('requires a trusted app origin for action policy reads and writes', async () => {
@@ -155,7 +157,9 @@ describe('createApiRoutes', () => {
       '/system/shutdown',
       {
         method: 'POST',
+        headers: { Host: 'localhost' },
       },
+      localServer,
     )
 
     expect(response.status).toBe(200)
@@ -172,7 +176,9 @@ describe('createApiRoutes', () => {
       '/shutdown',
       {
         method: 'POST',
+        headers: { Host: '127.0.0.1' },
       },
+      localServer,
     )
 
     expect(response.status).toBe(200)
@@ -181,6 +187,80 @@ describe('createApiRoutes', () => {
     await new Promise<void>((resolve) => setImmediate(resolve))
 
     expect(onShutdown).toHaveBeenCalledTimes(1)
+  })
+
+  it('blocks shutdown from non-loopback peers, forged hosts, and attacker origins on both routes', async () => {
+    const paths = ['/system/shutdown', '/shutdown']
+    for (const path of paths) {
+      const onShutdown = mock(() => {})
+      const app = createTestApp(undefined, onShutdown)
+      const denied = [
+        {
+          headers: { Host: 'localhost' },
+          server: serverWithPeer('192.0.2.10'),
+        },
+        {
+          headers: { Host: 'localhost.attacker.example' },
+          server: localServer,
+        },
+        {
+          headers: { Host: 'localhost:bogus' },
+          server: localServer,
+        },
+        {
+          headers: { Host: '127.0.0.1', Origin: 'https://attacker.example' },
+          server: localServer,
+        },
+      ]
+      for (const request of denied) {
+        const response = await app.request(
+          path,
+          { method: 'POST', headers: request.headers },
+          request.server,
+        )
+        expect(response.status).toBe(403)
+      }
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(onShutdown).not.toHaveBeenCalled()
+    }
+  })
+
+  it('accepts valid loopback ports and rejects invalid port authorities on both routes', async () => {
+    for (const path of ['/system/shutdown', '/shutdown']) {
+      const acceptedShutdown = mock(() => {})
+      const acceptedApp = createTestApp(undefined, acceptedShutdown)
+      for (const host of [
+        'localhost:1',
+        '127.0.0.1:32123',
+        'localhost:65535',
+      ]) {
+        const response = await acceptedApp.request(
+          path,
+          { method: 'POST', headers: { Host: host } },
+          localServer,
+        )
+        expect(response.status).toBe(200)
+      }
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(acceptedShutdown).toHaveBeenCalledTimes(3)
+
+      const rejectedShutdown = mock(() => {})
+      const rejectedApp = createTestApp(undefined, rejectedShutdown)
+      for (const host of [
+        'localhost:0',
+        '127.0.0.1:65536',
+        'localhost:123456',
+      ]) {
+        const response = await rejectedApp.request(
+          path,
+          { method: 'POST', headers: { Host: host } },
+          localServer,
+        )
+        expect(response.status).toBe(403)
+      }
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(rejectedShutdown).not.toHaveBeenCalled()
+    }
   })
 
   it('preserves the OAuth unavailable fallback', async () => {

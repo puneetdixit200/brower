@@ -16,7 +16,7 @@ import signal
 import subprocess
 import tempfile
 import time
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
 
 
@@ -40,6 +40,124 @@ def start(binary: Path, profile: Path, ozone: str) -> subprocess.Popen:
         args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         start_new_session=True,
     )
+
+
+def parse_command(line: str) -> list[str]:
+    """Split one command line; input is never evaluated as Python or shell."""
+    try:
+        return shlex.split(line)
+    except ValueError as error:
+        raise ValueError("Invalid command") from error
+
+
+def validate_command(words: list[str]) -> tuple[str, list[str]]:
+    """Validate an operation before it can reach the local DevTools socket."""
+    if not words:
+        return "", []
+    command, *params = words
+    if command in ("exit", "quit") and not params:
+        return "quit", []
+    if command == "tabs" and not params:
+        return command, params
+    if command == "open" and len(params) == 1:
+        value = params[0]
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme != "https"
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or len(value) > 2048
+            or any(ord(char) < 0x20 for char in value)
+        ):
+            raise ValueError("Only bounded HTTPS URLs are permitted")
+        return command, params
+    if command in ("activate", "close") and len(params) == 1:
+        if not re.fullmatch(r"[a-zA-Z0-9_-]{1,256}", params[0]):
+            raise ValueError("Invalid target ID")
+        return command, params
+    raise ValueError("Use tabs, open <https-url>, activate <id>, close <id> or quit")
+
+
+def dispatch_command(port: int, words: list[str], emit=print) -> bool:
+    """Dispatch one safe command; return False when the session should end."""
+    if not words:
+        return True
+    try:
+        command, params = validate_command(words)
+        if command == "quit":
+            return False
+        if command == "tabs":
+            items = request(port, "/json/list")
+            emit(json.dumps([
+                {"id": item.get("id"), "type": item.get("type"),
+                 "title": str(item.get("title", ""))[:120]}
+                for item in items[:100]
+            ], indent=2))
+        elif command == "open":
+            path = "/json/new?" + quote(params[0], safe="")
+            emit(request(port, path, method="PUT")[:500])
+        else:
+            action = "activate/" if command == "activate" else "close/"
+            emit(request(port, "/json/" + action + params[0])[:500])
+    except (ValueError, OSError) as error:
+        emit(f"Action rejected or unavailable: {error}")
+    return True
+
+
+def _process_group_exists(process_group_id: int) -> bool:
+    try:
+        os.killpg(process_group_id, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # The group exists even if this process cannot signal it.
+        return True
+
+
+def stop(process: subprocess.Popen, timeout: float = 8) -> None:
+    """Stop and reap the owned process group, including orphaned children."""
+    process_group_id = process.pid
+    try:
+        os.killpg(process_group_id, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+
+    deadline = time.monotonic() + timeout
+    while _process_group_exists(process_group_id) and time.monotonic() < deadline:
+        # poll() reaps an exited leader but does not imply its process group is gone.
+        process.poll()
+        time.sleep(min(0.05, max(0, deadline - time.monotonic())))
+
+    if _process_group_exists(process_group_id):
+        try:
+            os.killpg(process_group_id, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    process.wait()
+
+
+def run_repl(binary: Path, ozone: str, input_fn=input, emit=print) -> None:
+    with tempfile.TemporaryDirectory(prefix="aster-repl-dev-") as root:
+        profile = Path(root) / "profile"
+        profile.mkdir(mode=0o700)
+        process = start(binary, profile, ozone)
+        try:
+            port = locate_port(profile, process)
+            emit("Aster disposable-profile REPL. Commands: tabs, open <https-url>, activate <id>, close <id>, quit.")
+            while process.poll() is None:
+                try:
+                    words = parse_command(input_fn("aster-dev> ").strip())
+                except (EOFError, KeyboardInterrupt):
+                    break
+                except ValueError:
+                    emit("Invalid command")
+                    continue
+                if not dispatch_command(port, words, emit):
+                    break
+        finally:
+            stop(process)
 
 
 def locate_port(profile: Path, process: subprocess.Popen) -> int:
@@ -66,55 +184,7 @@ def main() -> int:
     binary = args.binary.expanduser().resolve(strict=True)
     if not binary.is_file() or not os.access(binary, os.X_OK):
         parser.error("Must provide an executable Aster development binary")
-    with tempfile.TemporaryDirectory(prefix="aster-repl-dev-") as root:
-        profile = Path(root) / "profile"
-        profile.mkdir(mode=0o700)
-        process = start(binary, profile, args.ozone)
-        try:
-            port = locate_port(profile, process)
-            print("Aster disposable-profile REPL. Commands: tabs, open <https-url>, activate <id>, close <id>, quit.")
-            while process.poll() is None:
-                try:
-                    words = shlex.split(input("aster-dev> ").strip())
-                except (EOFError, KeyboardInterrupt):
-                    break
-                except ValueError:
-                    print("Invalid command")
-                    continue
-                if not words:
-                    continue
-                cmd, *params = words
-                if cmd in ("exit", "quit") and not params:
-                    break
-                try:
-                    if cmd == "tabs" and not params:
-                        items = request(port, "/json/list")
-                        print(json.dumps([
-                            {"id": item.get("id"), "type": item.get("type"),
-                             "title": str(item.get("title", ""))[:120]}
-                            for item in items[:100]
-                        ], indent=2))
-                    elif cmd == "open" and len(params) == 1:
-                        if not params[0].startswith("https://") or len(params[0]) > 2048:
-                            raise ValueError("Only bounded HTTPS URLs are permitted")
-                        print(request(port, "/json/new?" + quote(params[0], safe=""), method="PUT")[:500])
-                    elif cmd in ("activate", "close") and len(params) == 1:
-                        if not re.fullmatch(r"[a-zA-Z0-9_-]{1,256}", params[0]):
-                            raise ValueError("Invalid target ID")
-                        path = "/json/" + ("activate/" if cmd == "activate" else "close/") + params[0]
-                        print(request(port, path)[:500])
-                    else:
-                        print("Use tabs, open <https-url>, activate <id>, close <id> or quit")
-                except (ValueError, OSError) as error:
-                    print(f"Action rejected or unavailable: {error}")
-        finally:
-            if process.poll() is None:
-                os.killpg(process.pid, signal.SIGTERM)
-                try:
-                    process.wait(timeout=8)
-                except subprocess.TimeoutExpired:
-                    os.killpg(process.pid, signal.SIGKILL)
-                    process.wait()
+    run_repl(binary, args.ozone)
     return 0
 
 

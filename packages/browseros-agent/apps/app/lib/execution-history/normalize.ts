@@ -1,5 +1,6 @@
 import type { DynamicToolUIPart, ToolUIPart, UIMessage } from 'ai'
 import type {
+  ExecutionArtifactDescriptor,
   ExecutionStepApproval,
   ExecutionStepRecord,
   ExecutionStepState,
@@ -79,6 +80,41 @@ function getApproval(part: ToolLikePart): ExecutionStepApproval | undefined {
     : undefined
 }
 
+function getDownloadArtifact(
+  part: ToolLikePart,
+): ExecutionArtifactDescriptor | undefined {
+  if (getToolName(part) !== 'download' || part.state !== 'output-available')
+    return
+  const output = 'output' in part ? part.output : undefined
+  if (!output || typeof output !== 'object') return
+  const candidate = (output as { artifact?: unknown }).artifact
+  if (!candidate || typeof candidate !== 'object') return
+  const value = candidate as Record<string, unknown>
+  const filename = value.filename
+  const artifactId = value.artifactId
+  const sizeBytes = value.sizeBytes
+  const sha256 = value.sha256
+  if (
+    typeof filename !== 'string' ||
+    !filename.trim() ||
+    filename === '.' ||
+    filename === '..' ||
+    /[\\/\0]/.test(filename) ||
+    typeof artifactId !== 'string' ||
+    !/^[a-f0-9-]{36}$/i.test(artifactId) ||
+    /\b(password|passwd|api[_ -]?key|secret[_ -]?key|access[_ -]?token)\s*[:=]/i.test(
+      filename,
+    ) ||
+    typeof sizeBytes !== 'number' ||
+    !Number.isSafeInteger(sizeBytes) ||
+    sizeBytes < 0 ||
+    typeof sha256 !== 'string' ||
+    !/^[a-f0-9]{64}$/i.test(sha256)
+  )
+    return
+  return { artifactId, filename, sizeBytes, sha256: sha256.toLowerCase() }
+}
+
 function getCompletedAt(
   existingStep: ExecutionStepRecord | undefined,
   state: ExecutionStepState,
@@ -109,6 +145,7 @@ function createStepRecord(
     completedAt: getCompletedAt(existingStep, state, nowIso),
     errorText: 'errorText' in part ? part.errorText : undefined,
     previewText: getPreviewText(part),
+    artifact: getDownloadArtifact(part),
     approval: getApproval(part),
   }
 }
@@ -147,9 +184,14 @@ export function normalizeExecutionSteps(args: {
       })
     : []
 
+  const artifacts = steps.flatMap((step) =>
+    step.artifact ? [step.artifact] : [],
+  )
+
   return {
     assistantMessageId: assistantMessage?.id,
     steps,
+    artifacts,
     actionCount: steps.length,
     approvalCount: steps.filter((step) => step.approval).length,
     deniedCount: steps.filter((step) => step.state === 'output-denied').length,

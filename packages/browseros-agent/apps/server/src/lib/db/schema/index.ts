@@ -6,6 +6,7 @@
 
 export * from './action-policy'
 export * from './conversation-run-state'
+export * from './conversation-run-trace-events'
 export * from './conversations'
 export * from './memories'
 export * from './oauth'

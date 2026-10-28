@@ -19,6 +19,7 @@ import {
   type UIMessage,
   wrapLanguageModel,
 } from 'ai'
+import { z } from 'zod'
 import { logger } from '../lib/logger'
 import { metrics } from '../lib/metrics'
 import { buildFilesystemToolSet } from '../tools/filesystem/build-toolset'
@@ -29,7 +30,10 @@ import {
 } from '../tools/filesystem/safe-file'
 import { decideActionPolicy } from './action-policy'
 import { createCompactionPrepareStep, type StepWithUsage } from './compaction'
-import { excludeCredentialAccessTools } from './credential-tool-filter'
+import {
+  buildAgentToolCatalog,
+  excludeRawPageCodeTools,
+} from './credential-tool-filter'
 import {
   buildInternalBrowserMcpSpec,
   buildMcpServerSpecs,
@@ -47,11 +51,18 @@ import {
   serializesReasoningContent,
 } from './provider-factory'
 import { buildAgentReasoningConfig } from './reasoning-config'
+import {
+  AgentToolCallEnvelopeSchema,
+  AgentToolResultEnvelopeSchema,
+} from './task-contract'
 import type { ResolvedAgentConfig } from './types'
 
 // Approval signatures are process-scoped. A restart invalidates an unresolved
 // approval, so recovered tasks cannot execute an action approved by stale UI.
 const TOOL_APPROVAL_SECRET = randomBytes(32)
+export interface AgentToolCallOptions {
+  taskId: string
+}
 
 /** The server-side approval check shared by production agents and fixture tests. */
 export async function handleToolApproval({
@@ -153,6 +164,97 @@ function summarizeToolResultError(
   }
 }
 
+const AgentToolRunContextSchema = z
+  .object({ taskId: z.string().uuid() })
+  .strict()
+
+function buildAgentToolRunContexts(
+  tools: ToolSet,
+  taskId: string,
+): Record<string, { taskId: string }> {
+  return Object.fromEntries(
+    Object.entries(tools)
+      .filter(([, tool]) => tool.contextSchema !== undefined)
+      .map(([toolName]) => [toolName, { taskId }]),
+  )
+}
+
+/** Add a per-call task identity to each tool's execution context and validate
+ * the versioned transport envelope at the actual dispatch/result boundary. */
+function addToolEnvelopeBoundary(tools: ToolSet): ToolSet {
+  const wrapped: ToolSet = {}
+  for (const [toolName, tool] of Object.entries(tools)) {
+    if (!tool.execute) {
+      wrapped[toolName] = tool
+      continue
+    }
+    // No current production tool has its own execution context. Refuse to
+    // replace one silently: doing so would change the tool's dispatch inputs.
+    if (tool.contextSchema !== undefined) {
+      throw new Error(`Tool ${toolName} already defines an execution context`)
+    }
+    const execute = tool.execute
+    wrapped[toolName] = {
+      ...tool,
+      contextSchema: AgentToolRunContextSchema,
+      execute: async (input, options) => {
+        const context = AgentToolRunContextSchema.parse(options.context)
+        const callId = crypto.randomUUID()
+        const call = AgentToolCallEnvelopeSchema.parse({
+          version: 1,
+          taskId: context.taskId,
+          // Provider call IDs are deliberately not copied into this envelope.
+          toolCallId: callId,
+          toolName,
+          input,
+        })
+        let output: unknown
+        try {
+          // The envelope is validated here but its payload remains byte-for-
+          // byte/identity equivalent to the input the tool normally receives.
+          output = await execute(call.input, {
+            ...options,
+            context: undefined,
+          })
+        } catch (error) {
+          AgentToolResultEnvelopeSchema.parse({
+            version: 1,
+            taskId: call.taskId,
+            toolCallId: call.toolCallId,
+            toolName: call.toolName,
+            ok: false,
+            errorCode: 'tool_execution_error',
+          })
+          throw error
+        }
+        const isError = toolResultIsError(output)
+        const result = AgentToolResultEnvelopeSchema.parse(
+          isError
+            ? {
+                version: 1,
+                taskId: call.taskId,
+                toolCallId: call.toolCallId,
+                toolName: call.toolName,
+                ok: false,
+                errorCode: 'tool_execution_error',
+              }
+            : {
+                version: 1,
+                taskId: call.taskId,
+                toolCallId: call.toolCallId,
+                toolName: call.toolName,
+                ok: true,
+                output,
+              },
+        )
+        // The provider sees exactly the original tool result, not the envelope.
+        return isError ? output : result.output
+      },
+    }
+  }
+  return wrapped
+}
+
 /** Builds filesystem tools for model-backed sessions, with scoped readback outside full workspace mode. */
 export function buildAgentFilesystemToolSet(
   resolvedConfig: ResolvedAgentConfig,
@@ -178,7 +280,7 @@ export function buildAgentFilesystemToolSet(
 
 export class AiSdkAgent {
   private constructor(
-    private _agent: ToolLoopAgent,
+    private _agent: ToolLoopAgent<AgentToolCallOptions, ToolSet>,
     private _messages: UIMessage[],
     private _mcpClients: Array<{ close(): Promise<void> }>,
     private conversationId: string,
@@ -189,6 +291,11 @@ export class AiSdkAgent {
   /** Tool names registered on this agent — used to sanitize messages during session rebuilds. */
   get toolNames(): Set<string> {
     return this._toolNames
+  }
+
+  /** Build contexts per invocation; run identity is never retained on the cached agent. */
+  getToolRunContexts(taskId: string): Record<string, { taskId: string }> {
+    return buildAgentToolRunContexts(this._agent.tools, taskId)
   }
 
   static async create(config: AiSdkAgentConfig): Promise<AiSdkAgent> {
@@ -240,6 +347,7 @@ export class AiSdkAgent {
       })
       const internalMcp = await createMcpClients([internalSpec])
       connectedMcpClients.push(...internalMcp.clients)
+      const restrictedInternalMcp = excludeRawPageCodeTools(internalMcp.tools)
       const reservedInternalToolNames = new Set(Object.keys(internalMcp.tools))
 
       // Arbitrary custom MCP servers do not provide a server-enforced
@@ -342,17 +450,20 @@ export class AiSdkAgent {
           ? (workspaceRoot?.path ?? config.resolvedConfig.workingDir)
           : undefined
       const candidateTools = {
-        ...internalMcp.tools,
+        ...restrictedInternalMcp.allowed,
         ...externalMcpTools,
         ...filesystemTools,
         ...buildNudgeToolSet(),
       }
-      const filtered = excludeCredentialAccessTools(candidateTools)
-      const tools = filtered.allowed
-      if (filtered.blocked.length > 0) {
-        logger.warn('Credential-access MCP tools excluded from agent', {
-          count: filtered.blocked.length,
-          toolNames: filtered.blocked,
+      const filtered = buildAgentToolCatalog(candidateTools)
+      const tools = addToolEnvelopeBoundary(filtered.tools)
+      const blockedToolNames = [
+        ...new Set([...restrictedInternalMcp.blocked, ...filtered.blocked]),
+      ]
+      if (blockedToolNames.length > 0) {
+        logger.warn('Restricted tools excluded from agent catalog', {
+          count: blockedToolNames.length,
+          toolNames: blockedToolNames,
         })
       }
 
@@ -415,7 +526,7 @@ export class AiSdkAgent {
         return compactionPrepareStep({ ...options, messages })
       }
 
-      const agent = new ToolLoopAgent({
+      const agent = new ToolLoopAgent<AgentToolCallOptions, ToolSet>({
         model,
         instructions,
         tools,
@@ -423,6 +534,10 @@ export class AiSdkAgent {
         experimental_toolApprovalSecret: TOOL_APPROVAL_SECRET,
         stopWhen: [stepCountIs(AGENT_LIMITS.MAX_TURNS)],
         prepareStep,
+        prepareCall: ({ options, ...call }) => ({
+          ...call,
+          toolsContext: buildAgentToolRunContexts(tools, options.taskId),
+        }),
         ...buildAgentReasoningConfig(config.resolvedConfig),
       })
 
@@ -455,7 +570,7 @@ export class AiSdkAgent {
     }
   }
 
-  get toolLoopAgent(): ToolLoopAgent {
+  get toolLoopAgent(): ToolLoopAgent<AgentToolCallOptions, ToolSet> {
     return this._agent
   }
 

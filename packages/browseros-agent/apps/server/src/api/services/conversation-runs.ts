@@ -9,6 +9,15 @@ import type {
   ConversationRunStatus,
 } from '@browseros/shared/schemas/conversation-panels'
 import type { UIMessage, UIMessageChunk } from 'ai'
+import {
+  type AgentTaskStatus,
+  type AgentTaskTraceEvent,
+  AgentTaskTraceEventSchema,
+  createAgentTaskTraceEvent,
+  type NewAgentTaskTraceEvent,
+  safeAgentTraceToolName,
+  transitionAgentTask,
+} from '../../agent/task-contract'
 import type { ConversationRunLifecycleStore } from '../../lib/conversations/conversation-run-lifecycle-store'
 
 export type { ConversationRunStatus } from '@browseros/shared/schemas/conversation-panels'
@@ -24,6 +33,10 @@ export interface ConversationRunSnapshot {
   chunkCount: number
   startedAt?: number
   finishedAt?: number | null
+  /** Redacted lifecycle metadata; tool arguments/results are omitted. */
+  traceEvents?: AgentTaskTraceEvent[]
+  /** True when trace storage failed; execution and tool results remain usable. */
+  tracePersistenceDegraded?: true
 }
 
 export interface ConversationTabGroupPresentation {
@@ -94,6 +107,11 @@ interface ConversationRunRecord {
   resolvePrepared: () => void
   finished: Promise<void>
   resolveFinished: () => void
+  taskStatus: AgentTaskStatus
+  traceEvents: AgentTaskTraceEvent[]
+  tracePersistenceDegraded: boolean
+  toolTraceIds: Map<string, { traceId: string; toolName: string }>
+  approvalToolCalls: Map<string, string>
 }
 
 interface PanelAssignmentsSubscriber {
@@ -140,6 +158,10 @@ export class ConversationRunNotFoundError extends Error {
  */
 export class ConversationRuns {
   private readonly runs = new Map<string, ConversationRunRecord>()
+  private readonly recoveredInterruptionEvents = new Map<
+    string,
+    AgentTaskTraceEvent
+  >()
   private readonly panelByTab = new Map<number, ConversationRunRecord>()
   private readonly autoOpenByTab = new Map<number, string>()
   private readonly panelSubscribers = new Set<PanelAssignmentsSubscriber>()
@@ -194,6 +216,11 @@ export class ConversationRuns {
       resolvePrepared,
       finished,
       resolveFinished,
+      taskStatus: 'queued',
+      traceEvents: [],
+      tracePersistenceDegraded: false,
+      toolTraceIds: new Map(),
+      approvalToolCalls: new Map(),
     }
 
     // Install before any provider/MCP preparation awaits. This both rejects a
@@ -209,6 +236,8 @@ export class ConversationRuns {
       this.runs.delete(input.conversationId)
       throw error
     }
+    record.taskStatus = transitionAgentTask(record.taskStatus, 'running')
+    this.appendTraceEvent(record, { kind: 'task_started' })
     this.deps.activity?.beginChatStream()
     record.activityStarted = true
     this.attachInitialPanels(record, input.panelTabIds ?? [])
@@ -366,20 +395,115 @@ export class ConversationRuns {
       if (!record) {
         const durable = this.deps.lifecycleStore?.get(conversationId)
         if (!durable) return undefined
-        return {
-          conversationId: durable.conversationId,
-          runId: durable.runId,
-          status: durable.status === 'running' ? 'interrupted' : durable.status,
-          chunkCount: 0,
-          startedAt: durable.startedAt,
-          finishedAt: durable.finishedAt,
-        }
+        return this.durableSnapshot(durable)
       }
       await record.prepared
       if (this.runs.get(conversationId) === record) {
         return this.snapshot(record)
       }
     }
+  }
+
+  private durableSnapshot(
+    durable: NonNullable<ReturnType<ConversationRunLifecycleStore['get']>>,
+  ): ConversationRunSnapshot {
+    const status = durable.status === 'running' ? 'interrupted' : durable.status
+    const recoveryAt = durable.finishedAt ?? Date.now()
+    const persisted = this.readDurableTraceEvents(durable)
+    let tracePersistenceDegraded =
+      durable.tracePersistenceDegraded || persisted.degraded
+    const traceEvents = persisted.events
+    const interruptionRecovery =
+      status === 'interrupted'
+        ? this.recoverInterruptionEvent(durable, recoveryAt)
+        : undefined
+    const interruptionEvent = interruptionRecovery?.event
+
+    tracePersistenceDegraded ||= interruptionRecovery?.degraded === true
+    if (
+      interruptionEvent &&
+      !traceEvents.some((event) => event.eventId === interruptionEvent.eventId)
+    ) {
+      traceEvents.push(interruptionEvent)
+    }
+
+    return {
+      conversationId: durable.conversationId,
+      runId: durable.runId,
+      status,
+      chunkCount: 0,
+      startedAt: durable.startedAt,
+      finishedAt:
+        durable.finishedAt ??
+        (status === 'interrupted'
+          ? (interruptionEvent?.at ?? recoveryAt)
+          : null),
+      traceEvents,
+      ...(tracePersistenceDegraded && {
+        tracePersistenceDegraded: true as const,
+      }),
+    }
+  }
+
+  private readDurableTraceEvents(
+    durable: NonNullable<ReturnType<ConversationRunLifecycleStore['get']>>,
+  ): { events: AgentTaskTraceEvent[]; degraded: boolean } {
+    try {
+      const events =
+        this.deps.lifecycleStore?.getTraceEvents(
+          durable.conversationId,
+          durable.runId,
+        ) ?? []
+      return {
+        events: events.map((event) => {
+          const validated = AgentTaskTraceEventSchema.parse(event)
+          if (validated.taskId !== durable.runId) {
+            throw new Error(
+              'Stored conversation run trace event scope is invalid',
+            )
+          }
+          return validated
+        }),
+        degraded: false,
+      }
+    } catch {
+      return { events: [], degraded: true }
+    }
+  }
+
+  private recoverInterruptionEvent(
+    durable: NonNullable<ReturnType<ConversationRunLifecycleStore['get']>>,
+    recoveryAt: number,
+  ): { event: AgentTaskTraceEvent; degraded: boolean } {
+    try {
+      if (durable.status === 'running') {
+        this.deps.lifecycleStore?.finish(
+          durable.conversationId,
+          durable.runId,
+          'interrupted',
+          recoveryAt,
+        )
+      }
+      const persisted = this.deps.lifecycleStore?.ensureInterruptionTraceEvent(
+        durable.conversationId,
+        durable.runId,
+        recoveryAt,
+      )
+      if (persisted) return { event: persisted, degraded: false }
+    } catch {
+      // Recovery continues with a stable in-memory event if persistence fails.
+    }
+
+    const key = `${durable.conversationId}:${durable.runId}`
+    let event = this.recoveredInterruptionEvents.get(key)
+    if (!event) {
+      event = createAgentTaskTraceEvent(
+        { kind: 'task_interrupted' },
+        { taskId: durable.runId, at: recoveryAt },
+      )
+      this.recoveredInterruptionEvents.set(key, event)
+    }
+    return { event, degraded: true }
   }
 
   private snapshot(record: ConversationRunRecord): ConversationRunSnapshot {
@@ -391,6 +515,10 @@ export class ConversationRuns {
       chunkCount: record.chunks.length,
       startedAt: record.startedAt,
       finishedAt: record.finishedAt,
+      traceEvents: [...record.traceEvents],
+      ...(record.tracePersistenceDegraded && {
+        tracePersistenceDegraded: true as const,
+      }),
     }
   }
 
@@ -400,7 +528,14 @@ export class ConversationRuns {
     messages: UIMessage[],
   ): boolean {
     const record = this.runs.get(conversationId)
-    if (!record || record.runId !== runId) return false
+    if (
+      !record ||
+      record.runId !== runId ||
+      record.status !== 'running' ||
+      record.abortController.signal.aborted
+    ) {
+      return false
+    }
     record.messages = [...messages]
     return true
   }
@@ -511,6 +646,7 @@ export class ConversationRuns {
         const { done, value } = await reader.read()
         if (done) break
         if (value.type === 'error') record.sawErrorChunk = true
+        this.recordTraceChunk(record, value)
         record.chunks.push(value)
         for (const subscriber of [...record.subscribers]) {
           try {
@@ -546,6 +682,7 @@ export class ConversationRuns {
     record.ended = true
     record.status = status
     record.finishedAt = Date.now()
+    this.finishTaskTrace(record, status)
     // Setup failures have no stream-return point, but panel hydration must still
     // resolve to the visible failed/aborted state instead of hanging forever.
     this.markPrepared(record)
@@ -575,6 +712,172 @@ export class ConversationRuns {
         record.resolveFinished()
       }
     }
+  }
+
+  private appendTraceEvent(
+    record: ConversationRunRecord,
+    event: NewAgentTaskTraceEvent,
+  ): void {
+    const validated = createAgentTaskTraceEvent(
+      { ...event },
+      { taskId: record.runId },
+    )
+    record.traceEvents.push(validated)
+    try {
+      this.deps.lifecycleStore?.appendTraceEvent(
+        record.conversationId,
+        record.runId,
+        validated,
+      )
+    } catch {
+      // Trace durability is best effort; expose degradation in the safe
+      // snapshot without changing tool execution or run completion.
+      record.tracePersistenceDegraded = true
+      try {
+        this.deps.lifecycleStore?.markTracePersistenceDegraded(
+          record.conversationId,
+          record.runId,
+        )
+      } catch {
+        // Keep the in-memory marker when the durability marker cannot be saved.
+      }
+    }
+  }
+
+  private recordTraceChunk(
+    record: ConversationRunRecord,
+    chunk: UIMessageChunk,
+  ): void {
+    if (record.status !== 'running' || record.abortController.signal.aborted)
+      return
+    const part = chunk as unknown as Record<string, unknown>
+    if (typeof part.type !== 'string') return
+
+    if (
+      part.type === 'tool-input-start' &&
+      typeof part.toolCallId === 'string' &&
+      typeof part.toolName === 'string'
+    ) {
+      const traceId = crypto.randomUUID()
+      const toolName = safeAgentTraceToolName(part.toolName)
+      record.toolTraceIds.set(part.toolCallId, { traceId, toolName })
+      this.appendTraceEvent(record, {
+        kind: 'tool_started',
+        toolCallId: traceId,
+        toolName,
+      })
+      return
+    }
+
+    if (
+      part.type === 'tool-approval-request' &&
+      typeof part.approvalId === 'string' &&
+      typeof part.toolCallId === 'string'
+    ) {
+      const call = record.toolTraceIds.get(part.toolCallId)
+      if (!call) return
+      record.approvalToolCalls.set(part.approvalId, part.toolCallId)
+      if (record.taskStatus === 'running') {
+        record.taskStatus = transitionAgentTask(
+          record.taskStatus,
+          'waiting_approval',
+        )
+      }
+      this.appendTraceEvent(record, {
+        kind: 'approval_requested',
+        toolCallId: call.traceId,
+        toolName: call.toolName,
+      })
+      return
+    }
+
+    if (
+      part.type === 'tool-approval-response' &&
+      typeof part.approvalId === 'string' &&
+      typeof part.approved === 'boolean'
+    ) {
+      const rawCallId = record.approvalToolCalls.get(part.approvalId)
+      const call = rawCallId && record.toolTraceIds.get(rawCallId)
+      if (!call) return
+      record.approvalToolCalls.delete(part.approvalId)
+      if (record.taskStatus === 'waiting_approval') {
+        record.taskStatus = transitionAgentTask(record.taskStatus, 'running')
+      }
+      this.appendTraceEvent(record, {
+        kind: 'approval_resolved',
+        toolCallId: call.traceId,
+        toolName: call.toolName,
+        outcome: part.approved ? 'approved' : 'denied',
+      })
+      return
+    }
+
+    if (
+      (part.type === 'tool-output-available' ||
+        part.type === 'tool-output-error' ||
+        part.type === 'tool-output-denied' ||
+        part.type === 'tool-input-error') &&
+      typeof part.toolCallId === 'string'
+    ) {
+      const call = record.toolTraceIds.get(part.toolCallId)
+      if (!call) return
+      this.appendTraceEvent(record, {
+        kind: 'tool_finished',
+        toolCallId: call.traceId,
+        toolName: call.toolName,
+        outcome: part.type === 'tool-output-available' ? 'ok' : 'error',
+      })
+      record.toolTraceIds.delete(part.toolCallId)
+    }
+  }
+
+  private finishTaskTrace(
+    record: ConversationRunRecord,
+    status: Exclude<ConversationRunStatus, 'running'>,
+  ): void {
+    if (status === 'interrupted') {
+      if (
+        record.taskStatus === 'cancel_requested' ||
+        record.taskStatus === 'running' ||
+        record.taskStatus === 'waiting_approval'
+      ) {
+        record.taskStatus = transitionAgentTask(
+          record.taskStatus,
+          'interrupted',
+        )
+      }
+      this.appendTraceEvent(record, { kind: 'task_interrupted' })
+      return
+    }
+
+    if (status === 'aborted') {
+      if (
+        record.taskStatus === 'running' ||
+        record.taskStatus === 'waiting_approval'
+      ) {
+        record.taskStatus = transitionAgentTask(
+          record.taskStatus,
+          'cancel_requested',
+        )
+      }
+      if (record.taskStatus === 'cancel_requested') {
+        record.taskStatus = transitionAgentTask(record.taskStatus, 'aborted')
+      }
+    } else {
+      if (record.taskStatus === 'waiting_approval') {
+        record.taskStatus = transitionAgentTask(record.taskStatus, 'running')
+      }
+      record.taskStatus = transitionAgentTask(
+        record.taskStatus,
+        status === 'completed' ? 'completed' : 'failed',
+      )
+    }
+    this.appendTraceEvent(record, {
+      kind: 'task_finished',
+      outcome: status === 'completed' ? 'completed' : status,
+    })
+    record.toolTraceIds.clear()
+    record.approvalToolCalls.clear()
   }
 
   private markPrepared(record: ConversationRunRecord): void {

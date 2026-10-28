@@ -1,6 +1,8 @@
 import { ChevronDown, Folder, Layers, PlugZap } from 'lucide-react'
 import type { FC, FormEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
+import type { Provider } from '@/components/chat/chatComponentTypes'
+import { ProcessingDisclosure } from '@/components/chat/ProcessingDisclosure'
 import { AppSelector } from '@/components/elements/AppSelector'
 import { WorkspaceSelector } from '@/components/elements/workspace-selector'
 import { McpServerIcon } from '@/components/mcp/McpServerIcon'
@@ -29,6 +31,7 @@ export interface ChatFooterProps {
   status: 'streaming' | 'submitted' | 'ready' | 'error'
   onStop: () => void
   sendDisabled?: boolean
+  selectedProvider?: Provider | null
   attachedTabs: chrome.tabs.Tab[]
   onToggleTab: (tab: chrome.tabs.Tab) => void
   onRemoveTab: (tabId?: number) => void
@@ -45,6 +48,7 @@ export const ChatFooter: FC<ChatFooterProps> = ({
   status,
   onStop,
   sendDisabled,
+  selectedProvider = null,
   attachedTabs,
   onToggleTab,
   onRemoveTab,
@@ -134,6 +138,9 @@ export const ChatFooter: FC<ChatFooterProps> = ({
       )}
 
       <div className="p-3">
+        <div className="mb-3">
+          <ProcessingDisclosure provider={selectedProvider} compact />
+        </div>
         <div className="flex items-center gap-2">
           <ChatModeToggle mode={mode} onModeChange={onModeChange} />
 

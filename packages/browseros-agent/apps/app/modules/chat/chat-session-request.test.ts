@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'bun:test'
 import type { UIMessage } from 'ai'
 import { resolvePanelTabId } from '@/lib/browseros/panelTab'
+import { createBrowserOSAction } from '@/lib/chat-actions/types'
 import type { LlmProviderConfig } from '@/lib/llm-providers/types'
 import {
+  buildRequestBrowserContext,
   buildSidepanelPreparedSendMessagesRequest,
   getOwnerTabSelection,
   getToolApprovalResponse,
@@ -13,6 +15,65 @@ import type { SidepanelChatTarget } from './sidepanel-chat-targets'
 const conversationId = '00000000-0000-4000-8000-000000000001'
 
 describe('chat request preparation', () => {
+  it('omits active and selected tab URL/title metadata for human login continuation only', () => {
+    const activeTab = {
+      id: 10,
+      windowId: 2,
+      url: 'https://login.example/reset/SECRET_PATH?token=SECRET_QUERY',
+      title: 'SECRET_TITLE',
+    } as chrome.tabs.Tab
+    const selectedTab = {
+      id: 20,
+      url: 'https://verify.example/SECRET_SELECTED?otp=SECRET_OTP',
+      title: 'SECRET_SELECTED_TITLE',
+    } as chrome.tabs.Tab
+    const continuationAction = createBrowserOSAction({
+      mode: 'agent',
+      message: 'Inspect the current page.',
+      tabs: [selectedTab],
+      contextPrivacy: 'human-login-continuation',
+    })
+    const context = buildRequestBrowserContext({
+      activeTab,
+      action: continuationAction,
+      enabledMcpServers: [],
+      customMcpServers: [],
+    })
+    const serializedContext = JSON.stringify(context)
+
+    expect(context).toEqual({
+      windowId: 2,
+      activeTab: { id: 10 },
+      selectedTabs: [{ id: 20 }],
+    })
+    for (const secret of [
+      'SECRET_PATH',
+      'SECRET_QUERY',
+      'SECRET_TITLE',
+      'SECRET_SELECTED_TITLE',
+      'SECRET_OTP',
+    ]) {
+      expect(serializedContext).not.toContain(secret)
+    }
+
+    const ordinaryContext = buildRequestBrowserContext({
+      activeTab,
+      action: { ...continuationAction, contextPrivacy: undefined },
+      enabledMcpServers: [],
+      customMcpServers: [],
+    })
+    expect(ordinaryContext?.activeTab).toEqual({
+      id: 10,
+      url: activeTab.url,
+      title: activeTab.title,
+    })
+    expect(ordinaryContext?.selectedTabs?.[0]).toEqual({
+      id: 20,
+      url: selectedTab.url,
+      title: selectedTab.title,
+    })
+  })
+
   it('submits only the owning tab selection and its captured URL metadata', async () => {
     const ownerTabId = await resolvePanelTabId(
       'chrome-extension://assistant/sidepanel.html?tabId=10#/chat',

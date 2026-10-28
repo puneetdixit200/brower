@@ -21,6 +21,10 @@ import { ChatMessageActions } from './ChatMessageActions'
 import { ConnectAppCard } from './ConnectAppCard'
 import { getMessageSegments } from './getMessageSegments'
 import { JtbdPopup } from './JtbdPopup'
+import {
+  getResearchSourceLedger,
+  RESEARCH_LEDGER_LIMITATION,
+} from './research-source-ledger'
 import { ScheduleSuggestionCard } from './ScheduleSuggestionCard'
 import { ToolBatch } from './ToolBatch'
 import { UserActionMessage } from './UserActionMessage'
@@ -55,6 +59,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   onDismissJtbdPopup,
 }) => {
   const isStreaming = status === 'streaming' || status === 'submitted'
+  const researchLedger = getResearchSourceLedger(messages, isStreaming)
 
   return (
     <>
@@ -138,6 +143,64 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
                             return null
                         }
                       })
+                    )}
+                    {researchLedger?.answerMessageId === message.id && (
+                      <aside
+                        aria-label="Source URL checks"
+                        className="mt-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs"
+                      >
+                        <h3 className="font-medium">Source URL checks</h3>
+                        <p className="mt-1 text-muted-foreground">
+                          {RESEARCH_LEDGER_LIMITATION}
+                        </p>
+                        {researchLedger.entries.length > 0 ? (
+                          <ul className="mt-2 space-y-1">
+                            {researchLedger.entries.map((entry) => (
+                              <li
+                                className="break-all"
+                                key={`${entry.status}:${entry.url}`}
+                              >
+                                <span className="font-medium">
+                                  {entry.status}
+                                </span>
+                                {entry.observedBy.length > 0 && (
+                                  <span className="text-muted-foreground">
+                                    {' '}
+                                    · observed via {entry.observedBy.join(', ')}
+                                  </span>
+                                )}
+                                <span className="text-muted-foreground">
+                                  {' '}
+                                  ·{' '}
+                                </span>
+                                <span>{entry.displayUrl}</span>
+                                {entry.quoteChecks.map((check) => (
+                                  <p
+                                    className="mt-1 text-muted-foreground"
+                                    key={`${entry.url}:quote:${check.sourceOffset}`}
+                                  >
+                                    <span className="font-medium">
+                                      Exact quote text{' '}
+                                      {check.found ? 'found' : 'not found'}
+                                    </span>{' '}
+                                    in a successful read from this URL: “
+                                    {check.quote}”
+                                  </p>
+                                ))}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="mt-2 text-muted-foreground">
+                            No HTTPS citation URLs or attached seed URLs were
+                            found in this research answer.
+                          </p>
+                        )}
+                        <p className="mt-2 text-muted-foreground">
+                          Exact text presence does not prove a quote supports
+                          its claim or that the claim is true.
+                        </p>
+                      </aside>
                     )}
                   </MessageContent>
                 </Message>

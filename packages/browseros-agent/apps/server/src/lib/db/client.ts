@@ -173,6 +173,18 @@ function bootstrapCurrentSchema(sqlite: BunDatabase): void {
     if (!memoryColumns.some((column) => column.name === 'source_title')) {
       sqlite.exec('ALTER TABLE memories ADD COLUMN source_title text')
     }
+    const conversationRunColumns = sqlite
+      .query<{ name: string }, []>('PRAGMA table_info(conversation_run_state)')
+      .all()
+    if (
+      !conversationRunColumns.some(
+        (column) => column.name === 'trace_persistence_degraded',
+      )
+    ) {
+      sqlite.exec(
+        'ALTER TABLE conversation_run_state ADD COLUMN trace_persistence_degraded integer NOT NULL DEFAULT 0',
+      )
+    }
     const scheduledJobColumns = sqlite
       .query<{ name: string }, []>('PRAGMA table_info(scheduled_jobs)')
       .all()
@@ -329,6 +341,21 @@ const currentMigrationHistory = [
     hash: '3e9373d40392c2ddb78577a8844911dfb81fde94a755197778079be45e7862db',
     createdAt: 1793318400000,
   },
+  {
+    tag: '0022_one_running_scheduled_job_per_job',
+    hash: '4b230c05ae30bd32ef121f9443eb067b104132397ec1b8a162c4c66c4f749b20',
+    createdAt: 1793404800000,
+  },
+  {
+    tag: '0023_add_conversation_run_trace_events',
+    hash: '05a0cc7220c88a36608bc5985c8a93eb23623ac3b41672b7531bf81d9fcd8737',
+    createdAt: 1793491200000,
+  },
+  {
+    tag: '0024_add_conversation_run_trace_degradation',
+    hash: '442ff475c47478ff982bb4296e1a97c3e489835274a49528857c61210e1e12b4',
+    createdAt: 1793577600000,
+  },
 ]
 
 // TODO(nikhil): Remove this fallback once Windows/Linux packaging always includes Drizzle migrations.
@@ -418,6 +445,20 @@ const currentSchemaStatements = [
     ON scheduled_job_runs (started_at)
   `,
   `
+    UPDATE scheduled_job_runs
+    SET status = 'failed',
+        error = 'Execution state is uncertain after overlapping scheduled runs'
+    WHERE status = 'running'
+      AND job_id IN (
+        SELECT job_id FROM scheduled_job_runs
+        WHERE status = 'running' GROUP BY job_id HAVING COUNT(*) > 1
+      )
+  `,
+  `
+    CREATE UNIQUE INDEX IF NOT EXISTS scheduled_job_runs_one_running_per_job
+    ON scheduled_job_runs (job_id) WHERE status = 'running'
+  `,
+  `
     CREATE TABLE IF NOT EXISTS oauth_tokens (
       browseros_id text NOT NULL,
       provider text NOT NULL,
@@ -457,10 +498,13 @@ const currentSchemaStatements = [
       run_id text NOT NULL,
       status text NOT NULL,
       started_at integer NOT NULL,
-      finished_at integer
+      finished_at integer,
+      trace_persistence_degraded integer NOT NULL DEFAULT 0
     )
   `,
   `CREATE INDEX IF NOT EXISTS conversation_run_state_status_idx ON conversation_run_state (status)`,
+  `CREATE TABLE IF NOT EXISTS conversation_run_trace_events (sequence integer PRIMARY KEY AUTOINCREMENT NOT NULL, conversation_id text NOT NULL, run_id text NOT NULL, event_id text NOT NULL UNIQUE, event_json text NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS conversation_run_trace_events_scope_idx ON conversation_run_trace_events (conversation_id, run_id, sequence)`,
   `CREATE TABLE IF NOT EXISTS action_policy_rules (action_id text PRIMARY KEY NOT NULL, decision text NOT NULL CHECK (decision IN ('allow', 'ask', 'deny')), expires_at integer, updated_at integer NOT NULL)`,
   `
     CREATE TABLE IF NOT EXISTS memories (

@@ -108,6 +108,38 @@ function stubObserverHarness(state: StubState): Observer {
 }
 
 describe('Observer stable refs', () => {
+  test('snapshot and diff never expose password values returned by AX', async () => {
+    const sentinel = 'observer-password-sentinel-93ac'
+    const state = {
+      loaderId: 'loader-1',
+      url: 'https://example.com/',
+      nodes: [
+        ax('1', 'RootWebArea', { children: ['2'] }),
+        ax('2', 'textbox', {
+          name: name('Password'),
+          backendDOMNodeId: 9,
+          value: { type: 'string', value: sentinel },
+        }),
+      ],
+    }
+    const observer = stubObserverHarness(state)
+
+    const snapshot = await observer.snapshot()
+    state.nodes = [
+      ax('1', 'RootWebArea', { children: ['2'] }),
+      ax('2', 'textbox', {
+        name: name('Password'),
+        backendDOMNodeId: 9,
+        value: { type: 'string', value: `${sentinel}-changed` },
+      }),
+    ]
+    const diff = await observer.diff()
+
+    expect(snapshot.text).not.toContain(sentinel)
+    expect(diff.text).not.toContain(sentinel)
+    expect(diff.text).not.toContain(`${sentinel}-changed`)
+  })
+
   test('diff keeps unchanged same-document nodes matched after insertion', async () => {
     const state = {
       loaderId: 'loader-1',

@@ -124,14 +124,253 @@ describe('KlavisService', () => {
 
     expect(modelOutput).toEqual({
       type: 'content',
-      value: [
-        { type: 'text', text: 'Found 2 threads' },
+      value: [{ type: 'text', text: 'Found 2 threads' }],
+    })
+  })
+
+  it('redacts named secrets in remote JSON and MCP text output', async () => {
+    const handle = createHandle({
+      tools: [
         {
-          type: 'image-data',
-          data: 'ZmFrZS1pbWFnZQ==',
-          mediaType: 'image/png',
+          name: 'gmail_search',
+          description: 'Search Gmail',
+          inputSchema: { type: 'object' },
+        } as never,
+      ],
+      callTool: mock(async () => ({
+        content: [
+          {
+            type: 'text',
+            text: [
+              'access_token: abc123 Authorization: Bearer xyz789 keep this',
+              'Authorization: Basic dXNlcjpwYXNzd29yZA==',
+              'Authorization: Digest username="alice", response="digest-secret"',
+            ].join('\n'),
+          },
+          {
+            type: 'text',
+            text: JSON.stringify({
+              title: 'Quarterly update',
+              apiKey: 'key-value',
+              Authorization: 'Bearer json-secret',
+              details: { refresh_token: 'refresh-value' },
+            }),
+          },
+          {
+            type: 'text',
+            text: JSON.stringify({
+              passwordValue: 'serialized-password-sentinel',
+              passwordValueText: 'serialized-password-text-sentinel',
+              nested: {
+                accessTokenValue: 'serialized-token-sentinel',
+                accessTokenValueEncoded: 'serialized-encoded-token-sentinel',
+              },
+              token_count: 2,
+              secret_count: 3,
+            }),
+          },
+        ],
+      })),
+    })
+    const service = new KlavisService({
+      browserosId: 'browseros-1',
+      client: asClient(new StubKlavisClient()),
+      connect: async () => handle,
+    })
+
+    service.start()
+    await nextTick()
+
+    const tool = service.buildAiSdkToolSet().gmail_search
+    const output = await tool.execute?.({})
+    const modelOutput = await tool.toModelOutput?.({
+      toolCallId: 'call-secret',
+      input: {},
+      output,
+    })
+
+    expect(modelOutput).toEqual({
+      type: 'content',
+      value: [
+        {
+          type: 'text',
+          text: [
+            'access_token: [REDACTED] Authorization: [REDACTED]',
+            'Authorization: [REDACTED]',
+            'Authorization: [REDACTED]',
+          ].join('\n'),
+        },
+        {
+          type: 'text',
+          text: '{"title":"Quarterly update","apiKey":"[REDACTED]","Authorization":"[REDACTED]","details":{"refresh_token":"[REDACTED]"}}',
+        },
+        {
+          type: 'text',
+          text: '{"passwordValue":"[REDACTED]","passwordValueText":"[REDACTED]","nested":{"accessTokenValue":"[REDACTED]","accessTokenValueEncoded":"[REDACTED]"},"token_count":2,"secret_count":3}',
         },
       ],
+    })
+  })
+
+  it('redacts complete cookie header values and multiline PEM private keys', async () => {
+    const handle = createHandle({
+      tools: [
+        {
+          name: 'gmail_search',
+          description: 'Search Gmail',
+          inputSchema: { type: 'object' },
+        } as never,
+      ],
+      callTool: mock(async () => ({
+        content: [
+          {
+            type: 'text',
+            text: [
+              'Cookie: session_id=session-secret; sid=another-secret; remember_me=third-secret',
+              'Set-Cookie: refresh_session=refresh-secret; Path=/; HttpOnly; SameSite=Lax',
+              'status: connected',
+            ].join('\n'),
+          },
+          {
+            type: 'text',
+            text: [
+              '-----BEGIN PRIVATE KEY-----',
+              'MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSj',
+              '-----END PRIVATE KEY-----',
+              'public result remains visible',
+            ].join('\n'),
+          },
+          {
+            type: 'text',
+            text: JSON.stringify({
+              Cookie: 'session_id=abc; sid=def',
+              status: 'connected',
+            }),
+          },
+          {
+            type: 'text',
+            text: JSON.stringify({
+              password: 'secret phrase with spaces',
+              privateKey: 'multi word private key value',
+              Cookie: 'session_id=another-secret; sid=second-secret',
+              status: 'connected',
+            }),
+          },
+        ],
+      })),
+    })
+    const service = new KlavisService({
+      browserosId: 'browseros-1',
+      client: asClient(new StubKlavisClient()),
+      connect: async () => handle,
+    })
+
+    service.start()
+    await nextTick()
+
+    const tool = service.buildAiSdkToolSet().gmail_search
+    const output = await tool.execute?.({})
+    const modelOutput = await tool.toModelOutput?.({
+      toolCallId: 'call-cookie-pem-secret',
+      input: {},
+      output,
+    })
+
+    expect(modelOutput).toEqual({
+      type: 'content',
+      value: [
+        {
+          type: 'text',
+          text: [
+            'Cookie: [REDACTED]',
+            'Set-Cookie: [REDACTED]',
+            'status: connected',
+          ].join('\n'),
+        },
+        {
+          type: 'text',
+          text: '[REDACTED PRIVATE KEY]\npublic result remains visible',
+        },
+        {
+          type: 'text',
+          text: '{"Cookie":"[REDACTED]","status":"connected"}',
+        },
+        {
+          type: 'text',
+          text: '{"password":"[REDACTED]","privateKey":"[REDACTED]","Cookie":"[REDACTED]","status":"connected"}',
+        },
+      ],
+    })
+  })
+
+  it('redacts secret-keyed fields in JSON outputs while preserving useful values', async () => {
+    const handle = createHandle({
+      tools: [
+        {
+          name: 'gmail_search',
+          description: 'Search Gmail',
+          inputSchema: { type: 'object' },
+        } as never,
+      ],
+      callTool: mock(
+        async () =>
+          ({
+            account: 'work',
+            clientSecret: 'secret-value',
+            nested: {
+              password: 'password-value',
+              passwordValue: 'object-password-sentinel',
+              passwordValueText: 'object-password-text-sentinel',
+              accessTokenValue: 'object-access-token-sentinel',
+              token: 'token-value',
+              count: 3,
+              token_count: 2,
+              cookie_count: 4,
+              secret_count: 5,
+            },
+            api_key: 'snake-api-key',
+            apiKey: 'camel-api-key',
+            privateKey: 'private-key-value',
+          }) as never,
+      ),
+    })
+    const service = new KlavisService({
+      browserosId: 'browseros-1',
+      client: asClient(new StubKlavisClient()),
+      connect: async () => handle,
+    })
+
+    service.start()
+    await nextTick()
+
+    const tool = service.buildAiSdkToolSet().gmail_search
+    const output = await tool.execute?.({})
+    const modelOutput = await tool.toModelOutput?.({
+      toolCallId: 'call-json-secret',
+      input: {},
+      output,
+    })
+
+    expect(modelOutput).toEqual({
+      type: 'json',
+      value: {
+        account: 'work',
+        clientSecret: '[REDACTED]',
+        nested: {
+          password: '[REDACTED]',
+          passwordValue: '[REDACTED]',
+          passwordValueText: '[REDACTED]',
+          accessTokenValue: '[REDACTED]',
+          token: '[REDACTED]',
+          count: 3,
+          token_count: 2,
+          cookie_count: 4,
+          secret_count: 5,
+        },
+        api_key: '[REDACTED]',
+        apiKey: '[REDACTED]',
+        privateKey: '[REDACTED]',
+      },
     })
   })
 

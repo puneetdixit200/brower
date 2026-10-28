@@ -2,7 +2,8 @@ import type { Browser } from '@browseros/browser-core/browser'
 import type { ConversationPanelAssignments } from '@browseros/shared/schemas/conversation-panels'
 import { zValidator } from '@hono/zod-validator'
 import { createUIMessageStreamResponse } from 'ai'
-import { Hono } from 'hono'
+import { Hono, type MiddlewareHandler } from 'hono'
+import { z } from 'zod'
 import {
   permissionModeTargetError,
   resolvePermissionMode,
@@ -51,6 +52,7 @@ interface ChatRouteDeps {
   activity?: ServerActivity
   acpRuntime?: AcpAgentRuntime
   conversationRuns?: ConversationRuns
+  sessionStore?: SessionStore
   /** Injectable so the hydration path is testable without a database. */
   providerStore?: ChatProviderLookup
 }
@@ -73,7 +75,7 @@ const credentialedProviderLookup: ChatProviderLookup = {
 export function createChatRoutes(deps: ChatRouteDeps): Hono<Env> {
   const { browserosId } = deps
 
-  const sessionStore = new SessionStore()
+  const sessionStore = deps.sessionStore ?? new SessionStore()
   const service = new ChatService({
     sessionStore,
     klavis: deps.klavis,
@@ -198,6 +200,41 @@ export function createChatRoutes(deps: ChatRouteDeps): Hono<Env> {
     service.removePanelTab(tabId)
     return c.json({ success: true })
   })
+  const readArtifactRoute: MiddlewareHandler<Env> = async (c) => {
+    if (!isTrustedAppRequest(c) || !c.req.header('origin')) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+    const conversationId = ConversationIdParamSchema.safeParse({
+      conversationId: c.req.param('conversationId'),
+    })
+    const artifactId = z.string().uuid().safeParse(c.req.param('artifactId'))
+    if (!conversationId.success || !artifactId.success) {
+      return c.json({ error: 'Artifact not found' }, 404)
+    }
+
+    const artifact = await service.readOutputArtifact(
+      conversationId.data.conversationId,
+      artifactId.data,
+    )
+    if (artifact.kind === 'too-large') {
+      return c.json({ error: 'Artifact exceeds the retrieval size limit' }, 413)
+    }
+    if (artifact.kind === 'missing') {
+      return c.json({ error: 'Artifact not found' }, 404)
+    }
+
+    const encodedFilename = encodeURIComponent(artifact.filename)
+    return new Response(new Uint8Array(artifact.contents), {
+      headers: {
+        'Cache-Control': 'no-store',
+        'Content-Disposition': `attachment; filename="download"; filename*=UTF-8''${encodedFilename}`,
+        'Content-Length': String(artifact.contents.byteLength),
+        'Content-Type': 'application/octet-stream',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    })
+  }
+  app.get('/:conversationId/artifacts/:artifactId', readArtifactRoute)
   app.get('/:conversationId/state', async (c) => {
     // Keep this handler's type shallow: combining an awaited response with the
     // Zod middleware overload exceeds TypeScript's depth in the composed API.

@@ -67,11 +67,15 @@ export const read = defineTool({
 
     const text = (result.result?.value as string) ?? ''
     const origin = ctx.session.pages.getInfo(args.page)?.url ?? 'unknown'
+    const structured = {
+      page: args.page,
+      format: args.format,
+      url: origin,
+    }
 
     if (text.length <= TOOL_LIMITS.INLINE_PAGE_CONTENT_MAX_CHARS) {
       return textResult(wrapUntrusted(text || '(empty)', origin), {
-        page: args.page,
-        format: args.format,
+        ...structured,
         contentLength: text.length,
         writtenToFile: false,
       })
@@ -89,8 +93,7 @@ export const read = defineTool({
         `Content truncated at ${TOOL_LIMITS.INLINE_PAGE_CONTENT_MAX_CHARS} chars. Full content (${text.length} chars) saved to: ${path}`,
       ].join('\n\n'),
       {
-        page: args.page,
-        format: args.format,
+        ...structured,
         path,
         contentLength: text.length,
         writtenToFile: true,

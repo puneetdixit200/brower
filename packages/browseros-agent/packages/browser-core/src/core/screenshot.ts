@@ -1,6 +1,10 @@
 import type { Viewport } from '@browseros/cdp-protocol/domains/page'
 import type { ProtocolApi } from '@browseros/cdp-protocol/protocol-api'
 import type { Observer } from './observer/observer'
+import {
+  installScreenshotFieldMask,
+  removeScreenshotFieldMask,
+} from './screenshot-field-mask'
 import { frameDepth } from './screenshot-frame'
 import {
   clipAnnotations,
@@ -64,13 +68,30 @@ export async function captureScreenshotWithAnnotations({
 }: CaptureInput): Promise<ScreenshotCaptureResult> {
   if ((options.annotate ?? false) === false) {
     return runExclusiveScreenshotCapture(pageSession, () =>
-      capturePlainScreenshot(pageSession, options),
+      captureWithFieldMask(pageSession, () =>
+        capturePlainScreenshot(pageSession, options),
+      ),
     )
   }
 
   return runExclusiveScreenshotCapture(pageSession, () =>
-    captureAnnotatedScreenshot({ pageSession, observer, options }),
+    captureWithFieldMask(pageSession, () =>
+      captureAnnotatedScreenshot({ pageSession, observer, options }),
+    ),
   )
+}
+
+async function captureWithFieldMask<T>(
+  pageSession: ProtocolApi,
+  capture: () => Promise<T>,
+): Promise<T> {
+  const token = createOverlayToken()
+  await installScreenshotFieldMask(pageSession, token)
+  try {
+    return await capture()
+  } finally {
+    await removeScreenshotFieldMask(pageSession, token)
+  }
 }
 
 async function capturePlainScreenshot(

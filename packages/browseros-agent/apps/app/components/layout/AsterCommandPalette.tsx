@@ -26,6 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { isCommandPaletteShortcut } from '@/lib/constants/shortcuts'
 import { useIsMac } from '@/lib/useIsMac'
 import {
   type CommandPaletteTab,
@@ -143,14 +144,7 @@ export function AsterCommandPalette() {
   const isOnboarding = location.pathname.startsWith('/onboarding')
   useEffect(() => {
     function onShortcut(event: KeyboardEvent) {
-      if (
-        !event.repeat &&
-        (event.ctrlKey || event.metaKey) &&
-        event.altKey &&
-        !event.shiftKey &&
-        event.key.toLowerCase() === 'k' &&
-        !isOnboarding
-      ) {
+      if (isCommandPaletteShortcut(event, isOnboarding, isMac)) {
         event.preventDefault()
         if (openRef.current) closePalette()
         else openPalette()
@@ -168,7 +162,7 @@ export function AsterCommandPalette() {
         onOpenCommandPalette,
       )
     }
-  }, [closePalette, isOnboarding, openPalette])
+  }, [closePalette, isMac, isOnboarding, openPalette])
 
   useEffect(() => {
     if (isOnboarding) closePalette()

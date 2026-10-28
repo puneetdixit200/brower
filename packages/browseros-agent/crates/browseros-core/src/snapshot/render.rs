@@ -3,7 +3,7 @@ use crate::{
     snapshot::{
         ax_types::{AxNode, AxValue},
         refs::{DocumentId, MintRef, RefMap},
-        roles::{is_interactive_role, is_root_role, is_skip_role, is_value_role},
+        roles::{is_interactive_role, is_root_role, is_skip_role},
     },
 };
 use serde_json::Value;
@@ -302,13 +302,12 @@ fn format_line(
         line.push(']');
     }
 
-    if is_value_role(role)
-        && let Some(value) = str_val(node.value.as_ref())
-        && !value.is_empty()
-    {
-        line.push_str(": ");
-        line.push_str(&json_quote(&value));
-    }
+    // Intentionally omit node.value for all roles. The pinned CDP AX schema
+    // does not reliably identify the underlying input type. A password input
+    // can be exposed as a textbox without any protocol property that
+    // distinguishes it from an ordinary text field. Snapshots also feed grep,
+    // cached diff baselines, and post-action tool output, so omission here
+    // protects all of those paths regardless of Chromium's masking setting.
 
     line
 }
@@ -467,10 +466,43 @@ mod tests {
                 "- main",
                 "  - heading \"Results\" [level=1]",
                 "  - button \"Load more\" [disabled] [ref=e2]",
-                "  - textbox \"Search\" [ref=e3]: \"abc\"",
+                "  - textbox \"Search\" [ref=e3]",
             ]
             .join("\n")
         );
+    }
+
+    #[test]
+    fn never_renders_ax_values_including_exposed_passwords() {
+        let sentinel = "rust-password-sentinel-2acf";
+        let mut nodes = vec![
+            ax("1", "RootWebArea", &["2", "3", "4"]),
+            ax("2", "textbox", &[]),
+            ax("3", "searchbox", &[]),
+            ax("4", "textarea", &[]),
+        ];
+        nodes[1].name = Some(name("Password"));
+        nodes[1].value = Some(AxValue {
+            value_type: "string".to_string(),
+            value: Some(json!(sentinel)),
+        });
+        nodes[2].name = Some(name("Search"));
+        nodes[2].value = Some(AxValue {
+            value_type: "string".to_string(),
+            value: Some(json!("ordinary search text")),
+        });
+        nodes[3].name = Some(name("Notes"));
+        nodes[3].value = Some(AxValue {
+            value_type: "string".to_string(),
+            value: Some(json!("ordinary textarea text")),
+        });
+
+        let text = render(&nodes, &mut RefMap::new());
+
+        assert!(text.contains("textbox \"Password\""));
+        assert!(!text.contains(sentinel));
+        assert!(!text.contains("ordinary search text"));
+        assert!(!text.contains("ordinary textarea text"));
     }
 
     #[test]

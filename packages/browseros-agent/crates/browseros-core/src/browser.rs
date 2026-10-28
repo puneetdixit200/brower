@@ -2,8 +2,7 @@ use crate::{
     BrowserView, CoreError, NativeCapabilities, PageId, ProtocolSession, TabId, TargetBinding,
     connection::CdpConnection,
     pages::PageInfo,
-    pointer,
-    screenshot::ScreenshotFormat,
+    screenshot::{ScreenshotCaptureOptions, ScreenshotFormat},
     session::{BrowserSession, BrowserSessionHooks},
 };
 use serde::Deserialize;
@@ -132,24 +131,19 @@ impl Browser {
         quality: Option<i64>,
         full_page: bool,
     ) -> Result<BrowserScreenshot, CoreError> {
-        let session = self.resolve_session(page_id).await?;
-        let mut params = serde_json::Map::new();
-        params.insert(
-            "format".to_string(),
-            Value::String(format.as_str().to_string()),
-        );
-        params.insert("captureBeyondViewport".to_string(), Value::Bool(full_page));
-        if let Some(quality) = quality {
-            params.insert("quality".to_string(), Value::from(quality));
-        }
-        let hidden = pointer::hide_for_capture(&session).await;
-        let screenshot = session
-            .send::<_, CaptureScreenshotResult>("Page.captureScreenshot", Value::Object(params))
-            .await;
-        if hidden {
-            pointer::restore_after_capture(&session).await;
-        }
-        let screenshot = screenshot?;
+        let view = self.view().await;
+        let session = view.page_session(page_id.clone()).await?.session;
+        let screenshot = view
+            .screenshot(
+                page_id,
+                ScreenshotCaptureOptions {
+                    format: Some(format),
+                    quality,
+                    full_page: Some(full_page),
+                    ..Default::default()
+                },
+            )
+            .await?;
         let dpr_result = session
             .send::<_, EvaluateResult>(
                 "Runtime.evaluate",
@@ -167,7 +161,7 @@ impl Browser {
         };
         Ok(BrowserScreenshot {
             data: screenshot.data,
-            mime_type: format!("image/{}", format.as_str()),
+            mime_type: screenshot.mime_type,
             device_pixel_ratio: dpr,
         })
     }
@@ -235,11 +229,6 @@ pub struct EvaluateOutput {
     pub value: Option<Value>,
     pub error: Option<String>,
     pub description: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct CaptureScreenshotResult {
-    data: String,
 }
 
 #[derive(Debug, Deserialize)]

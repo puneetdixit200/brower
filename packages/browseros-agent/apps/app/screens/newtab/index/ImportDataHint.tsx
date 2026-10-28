@@ -9,9 +9,8 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { openBrowserDataImport } from '@/lib/onboarding/browser-data-import'
 import { importHintDismissedAtStorage } from '@/lib/onboarding/onboardingStorage'
-
-const importSettingsURL = 'chrome://settings/importData'
 
 export const ImportDataHint = () => {
   const [dismissed, setDismissed] = useState(false)
@@ -29,7 +28,7 @@ export const ImportDataHint = () => {
   }
 
   const handleImport = () => {
-    chrome.tabs.create({ url: importSettingsURL })
+    openBrowserDataImport(chrome.tabs.create)
     handleDismiss()
   }
 

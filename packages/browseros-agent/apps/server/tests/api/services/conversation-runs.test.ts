@@ -5,7 +5,8 @@
  */
 
 import { describe, expect, it } from 'bun:test'
-import type { UIMessageChunk } from 'ai'
+import type { UIMessage, UIMessageChunk } from 'ai'
+import type { AgentTaskTraceEvent } from '../../../src/agent/task-contract'
 import {
   ConversationRunAlreadyActiveError,
   ConversationRuns,
@@ -19,6 +20,60 @@ const secondChunk: UIMessageChunk = {
 }
 
 describe('ConversationRuns', () => {
+  it('generates validated, redacted task and tool trace events from the live stream', async () => {
+    const source = controlledSource()
+    const runs = new ConversationRuns()
+    const started = await runs.start({
+      conversationId: 'trace-run',
+      messages: [],
+      createStream: () => source.stream,
+    })
+    source.write({
+      type: 'tool-input-start',
+      toolCallId: 'provider-call-private-secret',
+      toolName: 'browser.navigate',
+    })
+    source.write({
+      type: 'tool-approval-request',
+      approvalId: 'approval-private-secret',
+      toolCallId: 'provider-call-private-secret',
+      reason: 'private page context',
+    })
+    source.write({
+      type: 'tool-approval-response',
+      approvalId: 'approval-private-secret',
+      approved: true,
+    })
+    source.write({
+      type: 'tool-output-available',
+      toolCallId: 'provider-call-private-secret',
+      output: { password: 'result-private-secret' },
+    })
+    source.close()
+    await collect(runs.subscribe('trace-run'))
+
+    const snapshot = runs.getSnapshot('trace-run')
+    expect(
+      snapshot?.traceEvents?.map(({ kind, outcome }) => [kind, outcome]),
+    ).toEqual([
+      ['task_started', undefined],
+      ['tool_started', undefined],
+      ['approval_requested', undefined],
+      ['approval_resolved', 'approved'],
+      ['tool_finished', 'ok'],
+      ['task_finished', 'completed'],
+    ])
+    expect(
+      snapshot?.traceEvents?.every((event) => event.taskId === started.runId),
+    ).toBe(true)
+    expect(JSON.stringify(snapshot?.traceEvents)).not.toMatch(
+      /provider-call-private-secret|approval-private-secret|private page context|result-private-secret|password/,
+    )
+    expect(
+      new Set(snapshot?.traceEvents?.map((event) => event.eventId)).size,
+    ).toBe(snapshot?.traceEvents?.length)
+  })
+
   it('persists lifecycle metadata and returns a non-resumable interruption snapshot', async () => {
     const rows = new Map<
       string,
@@ -28,8 +83,11 @@ describe('ConversationRuns', () => {
         status: 'running' | 'completed' | 'aborted' | 'failed' | 'interrupted'
         startedAt: number
         finishedAt: number | null
+        tracePersistenceDegraded: boolean
+        tracePersistenceDegraded: boolean
       }
     >()
+    const traces = new Map<string, AgentTaskTraceEvent[]>()
     const lifecycleStore = {
       start: (conversationId: string, runId: string, startedAt: number) => {
         rows.set(conversationId, {
@@ -38,6 +96,7 @@ describe('ConversationRuns', () => {
           status: 'running',
           startedAt,
           finishedAt: null,
+          tracePersistenceDegraded: false,
         })
       },
       finish: (
@@ -51,6 +110,44 @@ describe('ConversationRuns', () => {
           rows.set(conversationId, { ...row, status, finishedAt })
       },
       get: (conversationId: string) => rows.get(conversationId),
+      markTracePersistenceDegraded: (conversationId: string, runId: string) => {
+        const row = rows.get(conversationId)
+        if (row?.runId === runId) {
+          rows.set(conversationId, { ...row, tracePersistenceDegraded: true })
+        }
+      },
+      appendTraceEvent: (
+        conversationId: string,
+        runId: string,
+        event: AgentTaskTraceEvent,
+      ) => {
+        if (event.taskId !== runId) throw new Error('trace scope mismatch')
+        const key = `${conversationId}:${runId}`
+        traces.set(key, [...(traces.get(key) ?? []), event])
+      },
+      getTraceEvents: (conversationId: string, runId: string) =>
+        traces.get(`${conversationId}:${runId}`) ?? [],
+      ensureInterruptionTraceEvent: (
+        conversationId: string,
+        runId: string,
+        at: number,
+      ) => {
+        const key = `${conversationId}:${runId}`
+        const runEvents = traces.get(key) ?? []
+        const existing = runEvents.find(
+          (event) => event.kind === 'task_interrupted',
+        )
+        if (existing) return existing
+        const event: AgentTaskTraceEvent = {
+          version: 1,
+          taskId: runId,
+          eventId: crypto.randomUUID(),
+          at,
+          kind: 'task_interrupted',
+        }
+        traces.set(key, [...runEvents, event])
+        return event
+      },
       delete: (conversationId: string) => rows.delete(conversationId),
     }
     const source = controlledSource()
@@ -63,6 +160,9 @@ describe('ConversationRuns', () => {
     const saved = rows.get('durable-run')
     expect(saved).toMatchObject({ runId: started.runId, status: 'running' })
     if (!saved) throw new Error('Expected persisted run metadata')
+    expect(
+      traces.get(`durable-run:${started.runId}`)?.map(({ kind }) => kind),
+    ).toEqual(['task_started'])
 
     // Simulate process restart: the next process reconciles the persisted row.
     rows.set('durable-run', {
@@ -77,6 +177,14 @@ describe('ConversationRuns', () => {
       status: 'interrupted',
       chunkCount: 0,
     })
+    expect(
+      (await restarted.getPreparedSnapshot('durable-run'))?.traceEvents?.map(
+        ({ taskId, kind }) => ({ taskId, kind }),
+      ),
+    ).toEqual([
+      { taskId: started.runId, kind: 'task_started' },
+      { taskId: started.runId, kind: 'task_interrupted' },
+    ])
     expect(restarted.activeRun('durable-run')).toBeUndefined()
     expect(() => restarted.subscribe('durable-run')).toThrow(
       'Conversation run not found',
@@ -88,6 +196,147 @@ describe('ConversationRuns', () => {
     expect(await restarted.delete('durable-run')).toBe(true)
     expect(rows.has('durable-run')).toBe(false)
     expect(await runs.delete('durable-run')).toBe(true)
+  })
+
+  it('normalizes a still-running durable row and persists one stable recovery event across parallel reads', async () => {
+    const runId = crypto.randomUUID()
+    const row = {
+      conversationId: 'recovering-run',
+      runId,
+      status: 'running' as 'running' | 'interrupted',
+      startedAt: 100,
+      finishedAt: null,
+      tracePersistenceDegraded: false,
+    }
+    const events: AgentTaskTraceEvent[] = []
+    const lifecycleStore = {
+      start: () => {},
+      finish: (
+        _conversationId: string,
+        currentRunId: string,
+        status: 'interrupted',
+        finishedAt: number,
+      ) => {
+        if (row.runId === currentRunId) {
+          row.status = status
+          row.finishedAt = finishedAt
+        }
+      },
+      get: () => row,
+      markTracePersistenceDegraded: () => {},
+      appendTraceEvent: () => {},
+      getTraceEvents: () => [...events],
+      ensureInterruptionTraceEvent: (
+        _conversationId: string,
+        currentRunId: string,
+        at: number,
+      ) => {
+        const existing = events.find(
+          (event) => event.kind === 'task_interrupted',
+        )
+        if (existing) return existing
+        const event: AgentTaskTraceEvent = {
+          version: 1,
+          taskId: currentRunId,
+          eventId: crypto.randomUUID(),
+          at,
+          kind: 'task_interrupted',
+        }
+        events.push(event)
+        return event
+      },
+      delete: () => false,
+    }
+    const runs = new ConversationRuns({ lifecycleStore })
+    const [first, concurrent] = await Promise.all([
+      runs.getPreparedSnapshot('recovering-run'),
+      runs.getPreparedSnapshot('recovering-run'),
+    ])
+    const repeated = await runs.getPreparedSnapshot('recovering-run')
+
+    expect(row.status).toBe('interrupted')
+    expect(first?.status).toBe('interrupted')
+    const firstEvent = first?.traceEvents?.find(
+      (event) => event.kind === 'task_interrupted',
+    )
+    expect(firstEvent).toBeDefined()
+    expect(
+      concurrent?.traceEvents?.find(
+        (event) => event.kind === 'task_interrupted',
+      ),
+    ).toEqual(firstEvent)
+    expect(
+      repeated?.traceEvents?.find((event) => event.kind === 'task_interrupted'),
+    ).toEqual(firstEvent)
+    expect(events).toEqual([firstEvent])
+  })
+
+  it('surfaces trace persistence degradation without changing run completion', async () => {
+    const source = controlledSource()
+    let durableRun:
+      | {
+          conversationId: string
+          runId: string
+          status: 'running' | 'completed'
+          startedAt: number
+          finishedAt: number | null
+          tracePersistenceDegraded: boolean
+        }
+      | undefined
+    const lifecycleStore = {
+      start: (conversationId: string, runId: string, startedAt: number) => {
+        durableRun = {
+          conversationId,
+          runId,
+          status: 'running',
+          startedAt,
+          finishedAt: null,
+          tracePersistenceDegraded: false,
+        }
+      },
+      finish: (
+        _conversationId: string,
+        _runId: string,
+        status: 'completed',
+        finishedAt: number,
+      ) => {
+        if (durableRun) durableRun = { ...durableRun, status, finishedAt }
+      },
+      get: () => durableRun,
+      markTracePersistenceDegraded: () => {
+        if (durableRun) {
+          durableRun = { ...durableRun, tracePersistenceDegraded: true }
+        }
+      },
+      appendTraceEvent: () => {
+        throw new Error('storage unavailable')
+      },
+      ensureInterruptionTraceEvent: () => {
+        throw new Error('storage unavailable')
+      },
+      getTraceEvents: () => [],
+      delete: () => false,
+    }
+    const runs = new ConversationRuns({ lifecycleStore })
+    await runs.start({
+      conversationId: 'trace-degraded',
+      messages: [],
+      createStream: () => source.stream,
+    })
+    source.close()
+    await collect(runs.subscribe('trace-degraded'))
+
+    expect(runs.getSnapshot('trace-degraded')).toMatchObject({
+      status: 'completed',
+      tracePersistenceDegraded: true,
+    })
+    const restarted = new ConversationRuns({ lifecycleStore })
+    expect(await restarted.getPreparedSnapshot('trace-degraded')).toMatchObject(
+      {
+        status: 'completed',
+        tracePersistenceDegraded: true,
+      },
+    )
   })
 
   it('publishes one canonical run to streams and panel assignments', async () => {
@@ -315,6 +564,42 @@ describe('ConversationRuns', () => {
     expect(runs.getSnapshot('conversation-3')?.status).toBe('completed')
   })
 
+  it('rejects late transcript updates after an explicit stop', async () => {
+    const source = controlledSource()
+    let updateMessages!: (messages: UIMessage[]) => boolean
+    const runs = new ConversationRuns()
+    await runs.start({
+      conversationId: 'stopped-transcript',
+      messages: [],
+      createStream: (_signal, _runId, update) => {
+        updateMessages = update
+        return source.stream
+      },
+    })
+
+    const partial = [
+      {
+        id: 'partial',
+        role: 'assistant' as const,
+        parts: [{ type: 'text' as const, text: 'partial answer' }],
+      },
+    ]
+    expect(updateMessages(partial)).toBe(true)
+    await runs.stop('stopped-transcript')
+
+    expect(
+      updateMessages([
+        ...partial,
+        {
+          id: 'late',
+          role: 'assistant' as const,
+          parts: [{ type: 'text' as const, text: 'late mutation' }],
+        },
+      ]),
+    ).toBe(false)
+    expect(runs.getSnapshot('stopped-transcript')?.messages).toEqual(partial)
+  })
+
   it('marks an AI SDK error chunk as a failed run and panel assignment', async () => {
     const source = controlledSource()
     const runs = new ConversationRuns()
@@ -422,6 +707,29 @@ describe('ConversationRuns', () => {
     expect(runs.activeRun('scheduled')?.associateTabs([31])).toBe(false)
     expect(await currentPanelAssignments(runs)).toEqual({ assignments: [] })
     await runs.stop('scheduled')
+  })
+
+  it('records explicit stop as an aborted task outcome', async () => {
+    const source = controlledSource()
+    const runs = new ConversationRuns()
+    const started = await runs.start({
+      conversationId: 'aborted-trace',
+      messages: [],
+      createStream: () => source.stream,
+    })
+    await runs.stop('aborted-trace')
+    expect(
+      runs
+        .getSnapshot('aborted-trace')
+        ?.traceEvents?.map(({ taskId, kind, outcome }) => [
+          taskId,
+          kind,
+          outcome,
+        ]),
+    ).toEqual([
+      [started.runId, 'task_started', undefined],
+      [started.runId, 'task_finished', 'aborted'],
+    ])
   })
 
   it('holds panel hydration until preparation publishes canonical messages', async () => {

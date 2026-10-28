@@ -1,6 +1,9 @@
 import type { UIMessage } from 'ai'
+import { compact } from 'es-toolkit/array'
 import type { Provider } from '../../components/chat/chatComponentTypes'
+import type { ChatAction } from '../../lib/chat-actions/types'
 import type { LlmProviderConfig } from '../../lib/llm-providers/types'
+import type { ChatRequestBrowserContext } from '../../lib/messaging/server/buildChatRequestBody'
 import { buildChatRequestBody } from '../../lib/messaging/server/buildChatRequestBody'
 import {
   type SidepanelChatTarget,
@@ -13,6 +16,49 @@ export interface OwnerTabSelection {
   text: string
   url: string
   title: string
+}
+
+export function buildRequestBrowserContext({
+  activeTab,
+  action,
+  enabledMcpServers,
+  customMcpServers,
+}: {
+  activeTab?: chrome.tabs.Tab
+  action?: ChatAction
+  enabledMcpServers: Array<string | undefined>
+  customMcpServers: { name: string; url?: string }[]
+}): ChatRequestBrowserContext | undefined {
+  const browserContext: ChatRequestBrowserContext = {}
+  const omitTabMetadata =
+    action?.type === 'browseros' &&
+    action.contextPrivacy === 'human-login-continuation'
+
+  if (activeTab) {
+    browserContext.windowId = activeTab.windowId
+    browserContext.activeTab = {
+      id: activeTab.id,
+      ...(omitTabMetadata
+        ? {}
+        : { url: activeTab.url, title: activeTab.title }),
+    }
+  }
+
+  if (action?.tabs?.length) {
+    browserContext.selectedTabs = action.tabs.map((tab) => ({
+      id: tab.id,
+      ...(omitTabMetadata ? {} : { url: tab.url, title: tab.title }),
+    }))
+  }
+
+  const managedMcpServers = compact(enabledMcpServers)
+  if (managedMcpServers.length) {
+    browserContext.enabledMcpServers = managedMcpServers
+  }
+  if (customMcpServers.length) {
+    browserContext.customMcpServers = customMcpServers
+  }
+  return Object.keys(browserContext).length ? browserContext : undefined
 }
 
 /** Resolve selected text only from the tab that owns the contextual panel. */

@@ -15,6 +15,7 @@ use std::{
 use tokio::sync::Mutex;
 
 const OVERLAY_ATTR: &str = "data-browseros-screenshot-annotation";
+const FIELD_MASK_ATTR: &str = "data-browseros-screenshot-field-mask";
 const OVERLAY_SCRIPT: &str = include_str!("../assets/screenshot-overlay.js");
 static OVERLAY_COUNTER: AtomicU64 = AtomicU64::new(1);
 
@@ -157,6 +158,8 @@ async fn capture_plain_screenshot(
     page_session: &ProtocolSession,
     options: &ScreenshotCaptureOptions,
 ) -> Result<ScreenshotCaptureResult, CoreError> {
+    let field_mask_token = create_overlay_token();
+    install_field_mask(page_session, &field_mask_token).await?;
     let format = options.format.unwrap_or(ScreenshotFormat::Png);
     let full_page = options.full_page.unwrap_or(false);
     let hidden = pointer::hide_for_capture(page_session).await;
@@ -169,7 +172,9 @@ async fn capture_plain_screenshot(
     if hidden {
         pointer::restore_after_capture(page_session).await;
     }
+    let cleanup = remove_field_mask(page_session, &field_mask_token).await;
     let result = result?;
+    cleanup?;
     Ok(ScreenshotCaptureResult {
         data: result.data,
         mime_type: format!("image/{}", format.as_str()),
@@ -182,6 +187,8 @@ async fn capture_annotated_screenshot(
     observer: Arc<Observer>,
     options: ScreenshotCaptureOptions,
 ) -> Result<ScreenshotCaptureResult, CoreError> {
+    let field_mask_token = create_overlay_token();
+    install_field_mask(&page_session, &field_mask_token).await?;
     let format = options.format.unwrap_or(ScreenshotFormat::Png);
     let full_page = options.full_page.unwrap_or(false);
     let token = create_overlay_token();
@@ -252,8 +259,124 @@ async fn capture_annotated_screenshot(
     if overlay_injected {
         let _ = remove_annotation_overlay(&page_session, &token).await;
     }
+    let field_mask_cleanup = remove_field_mask(&page_session, &field_mask_token).await;
     release_object_group(&object_sessions, &object_group).await;
+    field_mask_cleanup?;
     result
+}
+
+async fn install_field_mask(session: &ProtocolSession, token: &str) -> Result<(), CoreError> {
+    let tree: Value = session
+        .send("DOM.getDocument", json!({ "depth": -1, "pierce": true }))
+        .await?;
+    if contains_closed_shadow_root(&tree) {
+        return Err(CoreError::Message(
+            "Closed shadow root prevents safe screenshot masking".into(),
+        ));
+    }
+    let raw_token = token.to_string();
+    let attr = serde_json::to_string(FIELD_MASK_ATTR)
+        .map_err(|err| CoreError::Message(err.to_string()))?;
+    let token = serde_json::to_string(token).map_err(|err| CoreError::Message(err.to_string()))?;
+    let expression = format!(
+        r#"(() => {{
+      var attr = {attr}, token = {token};
+      var css = 'input,textarea,select{{color:transparent!important;-webkit-text-fill-color:transparent!important;-webkit-text-security:disc!important;text-shadow:none!important;caret-color:transparent!important}}input::placeholder,textarea::placeholder{{color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important}}input::selection,textarea::selection{{color:transparent!important;background:transparent!important}}[contenteditable],[contenteditable] *{{color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important;caret-color:transparent!important}}[contenteditable]::selection,[contenteditable] *::selection{{color:transparent!important;background:transparent!important}}iframe[' + attr + '=\"' + token + '\"],frame[' + attr + '=\"' + token + '\"]{{visibility:hidden!important}}';
+      var seen = new Set();
+      function transparent(value) {{ return value === 'transparent' || /^rgba\([^)]*,\s*0(?:\.0+)?\s*\)$/.test(value); }}
+      function visit(root, doc) {{
+        if (!root || seen.has(root)) return;
+        seen.add(root);
+        var style = doc.createElement('style'); style.setAttribute(attr, token); style.textContent = css;
+        (root.nodeType === 9 ? (root.head || root.documentElement) : root).appendChild(style);
+        var controls = root.querySelectorAll('input,textarea,select,[contenteditable],[contenteditable] *');
+        for (var c = 0; c < controls.length; c++) {{
+          var computed = doc.defaultView.getComputedStyle(controls[c]);
+          if (!transparent(computed.color) || !transparent(computed.webkitTextFillColor) || computed.textShadow !== 'none') throw new Error('Editable text was not fully masked for screenshot capture');
+        }}
+        var elements = root.querySelectorAll('*');
+        for (var e = 0; e < elements.length; e++) {{
+          var el = elements[e], name = (el.localName || '').toLowerCase();
+          if ((name.indexOf('-') !== -1 || el.hasAttribute('is')) && doc.defaultView.customElements.get(el.getAttribute('is') || name) && !el.shadowRoot) throw new Error('Closed custom-element shadow root prevents safe screenshot masking');
+          if (el.shadowRoot) visit(el.shadowRoot, doc);
+        }}
+        var frames = root.querySelectorAll('iframe,frame');
+        for (var i = 0; i < frames.length; i++) {{
+          var frame = frames[i];
+          try {{ var child = frame.contentDocument; if (child) visit(child, child); else {{ frame.setAttribute(attr, token); if (doc.defaultView.getComputedStyle(frame).visibility !== 'hidden') throw new Error('Inaccessible frame was not hidden for screenshot capture'); }} }}
+          catch (_) {{ frame.setAttribute(attr, token); if (doc.defaultView.getComputedStyle(frame).visibility !== 'hidden') throw new Error('Inaccessible frame was not hidden for screenshot capture'); }}
+        }}
+      }}
+      visit(document, document);
+      return true;
+    }})()"#
+    );
+    let result: RuntimeResult = match session
+        .send(
+            "Runtime.evaluate",
+            json!({ "expression": expression, "returnByValue": true, "awaitPromise": false }),
+        )
+        .await
+    {
+        Ok(result) => result,
+        Err(error) => {
+            let _ = remove_field_mask(session, &raw_token).await;
+            return Err(error);
+        }
+    };
+    if result.result.value != Some(Value::Bool(true)) {
+        let _ = remove_field_mask(session, &raw_token).await;
+        return Err(CoreError::Message(
+            "Unable to mask editable values for screenshot capture".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn contains_closed_shadow_root(value: &Value) -> bool {
+    match value {
+        Value::Object(object) => {
+            object.get("shadowRootType").and_then(Value::as_str) == Some("closed")
+                || object.values().any(contains_closed_shadow_root)
+        }
+        Value::Array(items) => items.iter().any(contains_closed_shadow_root),
+        _ => false,
+    }
+}
+
+async fn remove_field_mask(session: &ProtocolSession, token: &str) -> Result<(), CoreError> {
+    let attr = serde_json::to_string(FIELD_MASK_ATTR)
+        .map_err(|err| CoreError::Message(err.to_string()))?;
+    let token = serde_json::to_string(token).map_err(|err| CoreError::Message(err.to_string()))?;
+    let expression = format!(
+        r#"(() => {{
+      var attr = {attr}, token = {token}, seen = new Set();
+      function visit(root) {{
+        if (!root || seen.has(root)) return; seen.add(root);
+        var styles = root.querySelectorAll('style[' + attr + ']');
+        for (var i = styles.length - 1; i >= 0; i--) if (styles[i].getAttribute(attr) === token) styles[i].remove();
+        var frames = root.querySelectorAll('iframe[' + attr + '],frame[' + attr + ']');
+        for (var j = frames.length - 1; j >= 0; j--) if (frames[j].getAttribute(attr) === token) frames[j].removeAttribute(attr);
+        var elements = root.querySelectorAll('*');
+        for (var e = 0; e < elements.length; e++) if (elements[e].shadowRoot) visit(elements[e].shadowRoot);
+        var accessible = root.querySelectorAll('iframe,frame');
+        for (var k = 0; k < accessible.length; k++) {{ try {{ if (accessible[k].contentDocument) visit(accessible[k].contentDocument); }} catch (_) {{}} }}
+      }}
+      visit(document); return true;
+    }})()"#
+    );
+    let result: RuntimeResult = session
+        .send(
+            "Runtime.evaluate",
+            json!({ "expression": expression, "returnByValue": true, "awaitPromise": false }),
+        )
+        .await?;
+    if result.result.value != Some(Value::Bool(true)) {
+        return Err(CoreError::Message(
+            "Unable to restore page styles after screenshot capture".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn screenshot_params(
@@ -706,12 +829,18 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         for succeeds in [true, false] {
             let mut replies = vec![
+                (
+                    "DOM.getDocument",
+                    json!({ "root": { "nodeName": "#document" } }),
+                ),
                 ("Runtime.evaluate", json!({ "result": { "value": true } })),
                 ("Runtime.evaluate", json!({ "result": { "value": true } })),
             ];
             if succeeds {
                 replies.push(("Page.captureScreenshot", json!({ "data": "cG5n" })));
             }
+            replies.push(("Runtime.evaluate", json!({ "result": { "value": true } })));
+            replies.push(("Runtime.evaluate", json!({ "result": { "value": true } })));
             let connection = TestConnection::new(replies);
             let session = ProtocolSession::root(connection.clone());
             let result =
@@ -721,17 +850,34 @@ mod tests {
                 assert_eq!(capture.data, "cG5n");
             }
             let calls = connection.calls()?;
-            assert_eq!(calls.len(), 3);
+            assert_eq!(calls.len(), 6);
+            assert_eq!(calls[0].method, "DOM.getDocument");
             assert!(
-                calls[0].params["expression"]
+                calls[1].params["expression"]
                     .as_str()
-                    .is_some_and(|js| js.contains("p.hide()"))
+                    .is_some_and(|js| js.contains("-webkit-text-security:disc!important"))
             );
-            assert_eq!(calls[1].method, "Page.captureScreenshot");
+            assert!(
+                calls[1].params["expression"]
+                    .as_str()
+                    .is_some_and(|js| js.contains("input::placeholder,textarea::placeholder"))
+            );
+            assert_eq!(calls[2].method, "Runtime.evaluate");
             assert!(
                 calls[2].params["expression"]
                     .as_str()
+                    .is_some_and(|js| js.contains("p.hide()"))
+            );
+            assert_eq!(calls[3].method, "Page.captureScreenshot");
+            assert!(
+                calls[4].params["expression"]
+                    .as_str()
                     .is_some_and(|js| js.contains("p.show()"))
+            );
+            assert!(
+                calls[5].params["expression"]
+                    .as_str()
+                    .is_some_and(|js| js.contains("style["))
             );
         }
         Ok(())
@@ -740,16 +886,111 @@ mod tests {
     #[tokio::test]
     async fn tests_that_plain_capture_survives_a_failed_pointer_hide()
     -> Result<(), Box<dyn std::error::Error>> {
-        let connection =
-            TestConnection::new([("Page.captureScreenshot", json!({ "data": "cG5n" }))]);
+        let connection = TestConnection::new([
+            (
+                "DOM.getDocument",
+                json!({ "root": { "nodeName": "#document" } }),
+            ),
+            ("Runtime.evaluate", json!({ "result": { "value": true } })),
+            ("Runtime.evaluate", json!({ "result": { "value": false } })),
+            ("Page.captureScreenshot", json!({ "data": "cG5n" })),
+            ("Runtime.evaluate", json!({ "result": { "value": true } })),
+        ]);
         let session = ProtocolSession::root(connection.clone());
         let capture =
             capture_plain_screenshot(&session, &ScreenshotCaptureOptions::default()).await?;
         assert_eq!(capture.data, "cG5n");
         let calls = connection.calls()?;
-        assert_eq!(calls.len(), 2);
-        assert_eq!(calls[0].method, "Runtime.evaluate");
-        assert_eq!(calls[1].method, "Page.captureScreenshot");
+        assert_eq!(calls.len(), 5);
+        assert_eq!(calls[0].method, "DOM.getDocument");
+        assert!(
+            calls[1].params["expression"]
+                .as_str()
+                .is_some_and(|js| js.contains("-webkit-text-security:disc!important"))
+        );
+        assert_eq!(calls[2].method, "Runtime.evaluate");
+        assert_eq!(calls[3].method, "Page.captureScreenshot");
+        assert!(
+            calls[4].params["expression"]
+                .as_str()
+                .is_some_and(|js| js.contains("style["))
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn tests_that_plain_capture_fails_closed_when_field_mask_cannot_be_installed()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let connection = TestConnection::new([
+            (
+                "DOM.getDocument",
+                json!({ "root": { "nodeName": "#document" } }),
+            ),
+            ("Runtime.evaluate", json!({ "result": { "value": false } })),
+            ("Runtime.evaluate", json!({ "result": { "value": true } })),
+        ]);
+        let session = ProtocolSession::root(connection.clone());
+        let result = capture_plain_screenshot(&session, &ScreenshotCaptureOptions::default()).await;
+        assert!(result.is_err());
+        let calls = connection.calls()?;
+        assert_eq!(calls.len(), 3);
+        assert_eq!(calls[0].method, "DOM.getDocument");
+        assert!(
+            calls
+                .iter()
+                .all(|call| call.method != "Page.captureScreenshot")
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn tests_that_plain_capture_attempts_cleanup_after_a_failed_mask_response()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let connection = TestConnection::new([
+            (
+                "DOM.getDocument",
+                json!({ "root": { "nodeName": "#document" } }),
+            ),
+            // The command was sent, but its malformed response makes the mask state uncertain.
+            ("Runtime.evaluate", json!({})),
+            ("Runtime.evaluate", json!({ "result": { "value": true } })),
+        ]);
+        let session = ProtocolSession::root(connection.clone());
+        let result = capture_plain_screenshot(&session, &ScreenshotCaptureOptions::default()).await;
+        assert!(result.is_err());
+        let calls = connection.calls()?;
+        assert_eq!(calls.len(), 3);
+        assert_eq!(calls[0].method, "DOM.getDocument");
+        assert!(
+            calls[2].params["expression"]
+                .as_str()
+                .is_some_and(|js| js.contains("style["))
+        );
+        assert!(
+            calls
+                .iter()
+                .all(|call| call.method != "Page.captureScreenshot")
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn tests_that_plain_capture_fails_closed_when_closed_shadow_root_is_present()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let connection = TestConnection::new([(
+            "DOM.getDocument",
+            json!({ "root": { "shadowRoots": [{ "shadowRootType": "closed" }] } }),
+        )]);
+        let session = ProtocolSession::root(connection.clone());
+        let result = capture_plain_screenshot(&session, &ScreenshotCaptureOptions::default()).await;
+        assert!(result.is_err());
+        let calls = connection.calls()?;
+        assert_eq!(calls.len(), 1);
+        assert!(
+            calls
+                .iter()
+                .all(|call| call.method != "Page.captureScreenshot")
+        );
         Ok(())
     }
 }

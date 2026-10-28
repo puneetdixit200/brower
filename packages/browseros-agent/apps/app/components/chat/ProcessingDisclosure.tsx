@@ -8,7 +8,8 @@ function locationFor(provider: Provider | null): {
   if (!provider) {
     return {
       label: 'No model connected',
-      explanation: 'Connect a model before sharing page context or sending an AI task.',
+      explanation:
+        'Connect a model before sharing page context or sending an AI task.',
     }
   }
   if (provider.kind === 'acp') {

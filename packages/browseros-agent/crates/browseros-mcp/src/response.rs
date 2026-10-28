@@ -10,7 +10,7 @@ use crate::{
     },
     framework::{AuditHints, ToolCtx, ToolError, ToolExecResult, ToolResult, merge_structured},
 };
-use browseros_core::{ConsoleEntry, PageId, pointer, settle::SettleOutcome};
+use browseros_core::{ConsoleEntry, PageId, settle::SettleOutcome};
 use rmcp::model::ContentBlock;
 use serde_json::{Value, json};
 
@@ -274,28 +274,12 @@ impl ToolResponse {
                 Ok(())
             }
             PostAction::Screenshot { page } => {
-                let page_session = ctx
+                let result = ctx
                     .browser
-                    .page_session(browseros_core::PageId(page))
+                    .screenshot(PageId(page), Default::default())
                     .await?;
-                #[derive(serde::Deserialize)]
-                struct CaptureScreenshotResult {
-                    data: String,
-                }
-                let hidden = pointer::hide_for_capture(&page_session.session).await;
-                let result = page_session
-                    .session
-                    .send::<_, CaptureScreenshotResult>(
-                        "Page.captureScreenshot",
-                        json!({ "format": "png", "captureBeyondViewport": false }),
-                    )
-                    .await;
-                if hidden {
-                    pointer::restore_after_capture(&page_session.session).await;
-                }
-                let result = result?;
                 self.text(format!("[Page {page} screenshot]"));
-                self.image(result.data, "image/png");
+                self.image(result.data, result.mime_type);
                 Ok(())
             }
         }
@@ -509,6 +493,7 @@ mod pointer_capture_tests {
         CapturePath::Browser,
         CapturePath::PostAction,
     ];
+    const FIELD_SENTINEL: &str = "AUTOFILLED_SECRET_SENTINEL_7d93";
 
     struct CaptureConnection {
         calls: Mutex<Vec<(String, Value)>>,
@@ -537,6 +522,10 @@ mod pointer_capture_tests {
                     let expression = params["expression"].as_str().unwrap_or_default();
                     if method == "Page.captureScreenshot" {
                         Some("capture".to_string())
+                    } else if expression.contains("-webkit-text-security:disc!important") {
+                        Some("mask".to_string())
+                    } else if expression.contains("style[") {
+                        Some("unmask".to_string())
                     } else if expression.contains("p.hide()") {
                         Some("hide".to_string())
                     } else if expression.contains("p.show()") {
@@ -570,6 +559,7 @@ mod pointer_capture_tests {
                     "Browser.getTabs" => Ok(json!({ "tabs": [Self::tab()] })),
                     "Browser.getTabInfo" => Ok(json!({ "tab": Self::tab() })),
                     "Target.attachToTarget" => Ok(json!({ "sessionId": "session-1" })),
+                    "DOM.getDocument" => Ok(json!({ "root": { "nodeName": "#document" } })),
                     "Page.getFrameTree" => Ok(
                         json!({ "frameTree": { "frame": { "id": "main", "loaderId": "loader-1", "url": "https://example.test/" } } }),
                     ),
@@ -577,7 +567,19 @@ mod pointer_capture_tests {
                     "Page.captureScreenshot" if self.fail_capture => {
                         Err(CdpError::Transport("capture failed".into()))
                     }
-                    "Page.captureScreenshot" => Ok(json!({ "data": "cG5n" })),
+                    "Page.captureScreenshot" => {
+                        let masked = self
+                            .calls
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner)
+                            .iter()
+                            .any(|(_, params)| {
+                                params["expression"].as_str().is_some_and(|js| {
+                                    js.contains("-webkit-text-security:disc!important")
+                                })
+                            });
+                        Ok(json!({ "data": if masked { "cG5n" } else { FIELD_SENTINEL } }))
+                    }
                     "Runtime.evaluate"
                         if self.fail_hide
                             && params["expression"]
@@ -653,6 +655,7 @@ mod pointer_capture_tests {
                     .screenshot(PageId(1), ScreenshotFormat::Png, None, false)
                     .await?;
                 assert_eq!(capture.data, "cG5n");
+                assert!(!capture.data.contains(FIELD_SENTINEL));
             }
             CapturePath::Plain | CapturePath::Annotated => {
                 let capture = browser
@@ -684,7 +687,9 @@ mod pointer_capture_tests {
                     .run_session_post_action(PostAction::Screenshot { page: 1 }, &ctx)
                     .await?;
                 assert_eq!(response.content.len(), 2);
-                assert!(serde_json::to_string(&response.content)?.contains("cG5n"));
+                let output = serde_json::to_string(&response.content)?;
+                assert!(output.contains("cG5n"));
+                assert!(!output.contains(FIELD_SENTINEL));
             }
         }
         Ok(())
@@ -697,7 +702,7 @@ mod pointer_capture_tests {
             capture(path, connection.clone()).await?;
             assert_eq!(
                 connection.capture_calls(),
-                ["hide", "capture", "show"],
+                ["mask", "hide", "capture", "show", "unmask"],
                 "{path:?}"
             );
         }
@@ -715,7 +720,7 @@ mod pointer_capture_tests {
             );
             assert_eq!(
                 connection.capture_calls(),
-                ["hide", "capture", "show"],
+                ["mask", "hide", "capture", "show", "unmask"],
                 "{path:?}"
             );
         }
@@ -726,7 +731,11 @@ mod pointer_capture_tests {
         for path in PATHS {
             let connection = CaptureConnection::new(true, false);
             capture(path, connection.clone()).await?;
-            assert_eq!(connection.capture_calls(), ["hide", "capture"], "{path:?}");
+            assert_eq!(
+                connection.capture_calls(),
+                ["mask", "hide", "capture", "unmask"],
+                "{path:?}"
+            );
         }
         Ok(())
     }

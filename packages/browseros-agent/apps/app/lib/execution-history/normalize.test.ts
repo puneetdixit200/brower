@@ -117,6 +117,62 @@ describe('normalizeExecutionSteps', () => {
     expect(JSON.stringify(normalized)).not.toContain('BASE64_SCREENSHOT')
   })
 
+  it('records only a validated download descriptor without its server path', () => {
+    const descriptor = {
+      artifactId: '00000000-0000-4000-8000-000000000001',
+      filename: 'report.csv',
+      sizeBytes: 12,
+      sha256: 'a'.repeat(64),
+    }
+    const normalized = normalizeExecutionSteps({
+      assistantMessage: createAssistantMessage([
+        asMessagePart({
+          type: 'tool-download',
+          toolCallId: 'download-1',
+          state: 'output-available',
+          output: {
+            artifact: descriptor,
+            path: '/private/output/report.csv',
+          },
+        }),
+      ]),
+      nowIso: '2026-03-26T10:00:00.000Z',
+    })
+    expect(normalized.artifacts).toEqual([descriptor])
+    expect(JSON.stringify(normalized)).not.toContain('/private/output')
+    expect(normalized.steps[0]?.output).toBeUndefined()
+  })
+
+  it('rejects download descriptors with path-like names or invalid hashes', () => {
+    for (const artifact of [
+      {
+        artifactId: '00000000-0000-4000-8000-000000000001',
+        filename: '../secret.txt',
+        sizeBytes: 4,
+        sha256: 'a'.repeat(64),
+      },
+      {
+        artifactId: '00000000-0000-4000-8000-000000000001',
+        filename: 'safe.txt',
+        sizeBytes: 4,
+        sha256: 'not-a-hash',
+      },
+    ]) {
+      const normalized = normalizeExecutionSteps({
+        assistantMessage: createAssistantMessage([
+          asMessagePart({
+            type: 'tool-download',
+            toolCallId: 'download-1',
+            state: 'output-available',
+            output: { artifact },
+          }),
+        ]),
+        nowIso: '2026-03-26T10:00:00.000Z',
+      })
+      expect(normalized.artifacts).toEqual([])
+    }
+  })
+
   it('uses a compact preview for completed tool output', () => {
     const normalized = normalizeExecutionSteps({
       assistantMessage: createAssistantMessage([

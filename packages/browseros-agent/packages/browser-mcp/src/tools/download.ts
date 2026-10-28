@@ -1,11 +1,34 @@
-import { mkdtemp } from 'node:fs/promises'
-import { join } from 'node:path'
+import { createHash } from 'node:crypto'
+import { createReadStream } from 'node:fs'
+import { mkdtemp, stat } from 'node:fs/promises'
+import { basename, join } from 'node:path'
 import type { ProtocolApi } from '@browseros/cdp-protocol/protocol-api'
 import { TIMEOUTS } from '@browseros/shared/constants/timeouts'
 import { z } from 'zod/v4'
 import { getToolOutputDir } from '../tool-output-dir'
 import { defineTool, textResult } from './framework'
-import { recordBrowserOutputFile } from './output-file'
+import { recordBrowserOutputArtifact } from './output-file'
+
+async function hashDownloadedFile(path: string) {
+  const before = await stat(path)
+  const hash = createHash('sha256')
+  let sizeBytes = 0
+  for await (const chunk of createReadStream(path)) {
+    hash.update(chunk)
+    sizeBytes += chunk.byteLength
+  }
+  const after = await stat(path)
+  if (
+    before.dev !== after.dev ||
+    before.ino !== after.ino ||
+    before.size !== after.size ||
+    before.mtimeMs !== after.mtimeMs ||
+    sizeBytes !== after.size
+  ) {
+    throw new Error('The downloaded file changed while it was being recorded.')
+  }
+  return { sizeBytes, sha256: hash.digest('hex') }
+}
 
 export const download = defineTool({
   name: 'download',
@@ -31,13 +54,19 @@ export const download = defineTool({
     const { suggestedFilename } = await captureDownload(session, dir, () =>
       ctx.session.input(args.page).click(args.ref),
     )
-    const path = join(dir, suggestedFilename)
-    recordBrowserOutputFile(path)
+    const safeFilename = basename(suggestedFilename.replaceAll('\\', '/'))
+    if (!safeFilename || safeFilename === '.' || safeFilename === '..') {
+      throw new Error('The downloaded filename is invalid.')
+    }
+    const path = join(dir, safeFilename)
+    const digest = await hashDownloadedFile(path)
+    const artifact = {
+      filename: safeFilename,
+      ...digest,
+    }
+    const artifactId = recordBrowserOutputArtifact({ path, ...artifact })
     return textResult(`Downloaded "${suggestedFilename}" to: ${path}`, {
-      page: args.page,
-      ref: args.ref,
-      path,
-      filename: suggestedFilename,
+      artifact: { ...artifact, artifactId },
     })
   },
 })

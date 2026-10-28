@@ -12,6 +12,7 @@ export function taskChangeKey(task: ExecutionTaskRecord): string {
   const lastStep = task.steps[task.steps.length - 1]
   return [
     task.id,
+    task.serverRunId ?? '',
     task.status,
     task.steps.length,
     lastStep?.id ?? '',
@@ -24,5 +25,11 @@ export function taskChangeKey(task: ExecutionTaskRecord): string {
     task.assistantMessageId ?? '',
     task.completedAt ?? '',
     task.responsePreview ?? '',
+    (task.artifacts ?? [])
+      .map(
+        (artifact) =>
+          `${artifact.filename}:${artifact.sizeBytes}:${artifact.sha256}`,
+      )
+      .join(','),
   ].join('|')
 }

@@ -9,7 +9,22 @@ import {
 
 export interface BrowserOutputFileAccess {
   readonly paths: ReadonlySet<string>
+  readonly artifacts: ReadonlyMap<
+    string,
+    {
+      path: string
+      filename: string
+      sizeBytes: number
+      sha256: string
+    }
+  >
   record(path: string): void
+  recordArtifact(input: {
+    path: string
+    filename: string
+    sizeBytes: number
+    sha256: string
+  }): string
 }
 
 const outputFileAccessStorage = new AsyncLocalStorage<BrowserOutputFileAccess>()
@@ -17,10 +32,26 @@ const outputFileAccessStorage = new AsyncLocalStorage<BrowserOutputFileAccess>()
 /** Creates per-agent access state for generated browser output files. */
 export function createBrowserOutputFileAccess(): BrowserOutputFileAccess {
   const paths = new Set<string>()
+  const artifacts = new Map<
+    string,
+    {
+      path: string
+      filename: string
+      sizeBytes: number
+      sha256: string
+    }
+  >()
   return {
     paths,
+    artifacts,
     record(path: string) {
       paths.add(path)
+    },
+    recordArtifact(input) {
+      const id = randomUUID()
+      paths.add(input.path)
+      artifacts.set(id, input)
+      return id
     },
   }
 }
@@ -37,6 +68,18 @@ export function withBrowserOutputFileAccess<T>(
 /** Allows the current agent to read a browser-generated output path later. */
 export function recordBrowserOutputFile(path: string): void {
   outputFileAccessStorage.getStore()?.record(path)
+}
+
+/** Registers a browser download and returns an opaque conversation-scoped capability. */
+export function recordBrowserOutputArtifact(input: {
+  path: string
+  filename: string
+  sizeBytes: number
+  sha256: string
+}): string {
+  const access = outputFileAccessStorage.getStore()
+  if (!access) throw new Error('Browser output artifact access is unavailable.')
+  return access.recordArtifact(input)
 }
 
 function sanitizeSegment(value: string): string {

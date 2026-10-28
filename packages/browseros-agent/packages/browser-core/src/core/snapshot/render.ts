@@ -1,6 +1,6 @@
 import type { AXNode } from './ax-types'
 import type { DocumentId, FrameId, RefMap } from './refs'
-import { INTERACTIVE_ROLES, ROOT_ROLES, SKIP_ROLES, VALUE_ROLES } from './roles'
+import { INTERACTIVE_ROLES, ROOT_ROLES, SKIP_ROLES } from './roles'
 
 const IFRAME_ROLES: ReadonlySet<string> = new Set(['Iframe', 'iframe'])
 
@@ -135,10 +135,12 @@ function formatLine(
   }
   if (cursorReasons !== undefined) line += ' [cursor=pointer]'
 
-  if (VALUE_ROLES.has(role)) {
-    const value = strVal(node.value)
-    if (value) line += `: ${JSON.stringify(value)}`
-  }
+  // Intentionally omit node.value for all roles. The pinned CDP AX schema does
+  // not reliably identify the underlying input type. A password input can be
+  // exposed as a textbox without any protocol property that distinguishes it
+  // from an ordinary text field. Snapshots also feed grep, cached diff
+  // baselines, and post-action tool output, so omission here protects all of
+  // those paths regardless of Chromium's password masking setting.
 
   return line
 }

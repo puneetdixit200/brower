@@ -47,6 +47,7 @@ import {
   type SaveConversationInput,
 } from '../../lib/conversations/conversation-store'
 import { logger } from '../../lib/logger'
+import { readAuthorizedBrowserOutputArtifact } from '../../tools/filesystem/browser-output-artifact'
 import type { KlavisService } from '../services/klavis'
 import type {
   BrowserMcpModule,
@@ -116,12 +117,21 @@ export class ChatService {
       deps.conversationRuns ?? new ConversationRuns({ activity: deps.activity })
   }
 
+  async readOutputArtifact(conversationId: string, artifactId: string) {
+    const session = this.deps.sessionStore.get(conversationId)
+    return await readAuthorizedBrowserOutputArtifact(
+      session?.outputFileAccess,
+      artifactId,
+    )
+  }
+
   async processMessage(
     request: HydratedChatRequest,
     _requestAbortSignal: AbortSignal,
   ): Promise<Response> {
+    let runId: string
     try {
-      await this.conversationRuns.start({
+      const startedRun = await this.conversationRuns.start({
         conversationId: request.conversationId,
         messages: [],
         panelTabIds: browserContextTabIds(request.browserContext),
@@ -129,7 +139,7 @@ export class ChatService {
         tabGroup: request.isScheduledTask
           ? undefined
           : conversationTabGroup(request),
-        createStream: async (abortSignal, _runId, updateMessages) => {
+        createStream: async (abortSignal, runId, updateMessages) => {
           if (
             request.target.type === 'claude' ||
             request.target.type === 'codex' ||
@@ -145,10 +155,12 @@ export class ChatService {
           return await this.processBrowserOsMessage(
             request as HydratedBrowserOsChatRequest,
             abortSignal,
+            runId,
             updateMessages,
           )
         },
       })
+      runId = startedRun.runId
     } catch (error) {
       if (error instanceof ConversationRunAlreadyActiveError) {
         return Response.json(
@@ -170,7 +182,8 @@ export class ChatService {
     }
 
     return createUIMessageStreamResponse({
-      stream: this.conversationRuns.subscribe(request.conversationId),
+      stream: this.conversationRuns.subscribe(request.conversationId, runId),
+      headers: { 'X-BrowserOS-Run-Id': runId },
     })
   }
 
@@ -204,6 +217,7 @@ export class ChatService {
   private async processBrowserOsMessage(
     request: HydratedBrowserOsChatRequest,
     abortSignal: AbortSignal,
+    runId: string,
     updateMessages: (messages: UIMessage[]) => boolean,
   ): Promise<ReadableStream<UIMessageChunk>> {
     const { sessionStore } = this.deps
@@ -510,6 +524,9 @@ export class ChatService {
         agent: session.agent.toolLoopAgent,
         uiMessages: promptUiMessages,
         abortSignal,
+        options: {
+          taskId: runId,
+        },
         // Without this the SDK substitutes its masking default, which discards
         // the status code, provider code, and message of every mid-stream
         // failure - including every rate limit and credit exhaustion.

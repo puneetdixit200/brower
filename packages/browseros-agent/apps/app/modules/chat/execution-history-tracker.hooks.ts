@@ -71,34 +71,45 @@ export function useExecutionHistoryTracker(options?: { enabled?: boolean }) {
   const lastSavedKeyRef = useRef('')
   const pendingWritesRef = useRef<Map<string, ExecutionTaskRecord>>(new Map())
   const writeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const writingRef = useRef(false)
+  const drainPromiseRef = useRef<Promise<void> | null>(null)
 
   const drainWrites = useCallback(async () => {
-    if (writingRef.current) return
-    writingRef.current = true
-    try {
-      while (pendingWritesRef.current.size > 0) {
-        const next = pendingWritesRef.current.entries().next().value
-        if (!next) break
-        const [taskId, task] = next
-        pendingWritesRef.current.delete(taskId)
-        try {
-          await upsertConversationExecutionTask(task)
-          // Advance the dedupe marker only after a successful write so a
-          // transient failure is retried by the next persist, not skipped.
-          lastSavedKeyRef.current = taskChangeKey(task)
-        } catch (error) {
-          sentry.captureException(error, {
-            extra: {
-              message: 'Failed to persist execution history task',
-              conversationId: task.conversationId,
-              taskId: task.id,
-            },
-          })
-        }
+    while (true) {
+      const activeDrain = drainPromiseRef.current
+      if (activeDrain) {
+        await activeDrain
+        continue
       }
-    } finally {
-      writingRef.current = false
+      if (pendingWritesRef.current.size === 0) return
+
+      const drain = (async () => {
+        while (pendingWritesRef.current.size > 0) {
+          const next = pendingWritesRef.current.entries().next().value
+          if (!next) break
+          const [taskId, task] = next
+          pendingWritesRef.current.delete(taskId)
+          try {
+            await upsertConversationExecutionTask(task)
+            // Advance the dedupe marker only after a successful write so a
+            // transient failure is retried by the next persist, not skipped.
+            lastSavedKeyRef.current = taskChangeKey(task)
+          } catch (error) {
+            sentry.captureException(error, {
+              extra: {
+                message: 'Failed to persist execution history task',
+                conversationId: task.conversationId,
+                taskId: task.id,
+              },
+            })
+          }
+        }
+      })()
+      drainPromiseRef.current = drain
+      try {
+        await drain
+      } finally {
+        if (drainPromiseRef.current === drain) drainPromiseRef.current = null
+      }
     }
   }, [])
 
@@ -152,6 +163,26 @@ export function useExecutionHistoryTracker(options?: { enabled?: boolean }) {
     [persistTask],
   )
 
+  const associateServerRunId = useCallback(
+    async (serverRunId: string) => {
+      const activeTask = activeTaskRef.current
+      const normalizedRunId = serverRunId.trim()
+      if (
+        activeTask?.status !== 'running' ||
+        normalizedRunId.length === 0 ||
+        activeTask.serverRunId === normalizedRunId
+      ) {
+        return
+      }
+      persistTask(
+        { ...activeTask, serverRunId: normalizedRunId },
+        { immediate: true },
+      )
+      await drainWrites()
+    },
+    [drainWrites, persistTask],
+  )
+
   const syncFromMessages = useCallback(
     (messages: UIMessage[], status: ChatStatus) => {
       const activeTask = activeTaskRef.current
@@ -178,6 +209,7 @@ export function useExecutionHistoryTracker(options?: { enabled?: boolean }) {
           deniedCount: normalized.deniedCount,
           errorCount: normalized.errorCount,
           steps: normalized.steps,
+          artifacts: normalized.artifacts,
         },
         { immediate: status === 'ready' || status === 'error' },
       )
@@ -226,6 +258,7 @@ export function useExecutionHistoryTracker(options?: { enabled?: boolean }) {
 
   return {
     startTask,
+    associateServerRunId,
     syncFromMessages,
     finishTask,
     clearActiveTask,

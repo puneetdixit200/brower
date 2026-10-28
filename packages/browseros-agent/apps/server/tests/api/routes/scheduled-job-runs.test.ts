@@ -42,7 +42,66 @@ function memoryStore(initial: ScheduledJobRunRow[] = []) {
       rows.set(saved.id, saved)
       return saved
     },
-    remove: async (id) => rows.delete(id),
+    start: async (input: ScheduledJobRunUpsert) => {
+      const sameRun = rows.get(input.id)
+      if (
+        sameRun?.jobId === input.jobId &&
+        sameRun.status === 'running' &&
+        sameRun.startedAt === input.startedAt &&
+        (sameRun.conversationId ?? null) === (input.conversationId ?? null)
+      ) {
+        return sameRun
+      }
+      if (
+        [...rows.values()].some(
+          (run) => run.jobId === input.jobId && run.status === 'running',
+        )
+      ) {
+        return null
+      }
+      const saved = {
+        ...row(),
+        ...input,
+        status: 'running',
+        createdAt: input.createdAt ?? 100,
+        updatedAt: 200,
+      } as ScheduledJobRunRow
+      rows.set(saved.id, saved)
+      return saved
+    },
+    finish: async (input: ScheduledJobRunUpsert) => {
+      const existing = rows.get(input.id)
+      if (
+        existing?.jobId === input.jobId &&
+        existing.startedAt === input.startedAt &&
+        (existing.conversationId ?? null) === (input.conversationId ?? null) &&
+        existing.status === 'running'
+      ) {
+        const saved = {
+          ...existing,
+          ...input,
+          updatedAt: 300,
+        } as ScheduledJobRunRow
+        rows.set(saved.id, saved)
+        return saved
+      }
+      if (
+        existing?.jobId === input.jobId &&
+        existing.startedAt === input.startedAt &&
+        (existing.conversationId ?? null) === (input.conversationId ?? null) &&
+        existing.status === input.status
+      ) {
+        return existing
+      }
+      return null
+    },
+    remove: async (id) => {
+      const existing = rows.get(id)
+      if (!existing) return 'missing'
+      if (existing.status === 'running') return 'running'
+      rows.delete(id)
+      return 'removed'
+    },
     prune: async (jobId, keep = 15) => {
       const ofJob = [...rows.values()]
         .filter((r) => r.jobId === jobId)
@@ -88,6 +147,81 @@ describe('scheduled job run routes', () => {
 
     expect(response.status).toBe(200)
     expect(rows.get(RUN_ID)).toMatchObject({ status: 'running' })
+  })
+
+  it('rejects a second running run for the same job', async () => {
+    const { store, rows } = memoryStore()
+    const routes = createScheduledJobRunRoutes({ store })
+    expect((await put(routes, body, 'first')).status).toBe(200)
+    const second = await put(routes, body, 'second')
+
+    expect(second.status).toBe(409)
+    expect(rows.size).toBe(1)
+    expect(rows.has('first')).toBe(true)
+  })
+
+  it('returns the existing run when the same start request is retried', async () => {
+    const { store, rows } = memoryStore()
+    const routes = createScheduledJobRunRoutes({ store })
+
+    expect((await put(routes, body, 'retryable-run')).status).toBe(200)
+    const retry = await put(routes, body, 'retryable-run')
+
+    expect(retry.status).toBe(200)
+    expect(rows.size).toBe(1)
+    expect(rows.get('retryable-run')).toMatchObject({
+      status: 'running',
+      startedAt: 1000,
+    })
+  })
+
+  it('rejects retries and terminal updates with a changed run identity', async () => {
+    const { store, rows } = memoryStore()
+    const routes = createScheduledJobRunRoutes({ store })
+    await put(routes, body, 'identity-run')
+
+    const changedStart = await put(
+      routes,
+      { ...body, startedAt: 2000 },
+      'identity-run',
+    )
+    expect(changedStart.status).toBe(409)
+
+    const response = await put(
+      routes,
+      {
+        ...body,
+        status: 'completed',
+        conversationId: '11111111-1111-4111-8111-111111111111',
+        completedAt: 2000,
+      },
+      'identity-run',
+    )
+
+    expect(response.status).toBe(409)
+    expect(rows.get('identity-run')).toMatchObject({ status: 'running' })
+  })
+
+  it('allows a terminal retry without rewriting the completed run', async () => {
+    const { store, rows } = memoryStore()
+    const routes = createScheduledJobRunRoutes({ store })
+    await put(routes, body, 'terminal-retry')
+    const completed = {
+      ...body,
+      status: 'completed' as const,
+      completedAt: 2000,
+      result: 'done',
+    }
+
+    expect((await put(routes, completed, 'terminal-retry')).status).toBe(200)
+    const retry = await put(
+      routes,
+      { ...completed, result: 'rewritten' },
+      'terminal-retry',
+    )
+
+    expect(retry.status).toBe(200)
+    expect(rows.get('terminal-retry')?.result).toBe('done')
   })
 
   it('keeps the tool call log across a write', async () => {
@@ -145,5 +279,15 @@ describe('scheduled job run routes', () => {
       (await routes.request(`/${RUN_ID}`, { method: 'DELETE' })).status,
     ).toBe(200)
     expect(rows.size).toBe(0)
+  })
+
+  it('rejects deleting a running run', async () => {
+    const routes = createScheduledJobRunRoutes(
+      memoryStore([row({ status: 'running', completedAt: null })]),
+    )
+
+    const response = await routes.request(`/${RUN_ID}`, { method: 'DELETE' })
+
+    expect(response.status).toBe(409)
   })
 })

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import { BROWSER_TOOLS } from '@browseros/browser-mcp/registry'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import {
@@ -14,6 +13,7 @@ import {
   uninstallFrom,
 } from '../../lib/mcp-manager'
 import type { KlavisService } from '../services/klavis'
+import { getProductBrowserMcpTools } from '../services/mcp/browser-mcp-catalog'
 
 interface McpManagerRouteOptions {
   /**
@@ -53,7 +53,7 @@ export function createMcpManagerRoutes(options: McpManagerRouteOptions) {
       // and without tripping the /mcp browser-request guard. Mirrors the tool set
       // that /mcp tools/list exposes: browser tools plus Klavis connector tools.
       try {
-        const browserTools = BROWSER_TOOLS.map((tool) => ({
+        const browserTools = getProductBrowserMcpTools().map((tool) => ({
           name: tool.name,
           description: tool.description,
         }))

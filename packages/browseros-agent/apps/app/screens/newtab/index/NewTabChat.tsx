@@ -269,6 +269,7 @@ export const NewTabChat: FC = () => {
           status={status}
           onStop={handleStop}
           sendDisabled={!canSend}
+          selectedProvider={selectedProvider ?? null}
           attachedTabs={attachedTabs}
           onToggleTab={toggleTabSelection}
           onRemoveTab={removeTab}

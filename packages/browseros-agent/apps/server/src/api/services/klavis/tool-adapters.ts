@@ -23,6 +23,8 @@ import type {
   UserIntegration,
 } from './types'
 
+const MAX_REMOTE_OUTPUT_DEPTH = 32
+
 export interface KlavisToolAdapterDeps {
   catalog: readonly ConnectorCatalogItem[]
   proxyStatus: KlavisProxyStatus
@@ -67,6 +69,90 @@ function connectorInputSchema(catalog: readonly ConnectorCatalogItem[]) {
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+function isSecretKey(key: string) {
+  const normalized = key
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+  return /(?:^|_)(?:api_?key|access_?token|refresh_?token|id_?token|auth_?token|client_?secret|password|passwd|authorization|credential|private_?key|cookie|secret|token)(?:_(?:value|data|text|raw|encoded|base64|pem|bytes|content))*$/.test(
+    normalized,
+  )
+}
+
+function scrubSecretText(text: string) {
+  return (
+    text
+      // Cookie names are arbitrary, so redact the complete value of each raw
+      // HTTP cookie header instead of trying to recognize individual pairs.
+      .replace(
+        /(^|\r?\n)([\t ]*(?:set-cookie|cookie)\s*:\s*)[^\r\n]*/gim,
+        '$1$2[REDACTED]',
+      )
+      // Serialized JSON sometimes arrives inside an MCP text block instead of
+      // as an object, so redact the whole quoted value before pair-wise rules.
+      .replace(
+        /("(?:set-cookie|cookie)"\s*:\s*")((?:\\.|[^"\\])*)"/gi,
+        '$1[REDACTED]"',
+      )
+      // Private-key blocks are multiline secrets and do not use key=value syntax.
+      .replace(
+        /-----BEGIN ((?:(?:RSA|EC|DSA|OPENSSH|ENCRYPTED) )?PRIVATE KEY)-----[\s\S]*?-----END \1-----/gi,
+        '[REDACTED PRIVATE KEY]',
+      )
+      .replace(
+        /(\bauthorization\b\s*["']?\s*[:=]\s*["']?)[^\r\n]*/gim,
+        '$1[REDACTED]',
+      )
+      .replace(/(\bBearer\s+)[A-Za-z0-9._~+/=-]+/gi, '$1[REDACTED]')
+      .replace(
+        /(\b(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|auth[_-]?token|client[_-]?secret|secret|token|password|passwd|credential|private[_-]?key|cookie)\b\s*["']?\s*[:=]\s*["']?)([^\s"',;}&]+)/gi,
+        '$1[REDACTED]',
+      )
+  )
+}
+
+function redactRemoteOutput<T>(value: T, depth = 0): T {
+  if (depth >= MAX_REMOTE_OUTPUT_DEPTH) {
+    if (typeof value === 'object' && value !== null) {
+      return '[REDACTED: nested content omitted]' as T
+    }
+    return typeof value === 'string'
+      ? ('[REDACTED: nested content omitted]' as T)
+      : value
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trimStart()
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      try {
+        const parsed: unknown = JSON.parse(value)
+        if (Array.isArray(parsed) || isObjectRecord(parsed)) {
+          return JSON.stringify(redactRemoteOutput(parsed, depth + 1)) as T
+        }
+      } catch {
+        // Non-JSON text still goes through the assignment and header scrubbers.
+      }
+    }
+    return scrubSecretText(value) as T
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item) =>
+      isObjectRecord(item) && item.type === 'image'
+        ? []
+        : [redactRemoteOutput(item, depth + 1)],
+    ) as T
+  }
+  if (isObjectRecord(value)) {
+    if (value.type === 'image') return undefined as T
+    return Object.fromEntries(
+      Object.entries(value).map(([key, child]) => [
+        key,
+        isSecretKey(key) ? '[REDACTED]' : redactRemoteOutput(child, depth + 1),
+      ]),
+    ) as T
+  }
+  return value
 }
 
 function summarizeKlavisArgs(args: Record<string, unknown>) {
@@ -164,14 +250,15 @@ async function buildConnectorToolPayload(
 }
 
 function klavisResultToModelOutput(output: unknown) {
-  if (!isObjectRecord(output) || !Array.isArray(output.content)) {
+  const safeOutput = redactRemoteOutput(output)
+  if (!isObjectRecord(safeOutput) || !Array.isArray(safeOutput.content)) {
     return {
       type: 'json' as const,
-      value: (output as JSONValue | undefined) ?? null,
+      value: (safeOutput as JSONValue | undefined) ?? null,
     }
   }
 
-  const result = output as CallToolResult
+  const result = safeOutput as CallToolResult
 
   return {
     type: 'content' as const,
@@ -180,13 +267,6 @@ function klavisResultToModelOutput(output: unknown) {
         return {
           type: 'text' as const,
           text: part.text,
-        }
-      }
-      if (part.type === 'image') {
-        return {
-          type: 'image-data' as const,
-          data: part.data,
-          mediaType: part.mimeType ?? 'image/png',
         }
       }
       return {
@@ -405,10 +485,11 @@ export function registerKlavisTools(
             })
           }
 
-          return result
+          return redactRemoteOutput(result)
         } catch (error) {
-          const errorText =
-            error instanceof Error ? error.message : String(error)
+          const errorText = scrubSecretText(
+            error instanceof Error ? error.message : String(error),
+          )
           const durationMs = Math.round(performance.now() - startTime)
 
           metrics.log('tool_executed', {

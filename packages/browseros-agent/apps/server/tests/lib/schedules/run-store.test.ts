@@ -3,6 +3,7 @@ import { mkdtempSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createScheduledJobRunRoutes } from '../../../src/api/routes/scheduled-job-runs'
 import { closeDb, initializeDb } from '../../../src/lib/db'
 import {
   dbScheduledJobRunStore,
@@ -43,11 +44,11 @@ describe('dbScheduledJobRunStore', () => {
     tempDirs.length = 0
   })
 
-  async function useTempDbWithJob() {
+  async function useTempDbWithJob(jobOverrides: Record<string, unknown> = {}) {
     const dir = mkdtempSync(join(tmpdir(), 'browseros-runs-test-'))
     tempDirs.push(dir)
     initializeDb({ dbPath: join(dir, 'db', 'browseros.sqlite') })
-    await dbScheduledJobStore.upsert(baseJob())
+    await dbScheduledJobStore.upsert({ ...baseJob(), ...jobOverrides })
   }
 
   test('round-trips a run including its tool calls', async () => {
@@ -86,6 +87,144 @@ describe('dbScheduledJobRunStore', () => {
       result: 'done',
     })
     expect(await dbScheduledJobRunStore.list()).toHaveLength(1)
+  })
+
+  test('atomically allows only one running run per job', async () => {
+    await useTempDbWithJob()
+    const [first, second] = await Promise.all([
+      dbScheduledJobRunStore.start(baseRun({ id: 'first', status: 'running' })),
+      dbScheduledJobRunStore.start(
+        baseRun({ id: 'second', status: 'running' }),
+      ),
+    ])
+
+    expect([first, second].filter(Boolean)).toHaveLength(1)
+    expect(
+      (await dbScheduledJobRunStore.list()).filter(
+        (run) => run.status === 'running',
+      ),
+    ).toHaveLength(1)
+  })
+
+  test('treats a retry with the same run id as an idempotent claim', async () => {
+    await useTempDbWithJob()
+    const first = await dbScheduledJobRunStore.start(
+      baseRun({ id: 'retryable-run', status: 'running' }),
+    )
+    const retry = await dbScheduledJobRunStore.start(
+      baseRun({ id: 'retryable-run', status: 'running' }),
+    )
+
+    expect(retry).toEqual(first)
+    expect(
+      await dbScheduledJobRunStore.start(
+        baseRun({ id: 'retryable-run', status: 'running', startedAt: 2000 }),
+      ),
+    ).toBeNull()
+    expect(await dbScheduledJobRunStore.list()).toHaveLength(1)
+  })
+
+  test('heartbeat claims must use the saved job conversation identity', async () => {
+    const conversationId = '11111111-1111-4111-8111-111111111111'
+    await useTempDbWithJob({ mode: 'heartbeat', conversationId })
+
+    expect(
+      await dbScheduledJobRunStore.start(
+        baseRun({
+          id: 'wrong-conversation',
+          status: 'running',
+          conversationId: '22222222-2222-4222-8222-222222222222',
+        }),
+      ),
+    ).toBeNull()
+    expect(
+      await dbScheduledJobRunStore.start(
+        baseRun({
+          id: 'right-conversation',
+          status: 'running',
+          conversationId,
+        }),
+      ),
+    ).toMatchObject({ conversationId, status: 'running' })
+  })
+
+  test('SQLite route cannot delete a running claim and admit a competitor', async () => {
+    await useTempDbWithJob()
+    const routes = createScheduledJobRunRoutes()
+    const put = (id: string) =>
+      routes.request(`/${id}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          jobId: JOB_ID,
+          status: 'running',
+          startedAt: 1000,
+        }),
+      })
+
+    expect((await put('active-run')).status).toBe(200)
+    expect(
+      (await routes.request('/active-run', { method: 'DELETE' })).status,
+    ).toBe(409)
+    expect(await dbScheduledJobRunStore.remove('active-run')).toBe('running')
+    expect((await put('competing-run')).status).toBe(409)
+    expect(await dbScheduledJobRunStore.get('active-run')).toMatchObject({
+      status: 'running',
+    })
+  })
+
+  test('SQLite route rejects a run for a missing scheduled job', async () => {
+    await useTempDbWithJob()
+    const routes = createScheduledJobRunRoutes()
+    const response = await routes.request('/orphan-run', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jobId: 'missing-job',
+        status: 'running',
+        startedAt: 1000,
+      }),
+    })
+
+    expect(response.status).toBe(409)
+    expect(await dbScheduledJobRunStore.get('orphan-run')).toBeNull()
+  })
+
+  test('finish preserves run identity and is idempotent after completion', async () => {
+    await useTempDbWithJob()
+    const running = await dbScheduledJobRunStore.start(
+      baseRun({
+        status: 'running',
+        conversationId: '11111111-1111-4111-8111-111111111111',
+      }),
+    )
+    expect(running).not.toBeNull()
+
+    expect(
+      await dbScheduledJobRunStore.finish(
+        baseRun({
+          status: 'completed',
+          conversationId: '22222222-2222-4222-8222-222222222222',
+          completedAt: 2000,
+        }),
+      ),
+    ).toBeNull()
+
+    const completion = baseRun({
+      status: 'completed',
+      conversationId: '11111111-1111-4111-8111-111111111111',
+      completedAt: 2000,
+      result: 'done',
+    })
+    const saved = await dbScheduledJobRunStore.finish(completion)
+    expect(saved).toMatchObject({ status: 'completed', result: 'done' })
+    expect(
+      await dbScheduledJobRunStore.finish({ ...completion, result: 'changed' }),
+    ).toEqual(saved)
+    expect(await dbScheduledJobRunStore.get(RUN_ID)).toMatchObject({
+      conversationId: '11111111-1111-4111-8111-111111111111',
+      result: 'done',
+    })
   })
 
   // Cascade, unlike the job to provider reference which is set null. A run
@@ -127,6 +266,30 @@ describe('dbScheduledJobRunStore', () => {
     const remaining = await dbScheduledJobRunStore.list()
     expect(remaining).toHaveLength(MAX_RUNS_PER_JOB)
     expect(remaining[0].startedAt).toBe(1000 + MAX_RUNS_PER_JOB + 4)
+  })
+
+  test('prune preserves an old running claim beyond terminal retention', async () => {
+    await useTempDbWithJob()
+    for (let i = 0; i < MAX_RUNS_PER_JOB; i += 1) {
+      await dbScheduledJobRunStore.upsert(
+        baseRun({ id: `terminal-${i}`, startedAt: 10_000 + i }),
+      )
+    }
+    const active = await dbScheduledJobRunStore.start(
+      baseRun({ id: 'old-running', status: 'running', startedAt: 1 }),
+    )
+
+    expect(active).not.toBeNull()
+    expect(await dbScheduledJobRunStore.prune(JOB_ID)).toBe(0)
+    expect(await dbScheduledJobRunStore.get('old-running')).toMatchObject({
+      status: 'running',
+      startedAt: 1,
+    })
+    expect(
+      await dbScheduledJobRunStore.start(
+        baseRun({ id: 'second-running', status: 'running', startedAt: 20_000 }),
+      ),
+    ).toBeNull()
   })
 
   test('prune leaves a job under the cap alone', async () => {

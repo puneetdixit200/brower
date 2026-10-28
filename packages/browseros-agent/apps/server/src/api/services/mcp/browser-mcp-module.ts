@@ -16,14 +16,16 @@ import { tabs } from '@browseros/browser-mcp/tools/tabs'
 import type { BrowserContext } from '@browseros/shared/schemas/browser-context'
 import { z } from 'zod/v4'
 import { decideActionPolicy } from '../../../agent/action-policy'
+import { INLINED_ENV } from '../../../env'
 import { logger } from '../../../lib/logger'
 import { shouldLogToolRegistration } from '../../../tools/registration-log-sampling'
 import type { ConversationRuns } from '../conversation-runs'
 import type { KlavisService } from '../klavis'
 import type { ServerActivity } from '../server-activity'
+import { getProductBrowserMcpTools } from './browser-mcp-catalog'
 import { dispatchBrowserTool } from './browser-tool-dispatch'
 import { ConversationTabGroups } from './conversation-tab-groups'
-import { MCP_INSTRUCTIONS } from './mcp-prompt'
+import { getProductMcpInstructions } from './mcp-prompt'
 
 export { BROWSEROS_TOOL_LEASE_HEADER } from '../../../lib/browser-tool-lease'
 
@@ -141,7 +143,9 @@ export class BrowserMcpModule {
     // The query may further restrict a caller but can never weaken a lease.
     const readOnly = Boolean(lease?.readOnly || input.requestedReadOnly)
     const source = lease?.source ?? 'mcp'
-    const tools = readOnly ? READ_ONLY_BROWSER_TOOLS : BROWSER_TOOLS
+    const tools = getProductBrowserMcpTools(
+      readOnly ? READ_ONLY_BROWSER_TOOLS : undefined,
+    )
     const selectedServerNames = lease?.browserContext?.enabledMcpServers ?? []
 
     const server = createBrowserMcpServer({
@@ -150,7 +154,7 @@ export class BrowserMcpModule {
       version: this.deps.version,
       browserSession: this.deps.browserSession,
       defaultWindowId: lease?.browserContext?.windowId,
-      instructions: MCP_INSTRUCTIONS,
+      instructions: getProductMcpInstructions(INLINED_ENV.ASTER_SERVER_BUILD),
       registration: {
         tools,
         includeStructuredContent: input.includeStructuredContent ?? false,

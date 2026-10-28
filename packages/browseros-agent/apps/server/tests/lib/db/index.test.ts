@@ -220,6 +220,9 @@ describe('database initialization', () => {
       old.sqlite.exec('ALTER TABLE memories DROP COLUMN source_id')
       dropHeartbeatColumns(old.sqlite)
       old.sqlite.exec('DROP TABLE conversation_run_state')
+      old.sqlite.exec('DROP TABLE conversation_run_trace_events')
+      old.sqlite.exec('DROP TABLE action_policy_rules')
+      old.sqlite.exec('DROP INDEX scheduled_job_runs_one_running_per_job')
       // Drizzle replays from the newest recorded marker, so rewinding to
       // before the headers migration means clearing everything from it
       // onwards, not just its own row.
@@ -258,6 +261,34 @@ describe('database initialization', () => {
     expect(handle.db.select().from(providers).all()).toEqual([])
   })
 
+  it('adds the trace degradation marker to an existing lifecycle table in packaged fallback mode', () => {
+    const dir = mkTempDir()
+    const dbPath = join(dir, 'browseros.sqlite')
+    const legacy = new BunDatabase(dbPath)
+    legacy.exec(`
+      CREATE TABLE conversation_run_state (
+        conversation_id text PRIMARY KEY NOT NULL,
+        run_id text NOT NULL,
+        status text NOT NULL,
+        started_at integer NOT NULL,
+        finished_at integer
+      )
+    `)
+    legacy.close()
+
+    const handle = initializeDb({
+      dbPath,
+      migrationsDir: join(dir, 'missing-migrations'),
+    })
+    const columns = handle.sqlite
+      .query<{ name: string }, []>('PRAGMA table_info(conversation_run_state)')
+      .all()
+
+    expect(columns.map((column) => column.name)).toContain(
+      'trace_persistence_degraded',
+    )
+  })
+
   it('bootstraps the current schema when a migration directory is empty', () => {
     const dir = mkTempDir()
     const migrationsDir = join(dir, 'empty-migrations')
@@ -271,6 +302,68 @@ describe('database initialization', () => {
     expect(handle.migrationsDir).toBe(null)
     expectCurrentSchema(handle)
     expect(handle.db.select().from(providers).all()).toEqual([])
+  })
+
+  it('fails duplicate running jobs closed before the unique migration index', () => {
+    const { dbPath } = createDbWithDuplicateRunningRows()
+    const handle = initializeDb({ dbPath })
+
+    expect(
+      handle.sqlite
+        .query<{ status: string; error: string }, []>(
+          'SELECT status, error FROM scheduled_job_runs ORDER BY id',
+        )
+        .all(),
+    ).toEqual([
+      {
+        status: 'failed',
+        error: 'Execution state is uncertain after overlapping scheduled runs',
+      },
+      {
+        status: 'failed',
+        error: 'Execution state is uncertain after overlapping scheduled runs',
+      },
+    ])
+    handle.sqlite.exec(`
+      INSERT INTO scheduled_job_runs (
+        id, job_id, status, started_at, created_at, updated_at
+      ) VALUES ('new-run', 'overlapping-job', 'running', 3, 3, 3)
+    `)
+    expect(() =>
+      handle.sqlite.exec(`
+        INSERT INTO scheduled_job_runs (
+          id, job_id, status, started_at, created_at, updated_at
+        ) VALUES ('second-new-run', 'overlapping-job', 'running', 4, 4, 4)
+      `),
+    ).toThrow()
+  })
+
+  it('fails duplicate running jobs closed in the packaged schema fallback', () => {
+    const { dir, dbPath } = createDbWithDuplicateRunningRows()
+    const handle = initializeDb({
+      dbPath,
+      migrationsDir: join(dir, 'missing-migrations'),
+    })
+
+    expect(
+      handle.sqlite
+        .query<{ status: string }, []>(
+          'SELECT status FROM scheduled_job_runs ORDER BY id',
+        )
+        .all(),
+    ).toEqual([{ status: 'failed' }, { status: 'failed' }])
+    handle.sqlite.exec(`
+      INSERT INTO scheduled_job_runs (
+        id, job_id, status, started_at, created_at, updated_at
+      ) VALUES ('new-run', 'overlapping-job', 'running', 3, 3, 3)
+    `)
+    expect(() =>
+      handle.sqlite.exec(`
+        INSERT INTO scheduled_job_runs (
+          id, job_id, status, started_at, created_at, updated_at
+        ) VALUES ('second-new-run', 'overlapping-job', 'running', 4, 4, 4)
+      `),
+    ).toThrow()
   })
 
   it('skips empty packaged migration resources', () => {
@@ -409,6 +502,27 @@ describe('database initialization', () => {
       'scheduled_job_runs',
       'scheduled_jobs',
     ])
+    expect(
+      handle.sqlite
+        .query<{ name: string }, []>(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'conversation_run_trace_events'",
+        )
+        .get(),
+    ).toEqual({ name: 'conversation_run_trace_events' })
+    expect(
+      handle.sqlite
+        .query<{ name: string }, []>(
+          'PRAGMA table_info(conversation_run_trace_events)',
+        )
+        .all()
+        .map((row) => row.name),
+    ).toEqual([
+      'sequence',
+      'conversation_id',
+      'run_id',
+      'event_id',
+      'event_json',
+    ])
     const memoryColumns = handle.sqlite
       .query<{ name: string }, []>('PRAGMA table_info(memories)')
       .all()
@@ -443,11 +557,14 @@ describe('database initialization', () => {
     old.sqlite.exec('ALTER TABLE memories DROP COLUMN source_id')
     dropHeartbeatColumns(old.sqlite)
     old.sqlite.exec('DROP TABLE conversation_run_state')
+    old.sqlite.exec('DROP TABLE conversation_run_trace_events')
     // Stand the database up as it was before the hosted provider was retired,
     // by undoing the migration that removes it and re-inserting the row.
     old.sqlite
       .query('DELETE FROM __drizzle_migrations WHERE created_at >= ?')
       .run(migrationCreatedAt('0013_drop_browseros_provider'))
+    old.sqlite.exec('DROP TABLE action_policy_rules')
+    old.sqlite.exec('DROP INDEX scheduled_job_runs_one_running_per_job')
     restoreProfileIdColumns(old.sqlite)
     old.sqlite.exec(
       "INSERT INTO providers (id, kind, type, name, model_id, context_window, base_url, is_default, created_at, updated_at) VALUES ('browseros', 'llm', 'browseros', 'BrowserOS', 'browseros-auto', 200000, 'https://api.browseros.com/v1', 1, 1, 1)",
@@ -486,6 +603,48 @@ describe('database initialization', () => {
     const dir = mkdtempSync(join(tmpdir(), 'browseros-db-test-'))
     tempDirs.push(dir)
     return dir
+  }
+
+  function createDbWithDuplicateRunningRows(): { dir: string; dbPath: string } {
+    const dir = mkTempDir()
+    const dbPath = join(dir, 'browseros.sqlite')
+    const sourceMigrations = join(
+      import.meta.dir,
+      '../../../src/lib/db/migrations',
+    )
+    const migrationsDir = join(dir, 'migrations-before-run-lock')
+    const journal = JSON.parse(
+      readFileSync(join(sourceMigrations, 'meta/_journal.json'), 'utf8'),
+    )
+    journal.entries = journal.entries.filter(
+      (entry: { idx: number }) => entry.idx <= 21,
+    )
+    mkdirSync(join(migrationsDir, 'meta'), { recursive: true })
+    writeFileSync(
+      join(migrationsDir, 'meta/_journal.json'),
+      JSON.stringify(journal),
+    )
+    for (const entry of journal.entries as { tag: string }[]) {
+      cpSync(
+        join(sourceMigrations, `${entry.tag}.sql`),
+        join(migrationsDir, `${entry.tag}.sql`),
+      )
+    }
+
+    const legacy = new BunDatabase(dbPath)
+    migrate(drizzle(legacy), { migrationsFolder: migrationsDir })
+    legacy.exec(`
+      INSERT INTO scheduled_jobs (
+        id, name, query, schedule_type, created_at, updated_at
+      ) VALUES ('overlapping-job', 'Legacy task', 'do work', 'daily', 1, 1);
+      INSERT INTO scheduled_job_runs (
+        id, job_id, status, started_at, created_at, updated_at
+      ) VALUES
+        ('run-a', 'overlapping-job', 'running', 1, 1, 1),
+        ('run-b', 'overlapping-job', 'running', 2, 2, 2);
+    `)
+    legacy.close()
+    return { dir, dbPath }
   }
 })
 

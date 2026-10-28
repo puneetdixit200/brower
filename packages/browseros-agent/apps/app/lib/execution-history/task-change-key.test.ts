@@ -78,4 +78,26 @@ describe('taskChangeKey', () => {
 
     expect(taskChangeKey(first)).not.toBe(taskChangeKey(second))
   })
+
+  it('changes when the server run identity is associated', () => {
+    const before = task()
+    const after = task({ serverRunId: 'server-run-1' })
+
+    expect(taskChangeKey(before)).not.toBe(taskChangeKey(after))
+  })
+
+  it('changes when an artifact descriptor changes', () => {
+    const before = task()
+    const after = task({
+      artifacts: [
+        {
+          artifactId: '00000000-0000-4000-8000-000000000001',
+          filename: 'result.csv',
+          sizeBytes: 10,
+          sha256: 'a'.repeat(64),
+        },
+      ],
+    })
+    expect(taskChangeKey(before)).not.toBe(taskChangeKey(after))
+  })
 })

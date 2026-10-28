@@ -31,17 +31,38 @@ const history: ExecutionHistoryByConversation = {
   first: {
     conversationId: 'conversation/one',
     updatedAt: 1,
-    tasks: [task('running-1', 'running'), task('done', 'completed')],
+    tasks: [
+      { ...task('running-1', 'running'), serverRunId: 'run-1' },
+      task('done', 'completed'),
+    ],
   },
   second: {
     conversationId: 'conversation/one',
     updatedAt: 1,
-    tasks: [task('running-2', 'running'), task('failed', 'failed')],
+    tasks: [
+      { ...task('running-2', 'running'), serverRunId: 'run-2' },
+      task('failed', 'failed'),
+    ],
   },
 }
 
-function response(status: number): Response {
-  return new Response(null, { status })
+const singleRunningHistory: ExecutionHistoryByConversation = {
+  first: {
+    conversationId: 'conversation/one',
+    updatedAt: 1,
+    tasks: [
+      { ...task('running-1', 'running'), serverRunId: 'run-1' },
+      task('done', 'completed'),
+    ],
+  },
+}
+
+function response(status: number, body?: unknown): Response {
+  return new Response(body === undefined ? null : JSON.stringify(body), {
+    status,
+    headers:
+      body === undefined ? undefined : { 'Content-Type': 'application/json' },
+  })
 }
 
 describe('interrupted execution recovery', () => {
@@ -76,13 +97,151 @@ describe('interrupted execution recovery', () => {
     )
   })
 
-  it.each([200, 500, 503])(
-    'does not create markers for HTTP %s',
-    async (status) => {
-      const markers = await reconcileInterruptedExecutionTasks(history, {
+  it('reconciles a 200 interrupted snapshot', async () => {
+    const markers = await reconcileInterruptedExecutionTasks(
+      singleRunningHistory,
+      {
         serverUrl: 'http://127.0.0.1:9000',
-        fetchImpl: async () => response(status),
-      })
+        fetchImpl: async () =>
+          response(200, {
+            conversationId: 'conversation/one',
+            runId: 'run-1',
+            status: 'interrupted',
+            chunkCount: 0,
+          }),
+        now: () => '2026-10-27T02:00:00.000Z',
+      },
+    )
+
+    expect(markers).toEqual([
+      {
+        taskId: 'running-1',
+        conversationId: 'conversation/one',
+        status: 'interrupted',
+        completedAt: '2026-10-27T02:00:00.000Z',
+      },
+    ])
+  })
+
+  it.each([
+    ['completed', 'completed'],
+    ['failed', 'failed'],
+    ['aborted', 'stopped'],
+  ] as const)(
+    'maps a 200 %s snapshot to local %s',
+    async (serverStatus, localStatus) => {
+      const markers = await reconcileInterruptedExecutionTasks(
+        singleRunningHistory,
+        {
+          serverUrl: 'http://127.0.0.1:9000',
+          fetchImpl: async () =>
+            response(200, {
+              conversationId: 'conversation/one',
+              runId: 'run-1',
+              status: serverStatus,
+              chunkCount: 0,
+            }),
+          now: () => '2026-10-27T02:00:00.000Z',
+        },
+      )
+
+      expect(markers.map((marker) => marker.status)).toEqual([localStatus])
+    },
+  )
+
+  it.each([200, 500, 503])(
+    'does not create markers for HTTP %s without a recognized terminal snapshot',
+    async (status) => {
+      const markers = await reconcileInterruptedExecutionTasks(
+        singleRunningHistory,
+        {
+          serverUrl: 'http://127.0.0.1:9000',
+          fetchImpl: async () =>
+            response(
+              status,
+              status === 200
+                ? {
+                    conversationId: 'conversation/one',
+                    runId: 'run-1',
+                    status: 'running',
+                    chunkCount: 1,
+                  }
+                : undefined,
+            ),
+        },
+      )
+      expect(markers).toEqual([])
+    },
+  )
+
+  it('reconciles only the running task whose server run id matches the snapshot', async () => {
+    const markers = await reconcileInterruptedExecutionTasks(history, {
+      serverUrl: 'http://127.0.0.1:9000',
+      fetchImpl: async () =>
+        response(200, {
+          conversationId: 'conversation/one',
+          runId: 'run-1',
+          status: 'completed',
+          chunkCount: 2,
+        }),
+    })
+
+    expect(markers.map((marker) => marker.taskId)).toEqual(['running-1'])
+  })
+
+  it.each([
+    { runId: undefined, chunkCount: 0 },
+    { runId: '', chunkCount: 0 },
+    { runId: 'run-1', chunkCount: undefined },
+    { runId: 'run-1', chunkCount: '0' },
+  ])(
+    'ignores terminal snapshots missing valid runId/chunkCount: %o',
+    async (fields) => {
+      const markers = await reconcileInterruptedExecutionTasks(
+        singleRunningHistory,
+        {
+          serverUrl: 'http://127.0.0.1:9000',
+          fetchImpl: async () =>
+            response(200, {
+              conversationId: 'conversation/one',
+              status: 'completed',
+              ...fields,
+            }),
+        },
+      )
+
+      expect(markers).toEqual([])
+    },
+  )
+
+  it.each([undefined, 'another-run'] as const)(
+    'fails closed when the local task has no matching server run id: %s',
+    async (serverRunId) => {
+      const historyWithoutMatchingRun: ExecutionHistoryByConversation = {
+        first: {
+          ...singleRunningHistory.first,
+          tasks: [
+            {
+              ...task('running-1', 'running'),
+              ...(serverRunId ? { serverRunId } : {}),
+            },
+          ],
+        },
+      }
+      const markers = await reconcileInterruptedExecutionTasks(
+        historyWithoutMatchingRun,
+        {
+          serverUrl: 'http://127.0.0.1:9000',
+          fetchImpl: async () =>
+            response(200, {
+              conversationId: 'conversation/one',
+              runId: 'run-1',
+              status: 'completed',
+              chunkCount: 1,
+            }),
+        },
+      )
+
       expect(markers).toEqual([])
     },
   )

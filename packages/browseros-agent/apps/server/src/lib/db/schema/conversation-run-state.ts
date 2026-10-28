@@ -15,6 +15,11 @@ export const conversationRunState = sqliteTable(
     status: text('status').notNull(),
     startedAt: integer('started_at').notNull(),
     finishedAt: integer('finished_at'),
+    tracePersistenceDegraded: integer('trace_persistence_degraded', {
+      mode: 'boolean',
+    })
+      .notNull()
+      .default(false),
   },
   (table) => [index('conversation_run_state_status_idx').on(table.status)],
 )

@@ -21,12 +21,23 @@ export function isSafeTaskForDisplay(task: ExecutionTaskRecord): boolean {
     !containsCredentialShapedText(task.promptText) &&
     !containsCredentialShapedText(task.responseText ?? '') &&
     !containsCredentialShapedText(task.responsePreview ?? '') &&
+    (task.artifacts ?? []).every(
+      (artifact) =>
+        !containsCredentialShapedText(artifact.filename) &&
+        !/[\\/\0]/.test(artifact.filename) &&
+        Number.isSafeInteger(artifact.sizeBytes) &&
+        artifact.sizeBytes >= 0 &&
+        /^[a-f0-9]{64}$/i.test(artifact.sha256) &&
+        (!artifact.artifactId || /^[a-f0-9-]{36}$/i.test(artifact.artifactId)),
+    ) &&
     task.steps.every(
       (step) =>
         !containsCredentialShapedText(step.toolName) &&
         !containsCredentialShapedText(step.previewText) &&
         !containsCredentialShapedText(step.errorText ?? '') &&
-        !containsCredentialShapedText(step.approval?.reason ?? ''),
+        !containsCredentialShapedText(step.approval?.reason ?? '') &&
+        (!step.artifact ||
+          !containsCredentialShapedText(step.artifact.filename)),
     )
   )
 }

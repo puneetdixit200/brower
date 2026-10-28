@@ -27,6 +27,7 @@ export {
 export type { BrowserOutputFileAccess } from './tools/output-file'
 export {
   createBrowserOutputFileAccess,
+  recordBrowserOutputArtifact,
   recordBrowserOutputFile,
   withBrowserOutputFileAccess,
 } from './tools/output-file'

@@ -57,9 +57,36 @@ describe('renderSnapshot', () => {
         '- main',
         '  - heading "Results" [level=1]',
         '  - button "Load more" [disabled] [ref=e2]',
-        '  - textbox "Search" [ref=e3]: "abc"',
+        '  - textbox "Search" [ref=e3]',
       ].join('\n'),
     )
+  })
+
+  test('never renders AX values for value-bearing roles, including exposed passwords', () => {
+    const sentinel = 'password-sentinel-7e8f2c'
+    const nodes: AXNode[] = [
+      ax('1', 'RootWebArea', { children: ['2', '3', '4'] }),
+      ax('2', 'textbox', {
+        name: name('Password'),
+        backendDOMNodeId: 1,
+        value: { type: 'string', value: sentinel },
+      }),
+      ax('3', 'searchbox', {
+        name: name('Search'),
+        value: { type: 'string', value: 'ordinary search text' },
+      }),
+      ax('4', 'textarea', {
+        name: name('Notes'),
+        value: { type: 'string', value: 'ordinary textarea text' },
+      }),
+    ]
+
+    const out = renderSnapshot(nodes, { refs: new RefMap() })
+
+    expect(out.text).toContain('textbox "Password" [ref=e1]')
+    expect(out.text).not.toContain(sentinel)
+    expect(out.text).not.toContain('ordinary search text')
+    expect(out.text).not.toContain('ordinary textarea text')
   })
 
   test('drops unnamed generic wrappers, lifting children to parent depth', () => {

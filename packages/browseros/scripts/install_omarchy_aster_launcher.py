@@ -17,6 +17,7 @@ import tempfile
 IDENTIFIER = "aster-browser-debug"
 DESKTOP_NAME = f"{IDENTIFIER}.desktop"
 MANAGED = "X-Aster-Managed=true"
+ICON_MANAGED = b"<!-- X-Aster-Managed: aster-browser-debug -->"
 
 
 def _user_data() -> Path:
@@ -69,12 +70,17 @@ def install(binary: Path, icon: Path, *, replace_managed: bool, ozone: str = "au
     if ozone not in ("auto", "wayland", "x11"):
         raise ValueError("ozone must be auto, wayland or x11")
     desktop, icon_dest, profile = _paths()
+    if desktop.is_symlink():
+        raise ValueError(f"Refusing to overwrite symlinked launcher: {desktop}")
     if desktop.exists() or desktop.is_symlink():
         if not replace_managed or MANAGED not in desktop.read_text(encoding="utf-8"):
             raise ValueError(
                 f"Launcher already exists at {desktop}. "
                 "Only --replace-managed may update an Aster-owned launcher."
             )
+    if icon_dest.exists() or icon_dest.is_symlink():
+        if icon_dest.is_symlink() or ICON_MANAGED not in icon_dest.read_bytes():
+            raise ValueError(f"Refusing to overwrite an icon not owned by Aster: {icon_dest}")
     # Keep the compiled debug browser independent from all other Chromium
     # product profiles, including a future signed Aster installation.
     ozone_option = (
@@ -102,7 +108,7 @@ def install(binary: Path, icon: Path, *, replace_managed: bool, ozone: str = "au
     )
     # Read the source first; do not hardlink to the repo and do not touch any
     # other icon IDs or user-defined default browser settings.
-    icon_bytes = icon.read_bytes()
+    icon_bytes = icon.read_bytes().rstrip() + b"\n" + ICON_MANAGED + b"\n"
     _write_managed(icon_dest, icon_bytes)
     _write_managed(desktop, contents.encode("utf-8"))
     print(f"Installed Aster launcher: {desktop}")
@@ -120,7 +126,7 @@ def uninstall() -> None:
         if MANAGED not in desktop.read_text(encoding="utf-8"):
             raise ValueError("Refusing to remove a desktop file not owned by Aster")
         desktop.unlink()
-        if icon.is_file() and not icon.is_symlink():
+        if icon.is_file() and not icon.is_symlink() and ICON_MANAGED in icon.read_bytes():
             icon.unlink()
     print(f"Removed managed launcher (if present). User profile retained: {profile}")
 

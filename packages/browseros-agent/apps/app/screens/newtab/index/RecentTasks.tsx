@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { useIncognitoWindow } from '@/lib/browseros/use-incognito-window'
 import {
-  applyExecutionRecoveryMarkers,
   executionRecoveryMarkerKey,
   isExecutionRecoveryMarker,
 } from '@/lib/execution-history/recovery'
@@ -11,14 +10,15 @@ import type {
   ExecutionHistoryByConversation,
   ExecutionTaskRecord,
 } from '@/lib/execution-history/types'
-import { flattenExecutionHistory } from '@/screens/task-history/task-history'
+import { buildRecentTasks } from './recent-tasks'
 
 const HISTORY_KEY = 'executionHistoryByConversation'
-const MAX_RECENT_TASKS = 3
 
 function StatusIcon({ status }: { status: ExecutionTaskRecord['status'] }) {
   if (status === 'completed') {
-    return <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
+    return (
+      <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
+    )
   }
   if (status === 'running') {
     return <CircleDashed className="size-4 text-primary" />
@@ -80,9 +80,7 @@ export function RecentTasks() {
             ? [marker]
             : []
         })
-        const recent = flattenExecutionHistory(
-          applyExecutionRecoveryMarkers(history, markers),
-        ).slice(0, MAX_RECENT_TASKS)
+        const recent = buildRecentTasks(history, markers)
         if (active && current === generation) {
           setTasks(recent)
           setError(false)
@@ -99,7 +97,8 @@ export function RecentTasks() {
       if (
         area === 'local' &&
         Object.keys(changes).some(
-          (key) => key === HISTORY_KEY || key.startsWith('executionHistoryRecovery:'),
+          (key) =>
+            key === HISTORY_KEY || key.startsWith('executionHistoryRecovery:'),
         )
       ) {
         void refresh()
@@ -133,7 +132,10 @@ export function RecentTasks() {
       </div>
 
       {error ? (
-        <p role="alert" className="rounded-lg border p-3 text-muted-foreground text-sm">
+        <p
+          role="alert"
+          className="rounded-lg border p-3 text-muted-foreground text-sm"
+        >
           Could not read local tasks. Open Task History to retry.
         </p>
       ) : (

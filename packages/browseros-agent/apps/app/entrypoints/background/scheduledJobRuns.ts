@@ -1,13 +1,19 @@
 import { onScheduleMessage } from '@/lib/messaging/schedules/scheduleMessages'
 import { createAlarmFromJob } from '@/lib/schedules/createAlarmFromJob'
 import { getChatServerResponse } from '@/lib/schedules/getChatServerResponse'
-import { mayContinueHeartbeat } from '@/lib/schedules/heartbeat-continuation'
+import {
+  buildHeartbeatContinuationMessage,
+  mayContinueHeartbeat,
+} from '@/lib/schedules/heartbeat-continuation'
 import {
   handleScheduledAlarm,
   SCHEDULE_RECONCILIATION_ALARM,
   SCHEDULED_JOB_ALARM_PREFIX,
 } from '@/lib/schedules/scheduled-alarm-handler'
-import type { ScheduledJobRun } from '@/lib/schedules/scheduleTypes'
+import type {
+  ScheduledJob,
+  ScheduledJobRun,
+} from '@/lib/schedules/scheduleTypes'
 import {
   listScheduledJobRunsOrNull,
   listScheduledJobsOrNull,
@@ -122,6 +128,38 @@ export const scheduledJobRuns = async () => {
     if (updated) await putScheduledJob(updated)
   }
 
+  const getHeartbeatContinuationMessage = async (
+    jobId: string,
+    job: ScheduledJob,
+  ): Promise<string | undefined> => {
+    const previousRuns = await listScheduledJobRunsOrNull()
+    if (previousRuns === null) {
+      throw new Error('Cannot verify the previous heartbeat before continuing')
+    }
+    const previous = previousRuns
+      .filter((run) => run.jobId === jobId)
+      .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))[0]
+    if (!mayContinueHeartbeat(previous?.status, job.conversationId)) {
+      throw new Error(
+        'Heartbeat paused because its previous run did not complete; review the run before resuming',
+      )
+    }
+    if (!previous) return undefined
+
+    const message = buildHeartbeatContinuationMessage(
+      job.query,
+      previous,
+      jobId,
+      job.conversationId,
+    )
+    if (!message) {
+      throw new Error(
+        'Heartbeat paused because the completed run identity is incomplete or does not match; review the run before resuming',
+      )
+    }
+    return message
+  }
+
   const executeScheduledJob = async (jobId: string): Promise<void> => {
     if (activeJobIds.has(jobId)) {
       throw new Error(`Job is already running: ${jobId}`)
@@ -138,21 +176,9 @@ export const scheduledJobRuns = async () => {
         throw new Error(`Job not found: ${jobId}`)
       }
 
+      let continuationMessage: string | undefined
       if (job.mode === 'heartbeat') {
-        const previousRuns = await listScheduledJobRunsOrNull()
-        if (previousRuns === null) {
-          throw new Error(
-            'Cannot verify the previous heartbeat before continuing',
-          )
-        }
-        const previous = previousRuns
-          .filter((run) => run.jobId === jobId)
-          .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))[0]
-        if (!mayContinueHeartbeat(previous?.status, job.conversationId)) {
-          throw new Error(
-            'Heartbeat paused because its previous run did not complete; review the run before resuming',
-          )
-        }
+        continuationMessage = await getHeartbeatContinuationMessage(jobId, job)
       }
 
       let conversationId = job.conversationId
@@ -172,7 +198,7 @@ export const scheduledJobRuns = async () => {
 
       try {
         const response = await getChatServerResponse({
-          message: job.query,
+          message: continuationMessage ?? job.query,
           conversationId,
           persistScheduledTask: job.mode === 'heartbeat',
           signal: abortController.signal,

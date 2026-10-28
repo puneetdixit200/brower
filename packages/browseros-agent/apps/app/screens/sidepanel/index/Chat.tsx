@@ -29,6 +29,7 @@ import { ChatError } from './ChatError'
 import { ChatFooter } from './ChatFooter'
 import { ChatMessages } from './ChatMessages'
 import { HumanLoginHandoff } from './HumanLoginHandoff'
+import { continuationTabs } from './human-login-handoff'
 import { IncognitoNotice } from './IncognitoNotice'
 import { prepareSourceResearch } from './research-request'
 
@@ -389,7 +390,29 @@ export const Chat = () => {
         </div>
       )}
       {mode === 'agent' && (
-        <HumanLoginHandoff onStop={handleStop} attachedTabs={attachedTabs} />
+        <HumanLoginHandoff
+          onStop={handleStop}
+          onContinue={async (prompt) => {
+            let targetTabs = attachedTabs
+            if (!targetTabs.length) {
+              try {
+                targetTabs = await chrome.tabs.query({ currentWindow: true })
+              } catch {
+                return false
+              }
+            }
+            targetTabs = continuationTabs(attachedTabs, targetTabs)
+            if (!targetTabs.length) return false
+            const action = createBrowserOSAction({
+              mode: 'agent',
+              message: prompt,
+              tabs: targetTabs,
+              contextPrivacy: 'human-login-continuation',
+            })
+            return sendMessage({ text: prompt, action })
+          }}
+          attachedTabs={attachedTabs}
+        />
       )}
 
       <ChatFooter
@@ -403,6 +426,7 @@ export const Chat = () => {
         status={status}
         onStop={handleStop}
         sendDisabled={!canSend}
+        selectedProvider={selectedProvider}
         attachedTabs={attachedTabs}
         onToggleTab={toggleTabSelection}
         onRemoveTab={removeTab}

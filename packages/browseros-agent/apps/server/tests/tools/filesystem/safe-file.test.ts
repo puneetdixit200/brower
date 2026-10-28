@@ -91,6 +91,40 @@ describe('descriptor-anchored filesystem access', () => {
     }
   })
 
+  if (process.platform !== 'win32') {
+    it('opens a FIFO nonblocking when the POSIX caller omits O_NONBLOCK', async () => {
+      const fifo = join(root, 'input.pipe')
+      const created = Bun.spawnSync(['mkfifo', fifo])
+      expect(created.exitCode).toBe(0)
+
+      const rootHandle = await openWorkspaceRoot(root)
+      try {
+        let timeout: ReturnType<typeof setTimeout> | undefined
+        const opening = openPosixRelative(
+          rootHandle,
+          'input.pipe',
+          constants.O_RDONLY,
+        )
+        const file = await Promise.race([
+          opening,
+          new Promise<never>((_, reject) => {
+            timeout = setTimeout(
+              () => reject(new Error('FIFO open blocked')),
+              1_000,
+            )
+          }),
+        ]).finally(() => clearTimeout(timeout))
+        try {
+          expect((await file.readFile()).length).toBe(0)
+        } finally {
+          await file.close()
+        }
+      } finally {
+        await rootHandle.close()
+      }
+    })
+  }
+
   it('rejects a parent symlink swapped in after validation for reads and writes', async () => {
     const checkedDir = join(root, 'checked')
     const validatedFile = join(checkedDir, 'file.txt')

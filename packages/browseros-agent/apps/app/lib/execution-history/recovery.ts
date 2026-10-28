@@ -6,7 +6,7 @@ import type {
 export interface ExecutionRecoveryMarker {
   taskId: string
   conversationId: string
-  status: 'interrupted'
+  status: Exclude<ExecutionTaskRecord['status'], 'running'>
   completedAt: string
 }
 
@@ -33,12 +33,48 @@ export function isExecutionRecoveryMarker(
   return (
     typeof candidate.taskId === 'string' &&
     typeof candidate.conversationId === 'string' &&
-    candidate.status === 'interrupted' &&
+    (candidate.status === 'completed' ||
+      candidate.status === 'stopped' ||
+      candidate.status === 'failed' ||
+      candidate.status === 'interrupted') &&
     typeof candidate.completedAt === 'string'
   )
 }
 
-/** Return per-task markers only when the server confirms the run is absent. */
+interface TerminalRunSnapshot {
+  runId: string
+  status: ExecutionRecoveryMarker['status']
+}
+
+function terminalTaskStatusFromSnapshot(
+  snapshot: unknown,
+  conversationId: string,
+): TerminalRunSnapshot | undefined {
+  if (!snapshot || typeof snapshot !== 'object') return undefined
+  const candidate = snapshot as Record<string, unknown>
+  if (
+    candidate.conversationId !== conversationId ||
+    typeof candidate.runId !== 'string' ||
+    candidate.runId.trim().length === 0 ||
+    typeof candidate.chunkCount !== 'number' ||
+    !Number.isFinite(candidate.chunkCount)
+  ) {
+    return undefined
+  }
+
+  switch (candidate.status) {
+    case 'completed':
+    case 'failed':
+    case 'interrupted':
+      return { runId: candidate.runId, status: candidate.status }
+    case 'aborted':
+      return { runId: candidate.runId, status: 'stopped' }
+    default:
+      return undefined
+  }
+}
+
+/** Reconcile running local tasks against the server's current run state. */
 export async function reconcileInterruptedExecutionTasks(
   history: ExecutionHistoryByConversation,
   {
@@ -53,7 +89,11 @@ export async function reconcileInterruptedExecutionTasks(
   const uniqueConversationIds = [
     ...new Set(runningConversations.map((item) => item.conversationId)),
   ]
-  const missingRuns = new Set<string>()
+  const terminalRuns = new Map<
+    string,
+    | { status: 'interrupted'; runId?: undefined }
+    | { status: ExecutionRecoveryMarker['status']; runId: string }
+  >()
 
   await Promise.all(
     uniqueConversationIds.map(async (conversationId) => {
@@ -62,7 +102,18 @@ export async function reconcileInterruptedExecutionTasks(
           `${serverUrl}/chat/${encodeURIComponent(conversationId)}/state`,
           { cache: 'no-store' },
         )
-        if (response.status === 404) missingRuns.add(conversationId)
+        if (response.status === 404) {
+          terminalRuns.set(conversationId, {
+            status: 'interrupted',
+          })
+        } else if (response.status === 200) {
+          const snapshot: unknown = await response.json().catch(() => undefined)
+          const terminalRun = terminalTaskStatusFromSnapshot(
+            snapshot,
+            conversationId,
+          )
+          if (terminalRun) terminalRuns.set(conversationId, terminalRun)
+        }
       } catch {
         // Startup and network failures do not prove that a run was lost.
       }
@@ -70,18 +121,23 @@ export async function reconcileInterruptedExecutionTasks(
   )
 
   const completedAt = now()
-  return runningConversations
-    .filter((conversation) => missingRuns.has(conversation.conversationId))
-    .flatMap((conversation) =>
-      conversation.tasks
-        .filter((task) => task.status === 'running')
-        .map((task) => ({
-          taskId: task.id,
-          conversationId: conversation.conversationId,
-          status: 'interrupted' as const,
-          completedAt,
-        })),
-    )
+  return runningConversations.flatMap((conversation) => {
+    const terminalRun = terminalRuns.get(conversation.conversationId)
+    if (!terminalRun) return []
+    return conversation.tasks
+      .filter(
+        (task) =>
+          task.status === 'running' &&
+          (terminalRun.runId === undefined ||
+            task.serverRunId === terminalRun.runId),
+      )
+      .map((task) => ({
+        taskId: task.id,
+        conversationId: conversation.conversationId,
+        status: terminalRun.status,
+        completedAt,
+      }))
+  })
 }
 
 /** Overlay markers only on matching tasks that still exist and remain running. */
@@ -108,7 +164,7 @@ export function applyExecutionRecoveryMarkers(
       changed = true
       return {
         ...task,
-        status: 'interrupted',
+        status: marker.status,
         completedAt: marker.completedAt,
       }
     })
