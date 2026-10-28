@@ -14,7 +14,8 @@ const MAX_STRING = 400
 const MAX_OUTPUT = 6000
 
 function cleanText(value: string): string {
-  if (SENSITIVE_VALUE.test(value)) return '[redacted: credential-shaped content]'
+  // Preserve the destination origin for human review without exposing query
+  // parameters. URLs containing ?secret= are not hidden wholesale.
   if (/^https?:\/\//i.test(value)) {
     try {
       const address = new URL(value)
@@ -26,6 +27,7 @@ function cleanText(value: string): string {
       return '[invalid URL]'
     }
   }
+  if (SENSITIVE_VALUE.test(value)) return '[redacted: credential-shaped content]'
   if (value.length > MAX_STRING) return value.slice(0, MAX_STRING) + '… [truncated]'
   return value
 }
