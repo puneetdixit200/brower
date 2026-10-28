@@ -15,6 +15,7 @@ import {
   TaskTrigger,
 } from '@/components/ai-elements/task'
 import { Button } from '@/components/ui/button'
+import { formatApprovalInput } from './approval-preview'
 import type {
   ToolInvocationInfo,
   ToolInvocationState,
@@ -83,7 +84,10 @@ export const ToolBatch: FC<ToolBatchProps> = ({
             </TaskItem>
             {tool.state === 'approval-requested' && tool.approval?.id && (
               <div className="mt-2 ml-6 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
-                <p className="font-medium text-sm">Review this action</p>
+                <p className="font-medium text-sm">Review and authorize this action</p>
+                <p className="mt-1 text-muted-foreground text-xs">
+                  The following is a redacted preview. Deny if the target or side effect is unclear.
+                </p>
                 {tool.approval.reason && (
                   <p className="mt-1 text-muted-foreground text-xs">
                     {tool.approval.reason}
@@ -131,29 +135,6 @@ const formatToolName = (name: string) => {
     ?.replace(/_/g, ' ')
     ?.replace(/([a-z])([A-Z])/g, '$1 $2')
     ?.replace(/^./, (s) => s.toUpperCase())
-}
-
-function formatApprovalInput(input: Record<string, unknown>): string {
-  const redact = (value: unknown, key = ''): unknown => {
-    if (/(password|secret|token|api.?key|authorization|cookie)/i.test(key)) {
-      return '[redacted]'
-    }
-    if (Array.isArray(value)) return value.map((item) => redact(item))
-    if (typeof value === 'object' && value !== null) {
-      return Object.fromEntries(
-        Object.entries(value).map(([childKey, childValue]) => [
-          childKey,
-          redact(childValue, childKey),
-        ]),
-      )
-    }
-    return value
-  }
-  try {
-    return JSON.stringify(redact(input), null, 2)
-  } catch {
-    return 'Action details are unavailable.'
-  }
 }
 
 const isToolCompleted = (state: ToolInvocationState) =>
