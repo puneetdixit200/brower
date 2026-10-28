@@ -84,9 +84,12 @@ export const ToolBatch: FC<ToolBatchProps> = ({
             </TaskItem>
             {tool.state === 'approval-requested' && tool.approval?.id && (
               <div className="mt-2 ml-6 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
-                <p className="font-medium text-sm">Review and authorize this action</p>
+                <p className="font-medium text-sm">
+                  Review and authorize this action
+                </p>
                 <p className="mt-1 text-muted-foreground text-xs">
-                  The following is a redacted preview. Deny if the target or side effect is unclear.
+                  The following is a redacted preview. Deny if the target or
+                  side effect is unclear.
                 </p>
                 {tool.approval.reason && (
                   <p className="mt-1 text-muted-foreground text-xs">
