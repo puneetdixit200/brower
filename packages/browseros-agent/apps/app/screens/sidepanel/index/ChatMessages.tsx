@@ -153,6 +153,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
                         <p className="mt-1 text-muted-foreground">
                           {RESEARCH_LEDGER_LIMITATION}
                         </p>
+                        {researchLedger.unattributedQuoteCount > 0 && (
+                          <p role="status" className="mt-2 text-muted-foreground">
+                            {researchLedger.unattributedQuoteCount} quote(s) had
+                            multiple nearby source URLs and were not attributed
+                            to any page. Review those citations manually.
+                          </p>
+                        )}
                         {researchLedger.entries.length > 0 ? (
                           <ul className="mt-2 space-y-1">
                             {researchLedger.entries.map((entry) => (
