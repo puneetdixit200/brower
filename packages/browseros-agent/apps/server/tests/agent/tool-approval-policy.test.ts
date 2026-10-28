@@ -42,7 +42,14 @@ describe('tool approval policy', () => {
   })
 
   it('requires review for tab close and external side-effect connector tools', () => {
-    for (const action of ['close', 'new', 'pin', 'move', 'duplicate', 'unknown']) {
+    for (const action of [
+      'close',
+      'new',
+      'pin',
+      'move',
+      'duplicate',
+      'unknown',
+    ]) {
       expect(
         decideToolApproval({ toolName: 'tabs', input: { action } }).required,
         `tabs/${action} should require approval`,
