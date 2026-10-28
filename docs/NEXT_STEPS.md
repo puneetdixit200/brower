@@ -66,3 +66,7 @@ The [master build specification](OMARCHY_ASIDE_INSPIRED_BROWSER_MASTER_BUILD_SPE
 ## Local verification resumed — 2026-10-28
 
 Fetched 66 remote commits and fast-forwarded cleanly from `fd3e59910` to `179ef1eb3`. Earlier source-only entries below are historical; the latest execution evidence supersedes their unrun-check status only where explicitly recorded. Luna handles implementation/checks; Terra reviews native integration. The overall goal is active and incomplete.
+
+## Latest stop checkpoint — 2026-10-28
+
+The user-requested 5% remaining allowance threshold was reached. All current work and this full next-step plan are committed/pushed; agents are complete and owned native/test processes are stopped. This goal is paused pending a resume request. Four native objects compile (product, product-state, server config, server manager). Next: loader and crash-reporter object checks, full linked browser/sandbox build, native runtime verification, and continued implementation of all remaining features per CONTINUATION_HANDOFF.md and the 95-task plan.

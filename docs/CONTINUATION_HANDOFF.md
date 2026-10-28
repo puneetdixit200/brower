@@ -1,6 +1,6 @@
 # Aster continuation handoff and full implementation plan
 
-Updated 2026-10-28. The full project remains incomplete. This file supplements, and does not reduce, the original master specification or the 95-subtask implementation plan.
+Updated 2026-10-28. The full project remains incomplete. This goal is paused at the user-requested 5% allowance threshold; resume only when requested. This file supplements, and does not reduce, the original master specification or the 95-subtask implementation plan.
 
 ## Mandatory implementation scope
 

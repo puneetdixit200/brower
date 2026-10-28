@@ -348,3 +348,7 @@ The extension app router now lazily loads 15 secondary views (settings, task his
 - At the handoff checkpoint, actual server configuration and manager object preflight finished with exit 0 (2,556 actions). Alongside product.o, three requested Aster-related translation units compile; linking, remaining changed objects and runtime are still open. No build is left running by that finished preflight.
 
 - Actual pinned compilation of `browseros_product_state.o` also passed (one action, exit 0). Product, product-state, server config and server manager objects are now verified compiled. Loader/crash-reporter compilation, linking, package creation and runtime acceptance remain open.
+
+### Five-percent allowance pause — 2026-10-28
+
+The configured account allowance reached 5% remaining. Per the user instruction, the complete source/docs checkpoint and next implementation plan are pushed, owned builds/tests are stopped and agents are complete. The goal is paused, not complete. Continue from CONTINUATION_HANDOFF.md on a resume request.
