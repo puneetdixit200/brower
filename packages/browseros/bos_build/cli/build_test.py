@@ -583,6 +583,7 @@ class GnArgPlumbingTest(_ProfileMixin):
             chromium_src=None,
             source_sha=None,
             extra_gn_args=("symbol_level=2",),
+            aster_unpacked_dev=False,
         )
         kwargs.update(overrides)
         return kwargs
@@ -624,6 +625,36 @@ class GnArgPlumbingTest(_ProfileMixin):
             self.assertEqual(ctx.resource_mode, "source")
             self.assertEqual(ctx.prepared_resources, prepared.resolve())
             self.assertEqual(ctx.source_sha, "a" * 40)
+
+    def test_aster_unpacked_dev_option_reaches_debug_source_context(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            m = MockChromium(Path(tmp))
+            with (
+                scrubbed_env(),
+                mock.patch(
+                    "bos_build.cli.build._resolve_source_sha",
+                    return_value="a" * 40,
+                ),
+            ):
+                projection = _resolve_preset(
+                    **self._preset_kwargs(
+                        preset="debug",
+                        product="aster",
+                        resource_mode="source",
+                        aster_unpacked_dev=True,
+                        chromium_src=m.src,
+                    )
+                )
+                runs = projection.build_runs()
+
+        self.assertEqual(len(runs), 1)
+        ctx, steps = runs[0]
+        self.assertEqual(ctx.product.id, "aster")
+        self.assertEqual(ctx.build_type, "debug")
+        self.assertEqual(ctx.resource_mode, "source")
+        self.assertTrue(ctx.aster_unpacked_dev)
+        self.assertIn("bundled_extensions", steps)
+        self.assertIn("configure", steps)
 
     def test_source_sha_override_reaches_provenance_validation(self):
         profile_path = self._profile("preset: release\nresource_mode: source\n")

@@ -156,6 +156,7 @@ class GetAppPathTest(unittest.TestCase):
                 'browseros_product = "browseros"',
                 "browseros_allow_runtime_product_override = true",
                 "browseros_package_all_server_resources = true",
+                "aster_use_unpacked_dev_extension = false",
             ],
         )
 
@@ -175,6 +176,7 @@ class GetAppPathTest(unittest.TestCase):
                         f'browseros_product = "{product}"',
                         "browseros_allow_runtime_product_override = false",
                         "browseros_package_all_server_resources = false",
+                        "aster_use_unpacked_dev_extension = false",
                     ],
                 )
 

@@ -45,9 +45,9 @@ git merge --ff-only aster/feat/aster-linux-ui
 
 cd packages/browseros
 export BROWSEROS_NINJA_JOBS=2
-uv run browseros build --preset debug --product aster --arch x64 \\
-  --resource-mode source --aster-unpacked-dev --provision none \\
-  --no-clean --no-sign --no-upload \\
+uv run browseros build --preset debug --product aster --arch x64 \
+  --resource-mode source --aster-unpacked-dev --provision none \
+  --no-clean --no-sign --no-upload \
   --chromium-src /ABSOLUTE/PATH/TO/PINNED/CHROMIUM/src
 ```
 
@@ -61,11 +61,11 @@ After reviewing and synchronizing `aster/feat/aster-linux-ui` without overwritin
 ```sh
 cd /home/puneet/Projects/aster-browser/upstream-browseros
 # Existing pinned Chromium checkout is expected at the path below.
-python3 packages/browseros/scripts/aster_native_debug_build.py \\
+python3 packages/browseros/scripts/aster_native_debug_build.py \
   --chromium-src /ABSOLUTE/PATH/TO/PINNED/CHROMIUM/src --jobs 2
 # The same driver can provision shallowly when explicitly requested:
-# python3 packages/browseros/scripts/aster_native_debug_build.py \\
-#   --chromium-src /ABSOLUTE/PATH/TO/PINNED/CHROMIUM/src \\
+# python3 packages/browseros/scripts/aster_native_debug_build.py \
+#   --chromium-src /ABSOLUTE/PATH/TO/PINNED/CHROMIUM/src \
 #   --provision shallow --jobs 2
 ```
 
@@ -74,7 +74,7 @@ The driver checks for a clean `feat/aster-linux-ui` checkout, minimum free disk,
 Only after an Aster debug binary is actually built and its path verified, the optional desktop entry can be installed:
 
 ```sh
-python3 packages/browseros/scripts/install_omarchy_aster_launcher.py install \\
+python3 packages/browseros/scripts/install_omarchy_aster_launcher.py install \
   --binary /ABSOLUTE/PATH/TO/BUILT/ASTER/BINARY
 # Removes the managed desktop entry, not your debug profile:
 python3 packages/browseros/scripts/install_omarchy_aster_launcher.py uninstall
@@ -83,7 +83,7 @@ python3 packages/browseros/scripts/install_omarchy_aster_launcher.py uninstall
 Once running, record numeric memory/CPU benchmarks with a real browser PID:
 
 ```sh
-python3 packages/browseros/scripts/aster_perf_sample.py \\
+python3 packages/browseros/scripts/aster_perf_sample.py \
   --pid ACTUAL_BROWSER_PID --label aster --seconds 60
 ```
 

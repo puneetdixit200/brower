@@ -13,7 +13,7 @@ from typing import cast
 from unittest.mock import patch
 
 import yaml
-from .resources import ResourcesModule, copy_resources_impl, stage_prepared_onboarding
+from .resources import ResourcesModule, copy_resources_impl, stage_prepared_onboarding, write_aster_server_gn_manifest
 from ...core.context import Context
 from ...core.step import ValidationError
 from ...lib.testing import MockBrowserOSRoot, MockChromium, make_context
@@ -607,6 +607,30 @@ class ResourcesModuleValidateTest(unittest.TestCase):
             )
             with self.assertRaises(ValidationError):
                 ResourcesModule().validate(ctx)
+
+
+class AsterServerManifestTest(unittest.TestCase):
+    def test_manifest_requires_executables_and_enumerates_all_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp)
+            parent = src / "chrome/browser/browseros/aster_server"
+            resources = parent / "resources"
+            for name in ("bin/aster_server", "bin/third_party/bun", "migrations/0001.sql"):
+                file = resources / name
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_text("fixture")
+            with self.assertRaisesRegex(ValueError, "non-executable"):
+                write_aster_server_gn_manifest(src)
+            for name in ("bin/aster_server", "bin/third_party/bun"):
+                (resources / name).chmod(0o755)
+            write_aster_server_gn_manifest(src)
+            manifest = (parent / "aster_server_sources.gni").read_text()
+            self.assertIn('"bin/aster_server"', manifest)
+            self.assertIn('"bin/third_party/bun"', manifest)
+            self.assertIn('"migrations/0001.sql"', manifest)
+            (resources / "unsafe").symlink_to(resources / "bin/aster_server")
+            with self.assertRaisesRegex(ValueError, "Unsafe"):
+                write_aster_server_gn_manifest(src)
 
 
 if __name__ == "__main__":

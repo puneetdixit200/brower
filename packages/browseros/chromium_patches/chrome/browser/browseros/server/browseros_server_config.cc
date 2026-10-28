@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..c383a4374cc5a7bd4c4408c4efbdeb7d96acdc23
 --- /dev/null
 +++ b/chrome/browser/browseros/server/browseros_server_config.cc
-@@ -0,0 +1,204 @@
+@@ -0,0 +1,205 @@
 +// Copyright 2024 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -11,6 +11,7 @@ index 0000000000000000000000000000000000000000..c383a4374cc5a7bd4c4408c4efbdeb7d
 +#include "chrome/browser/browseros/server/browseros_server_config.h"
 +
 +#include "base/strings/stringprintf.h"
++#include "chrome/browser/browseros/buildflags.h"
 +#include "chrome/browser/browseros/core/browseros_product.h"
 +
 +namespace browseros {
@@ -58,12 +59,12 @@ index 0000000000000000000000000000000000000000..c383a4374cc5a7bd4c4408c4efbdeb7d
 +
 +constexpr ManagedServerDescriptor kAsterServerDescriptor = {
 +    Product::kAster,
-+    "Aster server (resources not integrated)",
++    "Aster development server",
 +    FILE_PATH_LITERAL("AsterServer"),
 +    FILE_PATH_LITERAL("aster_server"),
 +    FILE_PATH_LITERAL("config.json"),
 +    "/system/health",
-+    false,  // No Aster server binary/resources are registered yet.
++    BUILDFLAG(ASTER_UNPACKED_DEV_EXTENSION),  // Explicit development only.
 +    false,  // Never query BrowserOS/BrowserClaw release feeds.
 +    {
 +        FILE_PATH_LITERAL("AsterServer"),

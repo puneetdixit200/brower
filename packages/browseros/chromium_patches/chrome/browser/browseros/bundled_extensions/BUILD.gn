@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..dcc0720c667865f28b40801cd250c5aadcfe60d1
 --- /dev/null
 +++ b/chrome/browser/browseros/bundled_extensions/BUILD.gn
-@@ -0,0 +1,68 @@
+@@ -0,0 +1,71 @@
 +# Copyright 2024 The Chromium Authors
 +# Use of this source code is governed by a BSD-style license that can be
 +# found in the LICENSE file.
@@ -54,6 +54,9 @@ index 0000000000000000000000000000000000000000..dcc0720c667865f28b40801cd250c5aa
 +      "$root_out_dir/browseros_extensions/aster_unpacked_dev.stamp",
 +      "$root_out_dir/browseros_extensions/bundled_extensions.json",
 +    ]
++    foreach(source, aster_unpacked_dev_sources) {
++      outputs += [ "$root_out_dir/browseros_extensions/$source" ]
++    }
 +    args = [
 +      rebase_path("aster_unpacked_dev", root_build_dir),
 +      rebase_path("$root_out_dir/browseros_extensions/aster_unpacked_dev", root_build_dir),

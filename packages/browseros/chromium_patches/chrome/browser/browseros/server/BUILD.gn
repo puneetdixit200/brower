@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..f291703753d8a98bc66727e28b6175193514301d
 --- /dev/null
 +++ b/chrome/browser/browseros/server/BUILD.gn
-@@ -0,0 +1,184 @@
+@@ -0,0 +1,206 @@
 +# Copyright 2024 The Chromium Authors
 +# Use of this source code is governed by a BSD-style license that can be
 +# found in the LICENSE file.
@@ -79,6 +79,7 @@ index 0000000000000000000000000000000000000000..f291703753d8a98bc66727e28b617519
 +  deps = [
 +    "//base",
 +    "//chrome/browser:browser_process",
++    "//chrome/browser/browseros:buildflags",
 +    "//chrome/browser/browseros/core:product",
 +    "//chrome/common",
 +    "//components/prefs",
@@ -165,8 +166,29 @@ index 0000000000000000000000000000000000000000..f291703753d8a98bc66727e28b617519
 +  }
 +}
 +
++if (browseros_product_aster && aster_use_unpacked_dev_extension) {
++  import("//chrome/browser/browseros/aster_server/aster_server_sources.gni")
++  action("aster_server_resources_copy") {
++    script = "stage_aster_server.py"
++    sources = []
++    outputs = [ "$root_out_dir/AsterServer/default/aster_server.stamp" ]
++    foreach(file, aster_server_files) {
++      sources += [ "//chrome/browser/browseros/aster_server/resources/$file" ]
++      outputs += [ "$root_out_dir/AsterServer/default/resources/$file" ]
++    }
++    args = [
++      rebase_path("//chrome/browser/browseros/aster_server/resources", root_build_dir),
++      rebase_path("$root_out_dir/AsterServer/default/resources", root_build_dir),
++      rebase_path(outputs[0], root_build_dir),
++    ]
++  }
++}
++
 +group("browseros_server_resources") {
 +  deps = []
++  if (browseros_product_aster && aster_use_unpacked_dev_extension) {
++    deps += [ ":aster_server_resources_copy" ]
++  }
 +
 +  if (is_mac) {
 +    if (browseros_product_browseros ||

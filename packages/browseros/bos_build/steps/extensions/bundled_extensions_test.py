@@ -6,11 +6,13 @@ import json
 import os
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
 from bos_build.core.context import Context
 from bos_build.core.products import (
+    ASTER_EXTENSION_ID,
     BROWSEROS_AGENT_EXTENSION_ID,
     BROWSEROS_BUG_REPORTER_EXTENSION_ID,
     BROWSERCLAW_EXTENSION_ID,
@@ -19,6 +21,9 @@ from bos_build.core.products import (
 from bos_build.release.prepared_resources import (
     PreparedFile,
     PreparedResourcesManifest,
+)
+from bos_build.release.extensions.aster_unpacked_dev import (
+    AsterUnpackedDevelopmentExtension,
 )
 from bos_build.steps.extensions.bundled_extensions import (
     BundledExtensionsModule,
@@ -31,6 +36,105 @@ SOURCE_SHA = "2" * 40
 
 
 class BundledExtensionsTest(unittest.TestCase):
+    def test_aster_unpacked_dev_stages_tree_without_fake_crx(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            chromium = root / "chromium"
+            chromium.mkdir()
+            prepared = root / "prepared"
+            prepared.mkdir()
+            archive_path = prepared / "aster.zip"
+            extension_files = {
+                "manifest.json": b'{"manifest_version":3}',
+                "assets/app.js": b"console.log('aster')",
+            }
+            with zipfile.ZipFile(archive_path, "w") as archive:
+                for name, content in extension_files.items():
+                    archive.writestr(name, content)
+            archive_file = PreparedFile(
+                path="aster.zip",
+                size=archive_path.stat().st_size,
+                sha256=hashlib.sha256(archive_path.read_bytes()).hexdigest(),
+                version="0.1.0",
+            )
+            manifest = PreparedResourcesManifest(
+                product="aster",
+                parent_sha="1" * 40,
+                source_sha=SOURCE_SHA,
+                browser_version="0.0.1",
+                component_versions={"aster": "0.1.0"},
+                files={"product_unpacked_zip": archive_file},
+                extension_mode="unpacked-dev",
+            )
+            ctx = Context(
+                root_dir=root,
+                chromium_src=chromium,
+                architecture="x64",
+                build_type="debug",
+                product=get_product_descriptor("aster"),
+                resource_mode="source",
+                aster_unpacked_dev=True,
+                prepared_resources=prepared,
+                source_sha=SOURCE_SHA,
+                chromium_version="1.0.0.0",
+                browseros_build_offset="1",
+                browseros_version_parts=(1, 0, 0, 1),
+                browseros_chromium_version="1.0.0.1",
+                semantic_version="0.0.1",
+            )
+            output = BundledExtensionsModule()._get_output_dir(ctx)
+            output.mkdir(parents=True)
+            (output / "stale.crx").write_bytes(b"stale")
+            (output / "stale.json").write_text("{}")
+
+            validated = AsterUnpackedDevelopmentExtension(
+                directory=Path("/validated"),
+                extension_id="aster-id",
+                version="0.1.0",
+                files=tuple(sorted(extension_files)),
+                bytes_total=sum(map(len, extension_files.values())),
+            )
+            with (
+                patch(f"{MODULE}.validated_common_resources", return_value=manifest),
+                patch(f"{MODULE}._validate_unpacked_zip") as validate_zip,
+                patch(
+                    f"{MODULE}.validate_aster_unpacked_debug",
+                    return_value=validated,
+                ) as validate_tree,
+            ):
+                BundledExtensionsModule().execute(ctx)
+
+            validate_zip.assert_called_once_with(
+                archive_path,
+                expected_version="0.1.0",
+                expected_id=ASTER_EXTENSION_ID,
+            )
+            validate_tree.assert_called_once()
+            staged = output / "aster_unpacked_dev"
+            self.assertEqual(
+                {
+                    path.relative_to(staged).as_posix(): path.read_bytes()
+                    for path in staged.rglob("*")
+                    if path.is_file()
+                },
+                extension_files,
+            )
+            self.assertEqual(
+                (output / "aster_unpacked_dev_sources.gni").read_text(),
+                'aster_unpacked_dev_sources = [\n  "aster_unpacked_dev/assets/app.js",\n'
+                '  "aster_unpacked_dev/manifest.json",\n]\n',
+            )
+            self.assertEqual(
+                json.loads((output / "bundled_extensions.json").read_text()), {}
+            )
+            self.assertEqual(list(output.glob("*.crx")), [])
+            self.assertEqual(
+                ctx.artifact_registry.get("aster_unpacked_development"), staged
+            )
+            self.assertEqual(
+                ctx.artifact_registry.get("common_manifest_digest"), manifest.digest()
+            )
+
     def test_manifest_url_defaults_to_live_bundled_manifest(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(

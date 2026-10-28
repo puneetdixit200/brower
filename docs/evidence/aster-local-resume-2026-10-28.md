@@ -1,0 +1,28 @@
+# Aster local continuation — 2026-10-28
+
+Fetched and fast-forwarded 66 remote commits from `fd3e59910` to `179ef1eb3`, preserving upstream `origin` and user push remote `aster`. The working tree was initially clean. This resumes the incomplete goal; earlier pauses and source-only notes remain historical.
+
+## Executed checks
+
+- Full agent workspace typecheck passes.
+- BrowserOS and Aster onboarding builds pass sequentially, including exact emitted title/favicon assertions. Shared output means concurrent branding builds race; run sequentially.
+- The Aster no-upload onboarding wrapper passes. Local ignored archive: `packages/browseros-agent/dist/local/aster-onboard/aster-onboard-resources.zip`, 325,949 bytes, SHA-256 `e4f7cbaaf76fbb14d4017beb2e4c96dd994de0b42885291aa0f976e8a0a0f663`, 11 metadata resources.
+- Actual Aster unpacked extension builds with `NODE_OPTIONS=--max-old-space-size=4096`. First concurrent 2 GiB attempt ran out of heap; the sequential retry passed. Existing font-resolution, annotation and chunk-size warnings remain.
+- The Python validator accepts the actual emitted extension: version 0.0.161, ID `oifdmombnijnaiocijiacjhajbnpdlhb`, 106 files / 23,730,271 bytes, no update URL and external callers denied. This is development identity evidence, not release signing custody.
+- Full frozen-environment Python discovery passes: 1,345 tests, three skipped. Initial five stale expectations for the new default GN boolean were corrected. Added mode projection, actual unpacked ZIP staging and six rejected planner boundary cases.
+- Patch doctor passes at the initial fetched checkpoint: 423 patches / 38 features. Updated patch parsing and focused driver/resource checks are reported alongside the changes below; none prove native compilation.
+
+## Reviewed integration corrections
+
+- GN now declares each staged unpacked extension output, allowing missing files to invalidate an incremental build.
+- Native driver checks local Chromium HEAD against the pinned tag and permits only reviewed untracked files with `--allow-dirty`; tracked source modifications remain rejected for provenance.
+- Aster native sidecar resource staging now enumerates the complete product-owned resource tree, requires executable server and Bun files, and preserves their modes. Sidecar enablement is restricted to the explicit unpacked development buildflag. Updater remains disabled and startup bypasses downloaded-version discovery for Aster.
+- Disposable native verification must explicitly set `ASTER_DIR` alongside the isolated Chromium profile. The profile execution/lock directory and server application-state directory are distinct.
+
+## Provisioning and limits
+
+Dedicated checkout: `/home/puneet/Projects/aster-browser/chromium-aster-dev/src`; shallow source preparation started using the repository's provisioning command. Remote pin lookup resolves 155.0.8059.26 to `16c3e55476d3564bea713314b2fff638749ce3e6`. Source synchronization, GN generation, C++ compilation and native runtime remain pending. No native binary, performance improvement or feature completion is claimed. No release upload, signing key or update feed was created.
+
+## Final staging review
+
+Independent review found source/target resolution occurred before root-symlink checks. Both staging actions now reject lexical root/ancestor symlinks before destructive copying or stamp writes. Sentinel-preservation regressions cover direct and ancestor redirects for both actions. Focused driver/staging and resource suites pass together: 28 tests. The native descriptor C++ test was updated for both debug buildflag states but was not compiled.

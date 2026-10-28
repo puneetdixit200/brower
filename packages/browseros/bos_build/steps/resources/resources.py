@@ -2,6 +2,7 @@
 """Resource management module for BrowserOS build system"""
 
 import glob
+import re
 import shutil
 import yaml
 import subprocess
@@ -207,9 +208,33 @@ def copy_resources_impl(ctx: Context, commit_each: bool = False) -> bool:
             log_error(f"    Error: {e}")
             all_ok = False
 
+    if all_ok and getattr(ctx, "aster_unpacked_dev", False):
+        write_aster_server_gn_manifest(ctx.chromium_src)
     if all_ok:
         log_success("Resources copied")
     return all_ok
+
+
+def write_aster_server_gn_manifest(chromium_src: Path) -> None:
+    """Enumerate the prepared Aster server tree for the debug-only GN action."""
+    parent = chromium_src / "chrome/browser/browseros/aster_server"
+    root = parent / "resources"
+    if not root.is_dir() or root.is_symlink():
+        raise ValueError("Aster server resources are missing or unsafe")
+    files = []
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink() or not (path.is_file() or path.is_dir()):
+            raise ValueError(f"Unsafe Aster server resource: {path}")
+        if path.is_file():
+            relative = path.relative_to(root).as_posix()
+            if not re.fullmatch(r"[A-Za-z0-9._@+/-]+", relative):
+                raise ValueError(f"Unsafe Aster server GN filename: {relative!r}")
+            files.append(relative)
+    for required in ("bin/aster_server", "bin/third_party/bun"):
+        if required not in files or not (root / required).stat().st_mode & 0o111:
+            raise ValueError(f"Missing or non-executable Aster server resource: {required}")
+    lines = ['aster_server_files = ['] + [f'  "{item}",' for item in files] + [']']
+    (parent / "aster_server_sources.gni").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def product_matches(

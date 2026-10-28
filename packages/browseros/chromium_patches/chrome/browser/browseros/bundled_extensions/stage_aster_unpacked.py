@@ -2,7 +2,7 @@ diff --git a/chrome/browser/browseros/bundled_extensions/stage_aster_unpacked.py
 new file mode 100644
 --- /dev/null
 +++ b/chrome/browser/browseros/bundled_extensions/stage_aster_unpacked.py
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,66 @@
 +#!/usr/bin/env python3
 +"""GN action: stage only source-validated Aster development extension files.
 +
@@ -14,10 +14,28 @@ new file mode 100644
 +from pathlib import Path
 +
 +
++def _path_without_symlink_components(path: Path) -> Path:
++    """Normalize lexically while rejecting symlinks before following them."""
++    candidate = path if path.is_absolute() else Path.cwd() / path
++    current = Path(candidate.anchor)
++    for part in candidate.parts[1:]:
++        if part in ("", "."):
++            continue
++        if part == "..":
++            current = current.parent
++            continue
++        current = current / part
++        if current.is_symlink():
++            raise RuntimeError(f"Refusing symlink path component: {current}")
++    return current
++
++
 +def main() -> None:
 +    if len(sys.argv) != 4:
 +        raise SystemExit("usage: stage_aster_unpacked.py SOURCE TARGET STAMP")
-+    source, destination, stamp = (Path(a).resolve() for a in sys.argv[1:])
++    source, destination, stamp = (
++        _path_without_symlink_components(Path(arg)) for arg in sys.argv[1:]
++    )
 +    if not source.is_dir() or source.is_symlink():
 +        raise RuntimeError("Aster unpacked source tree is missing")
 +    if destination == source or source in destination.parents or destination in source.parents:

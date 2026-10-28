@@ -5,6 +5,7 @@ config/release.*.yaml files encoded (source file named per case)."""
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from bos_build.core.planner import (
     Profile,
@@ -305,6 +306,75 @@ class DebugGoldenTest(unittest.TestCase):
 
 
 class SwitchesTest(unittest.TestCase):
+    def test_aster_unpacked_dev_rejects_unsupported_build_combinations(self):
+        cases = (
+            (
+                "non-Aster product",
+                Switches(
+                    preset="debug",
+                    product="browseros",
+                    resource_mode="source",
+                    aster_unpacked_dev=True,
+                ),
+                "linux",
+            ),
+            (
+                "release preset",
+                Switches(
+                    preset="release",
+                    product="aster",
+                    resource_mode="source",
+                    aster_unpacked_dev=True,
+                ),
+                "linux",
+            ),
+            (
+                "published resources",
+                Switches(
+                    preset="debug", product="aster", aster_unpacked_dev=True
+                ),
+                "linux",
+            ),
+            (
+                "non-Linux host",
+                Switches(
+                    preset="debug",
+                    product="aster",
+                    resource_mode="source",
+                    aster_unpacked_dev=True,
+                ),
+                "macos",
+            ),
+            (
+                "signing enabled",
+                Switches(
+                    preset="debug",
+                    product="aster",
+                    resource_mode="source",
+                    aster_unpacked_dev=True,
+                    sign=True,
+                ),
+                "linux",
+            ),
+            (
+                "upload enabled",
+                Switches(
+                    preset="debug",
+                    product="aster",
+                    resource_mode="source",
+                    aster_unpacked_dev=True,
+                    upload=True,
+                ),
+                "linux",
+            ),
+        )
+        for label, switches, platform in cases:
+            with self.subTest(case=label), mock.patch(
+                "bos_build.core.planner.get_platform", return_value=platform
+            ):
+                with self.assertRaisesRegex(ValueError, "Unpacked Aster development"):
+                    switches.resolved()
+
     def test_unknown_preset_rejected(self):
         with self.assertRaisesRegex(ValueError, "Unknown preset"):
             Switches(preset="nightly").resolved()

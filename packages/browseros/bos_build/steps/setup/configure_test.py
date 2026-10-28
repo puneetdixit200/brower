@@ -92,7 +92,8 @@ class ConfigureExecuteTest(unittest.TestCase):
             'is_official_build = true\n\ntarget_cpu = "arm64"\n'
             'browseros_product = "browseros"\n'
             "browseros_allow_runtime_product_override = false\n"
-            "browseros_package_all_server_resources = false\n",
+            "browseros_package_all_server_resources = false\n"
+            "aster_use_unpacked_dev_extension = false\n",
         )
 
     def test_debug_args_append_product_args_verbatim(self):
@@ -137,6 +138,7 @@ class ConfigureExecuteTest(unittest.TestCase):
             'browseros_product = "browseros"\n'
             "browseros_allow_runtime_product_override = false\n"
             "browseros_package_all_server_resources = false\n"
+            "aster_use_unpacked_dev_extension = false\n"
             "\n# --gn-arg overrides\n"
             "symbol_level=2\n"
             "dcheck_always_on=true\n",

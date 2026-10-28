@@ -32,6 +32,19 @@ def _run_capture(args: list[str], cwd: Path) -> str:
     return result.stdout.strip()
 
 
+def _verify_chromium_pin(repo: Path, source: Path) -> None:
+    version_file = repo / "packages/browseros/CHROMIUM_VERSION"
+    parts = dict(line.split("=", 1) for line in version_file.read_text().splitlines() if line)
+    version = ".".join(parts[key] for key in ("MAJOR", "MINOR", "BUILD", "PATCH"))
+    try:
+        pin = _run_capture(["git", "rev-parse", "--verify", f"refs/tags/{version}^{{commit}}"], source)
+        head = _run_capture(["git", "rev-parse", "--verify", "HEAD"], source)
+    except RuntimeError as exc:
+        raise RuntimeError(f"Cannot verify local Chromium pin {version}: {exc}") from exc
+    if head != pin:
+        raise RuntimeError(f"Chromium HEAD {head} does not match pinned tag {version} ({pin})")
+
+
 def _preflight(repo: Path, source: Path, *, provision: str, allow_dirty: bool) -> None:
     if sys.platform != "linux":
         raise RuntimeError("Native Aster development builds require Linux")
@@ -45,10 +58,13 @@ def _preflight(repo: Path, source: Path, *, provision: str, allow_dirty: bool) -
             f"Expected feat/aster-linux-ui, found {branch!r}. "
             "Do not build from the wrong branch."
         )
+    tracked = _run_capture(["git", "diff", "--name-only", "HEAD", "--"], repo)
+    if tracked:
+        raise RuntimeError("Source mode requires a clean tracked checkout; commit or stash changes first")
     dirty = _run_capture(["git", "status", "--porcelain"], repo)
     if dirty and not allow_dirty:
         raise RuntimeError(
-            "Working tree contains changes. Commit/stash them first, or pass "
+            "Working tree contains untracked files. Remove or commit them, or pass "
             "--allow-dirty after reviewing them. Never reset automatically."
         )
     if provision == "none":
@@ -57,6 +73,7 @@ def _preflight(repo: Path, source: Path, *, provision: str, allow_dirty: bool) -
                 f"Pinned Chromium checkout is missing: {source}. "
                 "Use --provision shallow only after reviewing source/disk requirements."
             )
+        _verify_chromium_pin(repo, source)
     else:
         if source.exists() and any(source.iterdir()) and not (source / ".git").exists():
             raise RuntimeError(
@@ -94,7 +111,7 @@ def main() -> int:
         help="Default reuses an existing checkout; shallow may download many GB",
     )
     parser.add_argument("--jobs", type=int, default=2)
-    parser.add_argument("--allow-dirty", action="store_true")
+    parser.add_argument("--allow-dirty", action="store_true", help="Allow reviewed untracked files; tracked changes remain disallowed")
     args = parser.parse_args()
     if args.jobs < 1 or args.jobs > 8:
         parser.error("--jobs must be between 1 and 8")

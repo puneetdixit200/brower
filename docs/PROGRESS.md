@@ -316,3 +316,10 @@ Added isolated Aster WXT debug build selection; a native Linux build wrapper; us
 ### Initial-load code-splitting source update — 2026-10-28
 
 The extension app router now lazily loads 15 secondary views (settings, task history, scheduling, diagnostics, onboarding, chat and related screens). The home composer and root layout remain eagerly loaded, with an accessible Suspense fallback for secondary routes. This is a code-level startup optimization; **no bundle analysis, frontend build, visual verification or measured performance data exists for this change yet**. Keep F01–F05 NOT_STARTED/PARTIAL as already recorded; measure stock BrowserOS and Aster on identical hardware before claiming a benefit.
+
+### Local continuation and integration verification — 2026-10-28
+
+- Fast-forwarded the clean checkout through 66 remote commits to `179ef1eb3`. Both onboarding brands and the rebuilt no-upload Aster archive pass; workspace typecheck and actual unpacked-extension identity validation pass. Python discovery passes 1,345 tests, three skipped, including new development-mode rejection/staging coverage.
+- Reviewed corrections cover native pin verification, declared GN extension outputs and debug-only complete Aster sidecar resource/startup integration. These remain source-level native changes pending GN/C++ execution. Dedicated pinned Chromium provisioning is underway.
+- Evidence and explicit remaining gates: `evidence/aster-local-resume-2026-10-28.md`. The goal remains active/incomplete; release provisioning and native/runtime/performance acceptance remain open.
+- Final independent staging review fixed root/ancestor symlink redirects before copy/delete/write; combined focused driver/staging/resource suites pass 28 tests. Native descriptor tests remain uncompiled.

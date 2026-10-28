@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000000000000000000000000000000..19919de8931b03b7ae7cf772f9e98b0d907259cd
 --- /dev/null
 +++ b/chrome/browser/browseros/server/browseros_server_manager.cc
-@@ -0,0 +1,1565 @@
+@@ -0,0 +1,1571 @@
 +// Copyright 2024 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -559,6 +559,12 @@ index 0000000000000000000000000000000000000000..19919de8931b03b7ae7cf772f9e98b0d
 +
 +  started_ = true;
 +  StartProxy();
++  if (IsAsterProduct()) {
++    // The development bundle is the only authorized Aster installation.
++    // Do not probe or activate an existing downloaded version without a feed.
++    LaunchBrowserOSProcess();
++    return;
++  }
 +  ServerInstallation bundled;
 +  bundled.executable = GetBrowserOSServerExecutablePath();
 +  bundled.resources = GetBrowserOSServerResourcesPath();

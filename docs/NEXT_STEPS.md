@@ -4,12 +4,11 @@ Checkpoint: 2026-10-28, branch `feat/aster-linux-ui`. This repository contains t
 
 ## Next execution order
 
-1. Fix the emitted Aster onboarding favicon (still BrowserOS), verify the prepared-resource provider mapping and rerun both branding modes, then implement extension development resources and staging. The proposed debug-only unpacked extension path is detailed in `ASTER_NATIVE_DEVELOPMENT_PLAN.md`; signed release remains blocked on real signing custody and feed provisioning. The Aster-owned server bundle is implemented and development-startup verified; see `ASTER_SERVER_DEVELOPMENT.md`. Keep release signing keys, update service and remote ownership as separate unprovisioned release gates; do not substitute BrowserOS product resources.
-2. Provision the pinned Chromium source and attempt a monitored Linux native build with low concurrency (`BROWSEROS_NINJA_JOBS=2`). Run the new Aster GN/C++ paths, sandbox, profile/extension identity and native telemetry gates in the actual binary. Patch doctor and standalone assertion checks are not native compilation.
-3. Repeat privacy, identity and restart checks in that actual Aster runtime. Development BrowserOS extension/sidecar checks now pass, including failed revoke, offline retry, cross-tab state, persisted ON/OFF, 0600 state permissions and rejected untrusted origins. Complete the broader provider/log-sink and outbound-data review.
-
-4. Test basic browser features and OS integration in that Aster build, then implement remaining sidebar/tab UI, agent permissions/approvals, provider routing, memory, schedules and task recovery from `IMPLEMENTATION_PLAN.md`.
-5. Complete package/install/uninstall, security/outbound-data review, performance and lifecycle tests. Promote matrix rows only with matching execution evidence.
+1. Complete local validation of the fetched source-only commits. Both onboarding branding modes now pass emitted title/favicon checks. Verify the new unpacked resource preparation/staging, extension build, native pin gate and incremental staging behavior; retain signed release validation.
+2. Finish provisioning pinned Chromium 155.0.8059.26 in the dedicated `../chromium-aster-dev/src` checkout. Apply patches, generate GN and attempt native compilation with `BROWSEROS_NINJA_JOBS=2`. Source preparation and patch doctor are not native compilation.
+3. In the actual native binary, verify extension READY/new tab, sandbox, isolated profile/state, sidecar launch/authentication, privacy/restart and tool output. Complete broader provider/log-sink and outbound-data review.
+4. Verify the command palette and lazy routes in a disposable runtime. Measure bundle/startup/workload performance before claiming an improvement. Continue the remaining UI/agent/browser subtasks in `IMPLEMENTATION_PLAN.md` against the now-versioned master specification.
+5. Complete package/install/uninstall, release signing/update ownership, security, performance and lifecycle gates. Promote feature statuses only with matching evidence.
 
 ## Cost-conscious execution
 
@@ -59,3 +58,7 @@ The [master build specification](OMARCHY_ASIDE_INSPIRED_BROWSER_MASTER_BUILD_SPE
 
 
 **Performance next action:** compile the route-split extension and compare initial JS transfer/parse against its pre-splitting revision, then use `aster_perf_sample.py` with matching idle workloads. Confirm that lazy settings routes open normally and chat-session context is not lost. No performance result has been measured so far.
+
+## Local verification resumed — 2026-10-28
+
+Fetched 66 remote commits and fast-forwarded cleanly from `fd3e59910` to `179ef1eb3`. Earlier source-only entries below are historical; the latest execution evidence supersedes their unrun-check status only where explicitly recorded. Luna handles implementation/checks; Terra reviews native integration. The overall goal is active and incomplete.
