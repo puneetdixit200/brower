@@ -35,6 +35,13 @@
 - Linux dev binary selection accepts `ASTER_BROWSER_BIN`, `ASTER_BROWSER_BINARY`, `BROWSEROS_BINARY`, or `browseros` on `PATH`; it never silently substitutes system Chromium. Server integration test runtime uses the same override order.
 - Targeted Biome check passed on all five changed TypeScript files. `@browseros/server` typecheck passes after simplifying the new regression assertion.
 
+### T06 current source evidence — 2026-10-29
+
+- **T06.1:** The focused test passes 3/3 (18 assertions). It formats hostile page text through the real `formatSnapshotResult` path and sends deterministic send/post/payment proposals through the production `ToolLoopAgent` approval callback. This proves proposed side effects pause pending server approval; it does not demonstrate real-model prompt resistance or external integration wiring.
+- **T06.2:** POSIX filesystem helpers now use a descriptor-anchored no-follow walk. Linux `openat2` behavior is unchanged and Windows fails closed. The helper suite passes 15/15 (41 assertions), and the full filesystem suite passes 173/173 (378 assertions). Actual macOS/BSD execution is unverified. The portable POSIX `lstat`-to-`open` device-node swap remains a narrow documented race.
+- **T06.3:** Real Linux Bubblewrap tests now use isolation sentinels under home, `/var/tmp`, and `/run`. The Bash suite passes 20/20 and is included in the full filesystem suite. Server typecheck, targeted Biome, and `git diff --check` pass.
+- **Limits and next decisions:** Bubblewrap network egress remains enabled. No native Aster runtime/window is available, so packaged Aster acceptance is unverified. Keep S01 and S02 PARTIAL. Test macOS/BSD if supported or formally scope the path to Linux; resolve or explicitly accept the device-node race; decide network policy; verify packaged Aster on T20a and signed release gates. Overall matrix remains **2/72 PASS (2.8%)**.
+
 ### Phase 2 — Linux dev launcher (complete for the current source build)
 
 - Added `packages/browseros-agent/tools/dev/linux/run.sh` and `README.md`. The runner uses the pinned manual dev mode and can use the user-local Go/Bun installs.

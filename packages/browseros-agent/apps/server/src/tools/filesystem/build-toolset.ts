@@ -35,8 +35,8 @@ export function buildFilesystemToolSet(
     filesystem_edit: createEditTool(cwd, options.workspaceRoot),
     filesystem_bash: createBashTool(cwd, {
       resourcesDir: options.resourcesDir,
-      // Bubblewrap currently binds the workspace by pathname. Keep the pin
-      // alive through shell execution, but Bash does not yet inherit its inode.
+      // Keep the pinned workspace descriptor alive through Bash execution;
+      // Linux Bubblewrap binds the selected inode through inherited fd 3.
       workspaceRoot: options.workspaceRoot,
     }),
   }

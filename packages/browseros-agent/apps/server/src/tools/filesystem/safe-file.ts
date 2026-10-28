@@ -1,14 +1,14 @@
 import { dlopen, FFIType, type Pointer, ptr, toArrayBuffer } from 'bun:ffi'
-import type { Dirent } from 'node:fs'
+import type { Dirent, Stats } from 'node:fs'
 import { constants } from 'node:fs'
 import {
   type FileHandle,
+  lstat,
   mkdir,
   open,
   readdir,
   realpath,
   stat,
-  writeFile,
 } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, sep } from 'node:path'
 import { isPathInside } from './path-boundary'
@@ -122,6 +122,155 @@ function syscallError(
 function assertLinux(): void {
   if (process.platform !== 'linux') {
     throw new Error('openat2 filesystem access is only available on Linux.')
+  }
+}
+
+function assertDescriptorWalkSupported(): void {
+  if (process.platform === 'win32' || constants.O_NOFOLLOW === undefined) {
+    throw new Error(
+      'Race-safe workspace access is unavailable on this platform.',
+    )
+  }
+}
+
+function fdPath(fd: number, child = ''): string {
+  assertDescriptorWalkSupported()
+  return child ? `/dev/fd/${fd}/${child}` : `/dev/fd/${fd}`
+}
+
+/** Walks every component from an open directory so renamed/replaced parents cannot redirect access. */
+export async function openPosixRelative(
+  root: SafeFileHandle,
+  relativePath: string,
+  flags: number,
+  mode = 0,
+  createParents = false,
+): Promise<SafeFileHandle> {
+  assertDescriptorWalkSupported()
+  const components = relativePath
+    .split(sep)
+    .filter((part) => part && part !== '.')
+  if (components.some((part) => part === '..')) {
+    throw new Error('Path is outside the selected workspace.')
+  }
+  if (components.length === 0) {
+    if (flags & constants.O_DIRECTORY) {
+      return new NodeFileHandle(
+        await open(fdPath(root.fd), constants.O_RDONLY | constants.O_DIRECTORY),
+      )
+    }
+    throw new Error('Path does not identify a regular file.')
+  }
+
+  let directory = root
+  const ownedDirectories: SafeFileHandle[] = []
+  try {
+    for (const component of components.slice(0, -1)) {
+      const anchoredPath = fdPath(directory.fd, component)
+      let next: FileHandle
+      try {
+        next = await open(
+          anchoredPath,
+          constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+        )
+      } catch (error) {
+        if (
+          !createParents ||
+          !(error instanceof Error) ||
+          !('code' in error) ||
+          (error as NodeJS.ErrnoException).code !== 'ENOENT'
+        ) {
+          throw error
+        }
+        try {
+          await mkdir(anchoredPath)
+        } catch (mkdirError) {
+          if (
+            !(mkdirError instanceof Error) ||
+            !('code' in mkdirError) ||
+            (mkdirError as NodeJS.ErrnoException).code !== 'EEXIST'
+          ) {
+            throw mkdirError
+          }
+        }
+        next = await open(
+          anchoredPath,
+          constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+        )
+      }
+      directory = new NodeFileHandle(next)
+      ownedDirectories.push(directory)
+    }
+    const leafPath = fdPath(directory.fd, components.at(-1))
+    return new NodeFileHandle(
+      await open(leafPath, flags | constants.O_NOFOLLOW, mode),
+    )
+  } finally {
+    for (const handle of ownedDirectories.reverse()) await handle.close()
+  }
+}
+
+async function openPosixDirectoryPath(path: string): Promise<SafeFileHandle> {
+  assertDescriptorWalkSupported()
+  if (!isAbsolute(path)) throw new Error('Workspace root must be absolute.')
+  let directory = new NodeFileHandle(
+    await open('/', constants.O_RDONLY | constants.O_DIRECTORY),
+  )
+  try {
+    for (const component of path.split(sep).filter(Boolean)) {
+      const next = new NodeFileHandle(
+        await open(
+          fdPath(directory.fd, component),
+          constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+        ),
+      )
+      await directory.close()
+      directory = next
+    }
+    return directory
+  } catch (error) {
+    await directory.close()
+    throw error
+  }
+}
+
+export async function lstatPosixRelative(
+  root: SafeFileHandle,
+  relativePath: string,
+): Promise<Stats> {
+  assertDescriptorWalkSupported()
+  const components = relativePath
+    .split(sep)
+    .filter((part) => part && part !== '.')
+  if (components.some((part) => part === '..')) {
+    throw new Error('Path is outside the selected workspace.')
+  }
+  if (components.length === 0) return await stat(fdPath(root.fd))
+  let directory = root
+  const ownedDirectories: SafeFileHandle[] = []
+  try {
+    for (const component of components.slice(0, -1)) {
+      directory = new NodeFileHandle(
+        await open(
+          fdPath(directory.fd, component),
+          constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+        ),
+      )
+      ownedDirectories.push(directory)
+    }
+    return (await lstat(fdPath(directory.fd, components.at(-1)))) as Stats
+  } finally {
+    for (const handle of ownedDirectories.reverse()) await handle.close()
+  }
+}
+
+async function assertPosixRegularEntry(
+  root: SafeFileHandle,
+  relativePath: string,
+): Promise<void> {
+  const info = await lstatPosixRelative(root, relativePath)
+  if (!info.isFile()) {
+    throw new Error('Path does not identify a regular file.')
   }
 }
 
@@ -387,9 +536,7 @@ async function openRoot(root: string): Promise<SafeFileHandle> {
 /** Pins a canonical workspace directory for the lifetime of one tool operation. */
 export async function openWorkspaceRoot(root: string): Promise<SafeFileHandle> {
   if (process.platform === 'linux') return await openRoot(root)
-  return new NodeFileHandle(
-    await open(root, constants.O_RDONLY | constants.O_DIRECTORY),
-  )
+  return await openPosixDirectoryPath(root)
 }
 
 /** Opens the selected directory itself and derives its display path from that descriptor. */
@@ -397,8 +544,15 @@ export async function pinWorkspaceRoot(
   cwd: string,
 ): Promise<PinnedWorkspaceRoot> {
   if (process.platform !== 'linux') {
+    assertDescriptorWalkSupported()
     const canonical = await realpath(cwd)
-    return new WorkspaceRootPin(canonical, await openWorkspaceRoot(canonical))
+    const handle = await openPosixDirectoryPath(canonical)
+    try {
+      return new WorkspaceRootPin(await realpath(fdPath(handle.fd)), handle)
+    } catch (error) {
+      await handle.close()
+      throw error
+    }
   }
 
   const handle = new NodeFileHandle(
@@ -422,10 +576,18 @@ async function openRootRelative(
 ): Promise<SafeFileHandle> {
   const relativePath = relativeTarget(root, target)
   if (pinnedRoot) {
-    if (process.platform !== 'linux') {
-      throw new Error('Pinned descriptor access is only available on Linux.')
+    if (process.platform === 'linux') {
+      return openRelativeWithOpenAt2(pinnedRoot.fd, relativePath, flags, mode)
     }
-    return openRelativeWithOpenAt2(pinnedRoot.fd, relativePath, flags, mode)
+    return await openPosixRelative(pinnedRoot, relativePath, flags, mode)
+  }
+  if (process.platform !== 'linux') {
+    const rootHandle = await openWorkspaceRoot(root)
+    try {
+      return await openPosixRelative(rootHandle, relativePath, flags, mode)
+    } finally {
+      await rootHandle.close()
+    }
   }
   const rootHandle = await openRoot(root)
   try {
@@ -442,7 +604,15 @@ export async function statBeneath(
 ) {
   if (!isPathInside(root, target)) return null
   if (process.platform !== 'linux') {
-    return await stat(target).catch(() => null)
+    const rootHandle = pinnedRoot ?? (await openWorkspaceRoot(root))
+    const ownsRoot = !pinnedRoot
+    try {
+      return await lstatPosixRelative(rootHandle, relativeTarget(root, target))
+    } catch {
+      return null
+    } finally {
+      if (ownsRoot) await rootHandle.close()
+    }
   }
   let handle: SafeFileHandle | undefined
   try {
@@ -478,20 +648,33 @@ export async function listDirectoryBeneath(
     throw new Error('Path is outside the selected workspace.')
   }
   if (process.platform !== 'linux') {
-    const entries = (await readdir(target, { withFileTypes: true })) as Dirent[]
-    const visible: WorkspaceDirectoryEntry[] = []
-    for (const entry of entries) {
-      const path = join(target, entry.name)
-      const info = await stat(path).catch(() => null)
-      if (!info) continue
-      visible.push({
-        name: entry.name,
-        isDirectory: info.isDirectory(),
-        isSymbolicLink: entry.isSymbolicLink(),
-        size: info.size,
-      })
+    const directory = await openRootRelative(
+      root,
+      target,
+      constants.O_RDONLY | constants.O_DIRECTORY,
+      0,
+      pinnedRoot,
+    )
+    try {
+      const entries = (await readdir(fdPath(directory.fd), {
+        withFileTypes: true,
+      })) as Dirent[]
+      const visible: WorkspaceDirectoryEntry[] = []
+      for (const entry of entries) {
+        const path = fdPath(directory.fd, entry.name)
+        const info = await lstat(path).catch(() => null)
+        if (!info) continue
+        visible.push({
+          name: entry.name,
+          isDirectory: info.isDirectory(),
+          isSymbolicLink: info.isSymbolicLink(),
+          size: info.size,
+        })
+      }
+      return visible
+    } finally {
+      await directory.close()
     }
-    return visible
   }
 
   const directory = await openRootRelative(
@@ -631,19 +814,28 @@ export async function openExistingFileBeneath(
     throw new Error('Path is outside the selected workspace.')
   }
   if (process.platform !== 'linux') {
-    const file = await open(target, flags)
+    const relativePath = relativeTarget(root, target)
+    const rootHandle = pinnedRoot ?? (await openWorkspaceRoot(root))
+    const ownsRoot = !pinnedRoot
+    let file: SafeFileHandle | undefined
     try {
-      const fileStat = await file.stat()
+      // This rejects existing special files before opening them. A portable
+      // POSIX open-by-fd primitive cannot make this check atomic with open.
+      await assertPosixRegularEntry(rootHandle, relativePath)
+      file = await openPosixRelative(rootHandle, relativePath, flags)
+      const fileStat = await stat(fdPath(file.fd))
       if (!fileStat.isFile()) {
         throw new Error('Path does not identify a regular file.')
       }
       if (maxBytes !== undefined && fileStat.size > maxBytes) {
         throw new Error('File exceeds the permitted read size.')
       }
-      return new NodeFileHandle(file)
-    } catch (error) {
-      await file.close()
-      throw error
+      const result = file
+      file = undefined
+      return result
+    } finally {
+      await file?.close()
+      if (ownsRoot) await rootHandle.close()
     }
   }
   const file = await openRootRelative(
@@ -678,8 +870,56 @@ export async function writeFileBeneath(
     throw new Error('Path is outside the selected workspace.')
   }
   if (process.platform !== 'linux') {
-    await mkdir(dirname(target), { recursive: true })
-    await writeFile(target, content, 'utf-8')
+    const relativePath = relativeTarget(root, target)
+    const rootHandle = pinnedRoot ?? (await openWorkspaceRoot(root))
+    const ownsRoot = !pinnedRoot
+    let file: SafeFileHandle | undefined
+    try {
+      try {
+        await assertPosixRegularEntry(rootHandle, relativePath)
+      } catch (error) {
+        if (
+          !(error instanceof Error) ||
+          !('code' in error) ||
+          (error as NodeJS.ErrnoException).code !== 'ENOENT'
+        ) {
+          throw error
+        }
+      }
+      try {
+        file = await openPosixRelative(
+          rootHandle,
+          relativePath,
+          constants.O_WRONLY | constants.O_NONBLOCK,
+          0,
+          true,
+        )
+      } catch (error) {
+        if (
+          !(error instanceof Error) ||
+          !('code' in error) ||
+          (error as NodeJS.ErrnoException).code !== 'ENOENT'
+        ) {
+          throw error
+        }
+        file = await openPosixRelative(
+          rootHandle,
+          relativePath,
+          constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
+          0o666,
+          true,
+        )
+      }
+      const info = await stat(fdPath(file.fd))
+      if (!info.isFile()) {
+        throw new Error('Path does not identify a regular file.')
+      }
+      await file.truncate(0)
+      await file.writeAtStart(content)
+    } finally {
+      await file?.close()
+      if (ownsRoot) await rootHandle.close()
+    }
     return
   }
 

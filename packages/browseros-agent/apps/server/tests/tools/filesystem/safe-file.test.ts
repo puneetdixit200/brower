@@ -3,6 +3,7 @@ import { constants } from 'node:fs'
 import {
   mkdir,
   open,
+  readdir,
   readFile,
   rename,
   rm,
@@ -13,7 +14,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { resolveWorkspacePath } from '../../../src/tools/filesystem/path-boundary'
 import {
+  lstatPosixRelative,
   openExistingFileBeneath,
+  openPosixRelative,
   openRelativeWithOpenAt2,
   openWorkspaceRoot,
   pinWorkspaceRoot,
@@ -39,6 +42,87 @@ afterEach(async () => {
 })
 
 describe('descriptor-anchored filesystem access', () => {
+  it('handles the root-relative POSIX descriptor for directory and stat operations', async () => {
+    const rootHandle = await openWorkspaceRoot(root)
+    try {
+      const directory = await openPosixRelative(
+        rootHandle,
+        '.',
+        constants.O_RDONLY | constants.O_DIRECTORY,
+      )
+      try {
+        expect(await readdir(`/dev/fd/${directory.fd}`)).toEqual([])
+      } finally {
+        await directory.close()
+      }
+      expect((await lstatPosixRelative(rootHandle, '.')).isDirectory()).toBe(
+        true,
+      )
+      await expect(
+        openPosixRelative(rootHandle, '.', constants.O_RDONLY),
+      ).rejects.toThrow('Path does not identify a regular file.')
+    } finally {
+      await rootHandle.close()
+    }
+  })
+
+  it('handles concurrent creation of shared POSIX parent directories', async () => {
+    const rootHandle = await openWorkspaceRoot(root)
+    try {
+      const handles = await Promise.all(
+        Array.from({ length: 8 }, (_, index) =>
+          openPosixRelative(
+            rootHandle,
+            `shared/parents/file-${index}.txt`,
+            constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL,
+            0o600,
+            true,
+          ),
+        ),
+      )
+      await Promise.all(handles.map((handle) => handle.close()))
+    } finally {
+      await rootHandle.close()
+    }
+    for (let index = 0; index < 8; index++) {
+      expect(
+        await readFile(join(root, `shared/parents/file-${index}.txt`)),
+      ).toEqual(Buffer.alloc(0))
+    }
+  })
+
+  it('rejects a parent symlink swapped in after validation for reads and writes', async () => {
+    const checkedDir = join(root, 'checked')
+    const validatedFile = join(checkedDir, 'file.txt')
+    const outsideFile = join(outside, 'file.txt')
+    await mkdir(checkedDir)
+    await writeFile(validatedFile, 'in-root')
+    await writeFile(outsideFile, 'outside')
+    const validated = await resolveWorkspacePath(root, 'checked/file.txt')
+
+    await rename(checkedDir, join(root, 'moved'))
+    await symlink(outside, checkedDir)
+
+    await expect(readFileBeneath(root, validated)).rejects.toThrow()
+    await expect(writeFileBeneath(root, validated, 'changed')).rejects.toThrow()
+    expect(await readFile(outsideFile, 'utf-8')).toBe('outside')
+  })
+
+  it('rejects a leaf symlink swapped in after validation before opening or writing', async () => {
+    const target = join(root, 'victim.txt')
+    const outsideFile = join(outside, 'secret.txt')
+    await writeFile(target, 'in-root')
+    await writeFile(outsideFile, 'secret')
+    const validated = await resolveWorkspacePath(root, 'victim.txt')
+
+    await rm(target)
+    await symlink(outsideFile, target)
+
+    await expect(readFileBeneath(root, validated)).rejects.toThrow()
+    await expect(writeFileBeneath(root, validated, 'changed')).rejects.toThrow()
+    expect(await readFile(outsideFile, 'utf-8')).toBe('secret')
+  })
+
   if (process.platform === 'linux') {
     it('keeps the selected workspace inode after its pathname is replaced', async () => {
       const selectedPath = root

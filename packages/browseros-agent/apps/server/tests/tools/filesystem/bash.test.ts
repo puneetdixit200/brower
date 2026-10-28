@@ -1,15 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import { statSync } from 'node:fs'
+import { accessSync, constants, existsSync, statSync } from 'node:fs'
 import {
   chmod,
   copyFile,
   mkdir,
+  mkdtemp,
   readFile,
   rename,
   rm,
   writeFile,
 } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createBashTool } from '../../../src/tools/filesystem/bash'
 import { pinWorkspaceRoot } from '../../../src/tools/filesystem/safe-file'
@@ -17,6 +18,10 @@ import type { FilesystemToolResult } from '../../../src/tools/filesystem/utils'
 
 let tmpDir: string
 let exec: (params: Record<string, unknown>) => Promise<FilesystemToolResult>
+
+function quoteForShell(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`
+}
 
 beforeEach(async () => {
   tmpDir = join(
@@ -157,6 +162,70 @@ describe('filesystem_bash', () => {
       expect(await readFile(sibling, 'utf-8')).toBe('host-only-secret')
     } finally {
       await rm(sibling, { force: true })
+    }
+  })
+
+  it('hides host home, var, and run mounts outside the selected workspace', async () => {
+    if (process.platform !== 'linux' || process.getuid?.() === 0) return
+
+    const marker = `host-only-${Math.random().toString(36).slice(2)}`
+    const outsideDirs: string[] = []
+    const runUserDir = join('/run/user', String(process.getuid?.()))
+    try {
+      outsideDirs.push(await mkdtemp(join(homedir(), '.aster-bwrap-home-')))
+      outsideDirs.push(await mkdtemp('/var/tmp/aster-bwrap-var-'))
+      try {
+        accessSync(runUserDir, constants.W_OK)
+        outsideDirs.push(await mkdtemp(join(runUserDir, 'aster-bwrap-run-')))
+      } catch {
+        // /run may not provide a per-user writable directory in CI. The
+        // explicit /run absence and write probes below still cover that mount.
+      }
+
+      const outsideFiles: string[] = []
+      for (const [index, dir] of outsideDirs.entries()) {
+        const file = join(dir, `sentinel-${index}`)
+        await writeFile(file, marker)
+        outsideFiles.push(file)
+      }
+      const workspaceSentinel = join(tmpDir, 'workspace-sentinel')
+      await writeFile(workspaceSentinel, 'workspace-visible')
+
+      const workspaceRead = await exec({
+        command: `cat ${quoteForShell(workspaceSentinel)}`,
+      })
+      expect(workspaceRead.isError).toBeUndefined()
+      expect(workspaceRead.text.trim()).toBe('workspace-visible')
+
+      for (const file of outsideFiles) {
+        const read = await exec({ command: `cat ${quoteForShell(file)}` })
+        expect(read.isError).toBe(true)
+        expect(read.text).not.toContain(marker)
+
+        const write = await exec({
+          command: `printf changed > ${quoteForShell(file)}`,
+        })
+        expect(write.isError).toBe(true)
+        expect(await readFile(file, 'utf-8')).toBe(marker)
+      }
+
+      const runWrite = join(
+        '/run',
+        `aster-bwrap-write-${process.pid}-${Math.random().toString(36).slice(2)}`,
+      )
+      expect(statSync('/run').isDirectory()).toBe(true)
+      expect(existsSync(runWrite)).toBe(false)
+      const runVisible = await exec({ command: 'test ! -e /run' })
+      expect(runVisible.isError).toBeUndefined()
+      const runWriteResult = await exec({
+        command: `printf probe > ${quoteForShell(runWrite)}`,
+      })
+      expect(runWriteResult.isError).toBe(true)
+      expect(existsSync(runWrite)).toBe(false)
+    } finally {
+      await Promise.all(
+        outsideDirs.map((dir) => rm(dir, { recursive: true, force: true })),
+      )
     }
   })
 
