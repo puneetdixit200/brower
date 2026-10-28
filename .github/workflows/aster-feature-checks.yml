@@ -51,7 +51,7 @@ jobs:
             apps/server/tests/agent/tool-approval-policy.test.ts
       - name: Focused Biome source check
         run: |
-          bunx @biomejs/biome check \
+          bunx @biomejs/biome check --write \
             apps/app/components/sidebar/SidebarBrowserGroups.tsx \
             apps/app/components/sidebar/sidebar-browser-data.ts \
             apps/app/components/sidebar/sidebar-browser-data.test.ts \
@@ -61,3 +61,15 @@ jobs:
             apps/app/screens/sidepanel/index/approval-preview.test.ts \
             apps/server/src/agent/tool-approval-policy.ts \
             apps/server/tests/agent/tool-approval-policy.test.ts
+
+      - name: Show formatter-only changes for review
+        if: always()
+        run: |
+          git diff --name-only -- apps/app apps/server > "${RUNNER_TEMP}/aster-formatted-files"
+          if [ -s "${RUNNER_TEMP}/aster-formatted-files" ]; then
+            while IFS= read -r file; do
+              printf 'ASTER_FORMATTED_FILE:%s:%s\n' "$file" "$(base64 -w0 "$file")"
+            done < "${RUNNER_TEMP}/aster-formatted-files"
+            echo 'Biome formatter changes are ready for review and must be committed.'
+            exit 1
+          fi
