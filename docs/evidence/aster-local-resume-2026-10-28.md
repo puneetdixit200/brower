@@ -50,3 +50,7 @@ Terra ran full-project GN successfully with the pinned tool: exit 0, 35,759 targ
 The full baseline `3fb17c5c6` build entered real C++ compilation with `-j 2` (57,342 scheduled actions). It was intentionally interrupted to prioritize changed translation units; completed outputs are reusable. The combined preflight exposed a large shared input closure, so object checks were separated. The actual pinned compiler successfully produced `obj/chrome/browser/browseros/core/product/browseros_product.o` with exit 0 after generating the Aster buildflags. This proves that translation unit compiles, not that the browser links or runs.
 
 Server configuration and manager object preflight is active with two jobs, followed by loader/crash-reporter checks and resumption of the full graph. No native browser binary or package is complete. The Chromium checkout remains on baseline `3fb17c5c6` source/resource content; the later command-palette frontend change is verified separately and has not been staged into that checkout.
+
+## Server object preflight completed
+
+The actual pinned compiler produced `browseros_server_config.o` and `browseros_server_manager.o`; the two-job preflight completed all 2,556 actions and exited 0. Product/config/manager translation units have compiled successfully. The next native checks are product-state, loader and crash-reporter objects, followed by the full linked browser and sandbox targets. No native browser runtime or package acceptance is claimed.

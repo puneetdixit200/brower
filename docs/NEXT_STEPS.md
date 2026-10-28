@@ -2,10 +2,14 @@
 
 Checkpoint: 2026-10-28, branch `feat/aster-linux-ui`. This repository contains the full current source and implementation plan, not a finished browser release. The user explicitly authorized resuming on 2026-10-28. The goal remains incomplete; the prior pause is retained as a historical checkpoint.
 
+## Complete build scope and handoff
+
+**Build every feature**, even when the next agent cannot runtime-test them all. Continue real source implementation with available focused checks, record unavailable verification explicitly, and do not claim PASS from source alone. The full prioritized handoff, native build state, tool commands and 72-feature checklist are in [CONTINUATION_HANDOFF.md](CONTINUATION_HANDOFF.md); the canonical detailed 95-subtask breakdown remains in IMPLEMENTATION_PLAN.md.
+
 ## Next execution order
 
 1. Complete local validation of the fetched source-only commits. Both onboarding branding modes now pass emitted title/favicon checks. Verify the new unpacked resource preparation/staging, extension build, native pin gate and incremental staging behavior; retain signed release validation.
-2. Pinned Chromium 155.0.8059.26 and Linux sysroot are ready in `../chromium-aster-dev/src`; all 424 patches have applied. Actual GN generation passes (35,759 targets); finish the active changed-object preflight, resume the full build, and compile with `BROWSEROS_NINJA_JOBS=2`. Source preparation and patch doctor are not native compilation.
+2. Pinned Chromium 155.0.8059.26 and Linux sysroot are ready in `../chromium-aster-dev/src`; all 424 patches have applied. Actual GN generation passes (35,759 targets); product/config/manager objects compile successfully; check the remaining loader/crash-reporter objects, then resume the full build and compile with `BROWSEROS_NINJA_JOBS=2`. Source preparation and patch doctor are not native compilation.
 3. In the actual native binary, verify extension READY/new tab, sandbox, isolated profile/state, sidecar launch/authentication, privacy/restart and tool output. Complete broader provider/log-sink and outbound-data review.
 4. Verify the command palette and lazy routes in a disposable runtime. Measure bundle/startup/workload performance before claiming an improvement. Continue the remaining UI/agent/browser subtasks in `IMPLEMENTATION_PLAN.md` against the now-versioned master specification.
 5. Complete package/install/uninstall, release signing/update ownership, security, performance and lifecycle gates. Promote feature statuses only with matching evidence.

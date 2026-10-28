@@ -111,3 +111,7 @@ Batch 0 is the current integration checkpoint: preserve the existing dirty tree 
 | 6: release and performance | T20b release package, T21 lifecycle, remaining T09–T10 browser regressions, T31 developer tools, T32–T33 benchmarks, T34 release audit. | Independent package, security, licensing, and matched-performance gate before changing any release claim. |
 
 The next executable handoff is Batch 0 reconciliation, then the two isolated T02a/T02b Luna assignments in Batch 1 while T20a host feasibility is investigated. For each Luna assignment, provide its task ID, matrix rows, owned paths, expected focused tests and live evidence, and explicit instruction to preserve unrelated dirty files. Sol reviews each worker result before integration and updates the matrix only to the level the evidence actually supports. If T20a cannot run, continue independent source work but leave every native/package evidence unit open. The entire Aster goal remains open.
+
+## User clarification — build all features (2026-10-28)
+
+The next agent may be unable to test all features in its environment. This does not reduce implementation scope: build every master-spec requirement and all 95 subtasks, with real UI/native/backend/persistence behavior. Run feasible checks and record precise unverified gates. Continue source work rather than stopping at test plans or placeholders; preserve PARTIAL/NOT VERIFIED until execution evidence exists. See CONTINUATION_HANDOFF.md for the complete continuation order and 72-feature checklist.
