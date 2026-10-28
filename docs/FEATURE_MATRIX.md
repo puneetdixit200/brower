@@ -1,5 +1,19 @@
 # Feature matrix
 
+## Latest status: source-only partial foundations, 2026-10-28
+
+**2 PASS, 67 PARTIAL, 1 PARTIAL/BLOCKED, 2 NOT_STARTED (72 total).**
+Of the 38 rows that were NOT_STARTED at the beginning of this user-requested batch,
+36 now have source-level partial implementations. **No tests or native builds
+were run in this batch, as requested by the user.** Partial status explicitly
+does not mean the feature works in a packaged Aster browser.
+
+R02 (heartbeat continuation) and P03 (origin-safe blind autofill) remain
+NOT_STARTED. Native link/runtime, performance budgets, release signing and
+update-service provisioning remain unverified or blocked.
+Read [source implementation evidence](evidence/aster-source-foundations-38-2026-10-28.md)
+before making acceptance or release claims.
+
 Status describes **Aster implementation**, not stock BrowserOS capability. Upstream baseline tests are recorded in [`PROGRESS.md`](PROGRESS.md) and must not be promoted to Aster PASS. Aster `NOT_STARTED` means no Aster-owned implementation or verification; inherited features remain unproven until retested against the eventual Aster package.
 
 Pinned upstream revision: `0792066b8fc7377e59a9dbb2ced3a977cd6a1310`. Target behavior is documented in the linked public references; implementation and verification status are separate. No feature is marked PASS without execution evidence.
