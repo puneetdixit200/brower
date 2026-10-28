@@ -658,6 +658,10 @@ Next continue the full 103-subtask plan: verify the T31.1 CLI and server togethe
 ### T31.1 bearer-scheme parsing — 2026-10-29
 
 The CLI route now accepts the HTTP authentication scheme case-insensitively while retaining exact token matching with a length check and `timingSafeEqual`. Focused route tests pass 5/5 (25 assertions), including lowercase/mixed-case schemes for status and stop plus rejection of Basic and incorrect bearer credentials. Targeted Biome and `git diff --check` pass; independent Luna review found no actionable issue. D01 remains PARTIAL pending the packaged CLI/server acceptance described above.
+
+### A03 task-export credential-pattern follow-up — 2026-10-29
+
+Task-history export screening now rejects JWT-shaped values, Slack `xox*` and `xapp` token patterns, and standard/encrypted PEM private-key headers across prompt, response, step, approval and artifact filename fields. Focused export tests pass 4/4 (13 assertions), including JWT response-preview, encrypted PEM step-error, and Slack app-token sentinels. Targeted Biome and `git diff --check` pass. Independent Luna review caught the encrypted PKCS#8 false negative and the Slack `xapp-` gap; both are fixed. This remains heuristic filtering, not comprehensive secret detection, so A03 stays PARTIAL pending broader sentinels and selected-directory/native acceptance.
 # 2026-10-29 — T31.1 local CLI route contract
 
 Added focused source tests for the existing Aster task CLI server routes. The suite verifies that missing or incorrect bearer credentials cannot inspect or stop a run, the status response contains only the task identifiers/status/count fields, cancellation is reachable only through the explicit stop endpoint, and missing tasks/oversized IDs stay bounded. `bun test tests/api/routes/aster-cli.test.ts` passes 4/4 (18 assertions). This is route-level source evidence only: the CLI client and native Aster server have not been exercised together, and D01 remains PARTIAL pending a disposable packaged-runtime check with a provisioned token. No production route behavior was changed.

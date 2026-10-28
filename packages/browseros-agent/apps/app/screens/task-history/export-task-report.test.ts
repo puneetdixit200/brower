@@ -46,6 +46,51 @@ describe('local task report export', () => {
     ).toThrow('cannot be exported')
   })
 
+  it('refuses JWTs and private keys found outside the prompt', () => {
+    const jwt =
+      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signaturevalue123'
+    const slackAppToken = 'xapp-1-A0123456789-1234567890-abcdef0123456789'
+    expect(() =>
+      buildTaskReport({
+        ...safeTask,
+        responsePreview: `Provider error: ${jwt}`,
+      }),
+    ).toThrow('cannot be exported')
+
+    expect(() =>
+      buildTaskReport({
+        ...safeTask,
+        responsePreview: `Provider error: ${slackAppToken}`,
+      }),
+    ).toThrow('cannot be exported')
+
+    expect(() =>
+      buildTaskReport({
+        ...safeTask,
+        steps: [
+          {
+            ...safeTask.steps[0],
+            errorText:
+              '-----BEGIN PRIVATE KEY-----\nredacted fixture\n-----END PRIVATE KEY-----',
+          },
+        ],
+      }),
+    ).toThrow('cannot be exported')
+
+    expect(() =>
+      buildTaskReport({
+        ...safeTask,
+        steps: [
+          {
+            ...safeTask.steps[0],
+            errorText:
+              '-----BEGIN ENCRYPTED PRIVATE KEY-----\nredacted fixture\n-----END ENCRYPTED PRIVATE KEY-----',
+          },
+        ],
+      }),
+    ).toThrow('cannot be exported')
+  })
+
   it('keeps newline and fence injection in a tool name inside its text block', () => {
     const report = buildTaskReport({
       ...safeTask,

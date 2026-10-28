@@ -58,6 +58,8 @@ When account usage falls to 5% remaining, commit and push all current work, refr
 
 The local-only Linux x64 server archive includes verified Bun 1.4.2 and migration resources. Independent startup returned health OK with CDP connected, telemetry off and isolated Aster state. Python discovery ran 1,333 tests with three skipped; focused builder, state and filesystem checks and workspace typechecking pass. Native Aster browser and packaged MCP output verification remain open.
 
+The task-report exporter now rejects JWT-shaped response previews, Slack xapp tokens, and standard/encrypted PEM private keys in step errors in addition to existing credential patterns; the focused report suite passes 4/4 (13 assertions), including raw-tool-data omission and Markdown-fence handling. This is heuristic source coverage only: A03 remains PARTIAL pending broader sentinel coverage and selected-directory/native acceptance, and the matrix remains 2/72 PASS.
+
 ## User-requested stop checkpoint — 2026-10-28
 
 Commit and push all current source and Markdown now, then stop. Resume only on user request. The new onboarding producer is a development checkpoint; native Aster compilation and launch remain unverified. Next: finish onboarding integration checks, implement the gated unpacked extension development path in `ASTER_NATIVE_DEVELOPMENT_PLAN.md`, then attempt a low-concurrency pinned native build and repeat runtime/privacy checks. Use Luna medium for implementation and Terra for planning/review; reserve Sol for exceptional unresolved cases.
