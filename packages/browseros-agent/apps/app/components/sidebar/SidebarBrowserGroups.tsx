@@ -1,13 +1,22 @@
-import { Bookmark, ChevronDown, ExternalLink, Globe2, Pin, PinOff, RefreshCw, X } from 'lucide-react'
+import {
+  Bookmark,
+  ChevronDown,
+  ExternalLink,
+  Globe2,
+  Pin,
+  PinOff,
+  RefreshCw,
+  X,
+} from 'lucide-react'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { CurrentWindowTabs } from '../layout/command-palette-tabs'
 import {
+  flattenSidebarBookmarkTree,
   type SidebarBookmark,
   type SidebarTab,
-  flattenSidebarBookmarkTree,
   visibleSidebarTabs,
 } from './sidebar-browser-data'
-import { CurrentWindowTabs } from '../layout/command-palette-tabs'
 
 type Section = 'tabs' | 'bookmarks'
 
@@ -54,15 +63,14 @@ export function SidebarBrowserGroups({
         if (section === 'tabs') {
           const result = await tabsApi.current.query()
           if (active && result) {
-            setTabs(
-              visibleSidebarTabs(result, chrome.runtime.getURL('')),
-            )
+            setTabs(visibleSidebarTabs(result, chrome.runtime.getURL('')))
           }
         } else {
           const currentWindow = await chrome.windows.getCurrent()
           if (currentWindow.incognito) {
             if (active) setBookmarks([])
-            if (active) setError('Bookmarks are unavailable in private windows.')
+            if (active)
+              setError('Bookmarks are unavailable in private windows.')
           } else {
             const roots = await chrome.bookmarks.getTree()
             if (active) setBookmarks(flattenSidebarBookmarkTree(roots, 500))
@@ -138,7 +146,10 @@ export function SidebarBrowserGroups({
     }
   }
 
-  const actOnTab = async (tab: SidebarTab & { id: number }, action: 'pin' | 'close') => {
+  const actOnTab = async (
+    tab: SidebarTab & { id: number },
+    action: 'pin' | 'close',
+  ) => {
     if (pendingTabId !== null) return
     setPendingTabId(tab.id)
     setError(null)
@@ -146,7 +157,8 @@ export function SidebarBrowserGroups({
       // Re-check actual membership before a destructive tab action.
       const current = await chrome.tabs.query({ currentWindow: true })
       const live = current.find(
-        (entry) => entry.id === tab.id &&
+        (entry) =>
+          entry.id === tab.id &&
           !entry.url?.startsWith(chrome.runtime.getURL('')),
       )
       if (!live) throw new Error('Tab moved or closed')
@@ -174,10 +186,12 @@ export function SidebarBrowserGroups({
   return (
     <section className="mt-1" aria-label="Browser tabs and bookmarks">
       <div className="flex gap-1">
-        {([
-          { key: 'tabs', label: 'Tabs', Icon: Globe2 },
-          { key: 'bookmarks', label: 'Bookmarks', Icon: Bookmark },
-        ] as const).map(({ key, label, Icon }) => (
+        {(
+          [
+            { key: 'tabs', label: 'Tabs', Icon: Globe2 },
+            { key: 'bookmarks', label: 'Bookmarks', Icon: Bookmark },
+          ] as const
+        ).map(({ key, label, Icon }) => (
           <button
             key={key}
             type="button"
@@ -203,10 +217,14 @@ export function SidebarBrowserGroups({
         <div className="mt-2 flex items-center gap-1">
           <input
             type="search"
-            aria-label={section === 'bookmarks' ? 'Search bookmarks' : 'Search tabs'}
+            aria-label={
+              section === 'bookmarks' ? 'Search bookmarks' : 'Search tabs'
+            }
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
-            placeholder={section === 'bookmarks' ? 'Search bookmarks' : 'Search tabs'}
+            placeholder={
+              section === 'bookmarks' ? 'Search bookmarks' : 'Search tabs'
+            }
             className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
           <button
@@ -218,15 +236,25 @@ export function SidebarBrowserGroups({
             <RefreshCw className="size-4" />
           </button>
         </div>
-        {error && <p role="alert" className="px-1 py-2 text-destructive text-xs">{error}</p>}
-        {loading && <p role="status" className="px-1 py-2 text-muted-foreground text-xs">Loading…</p>}
+        {error && (
+          <p role="alert" className="px-1 py-2 text-destructive text-xs">
+            {error}
+          </p>
+        )}
+        {loading && (
+          <p role="status" className="px-1 py-2 text-muted-foreground text-xs">
+            Loading…
+          </p>
+        )}
         <ul className="styled-scrollbar mt-1 max-h-[min(24rem,40dvh)] space-y-1 overflow-y-auto">
           {section === 'tabs'
             ? filteredTabs.map((tab) => (
                 <li key={tab.id} className="flex min-w-0 items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => tab.id !== undefined && void activate(tab.id)}
+                    onClick={() =>
+                      tab.id !== undefined && void activate(tab.id)
+                    }
                     aria-current={tab.active ? 'page' : undefined}
                     title={tab.url}
                     className={cn(
@@ -235,7 +263,9 @@ export function SidebarBrowserGroups({
                     )}
                   >
                     <Globe2 className="size-3.5 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">{tab.title || tab.url || 'Untitled tab'}</span>
+                    <span className="min-w-0 flex-1 truncate">
+                      {tab.title || tab.url || 'Untitled tab'}
+                    </span>
                   </button>
                   <button
                     type="button"
@@ -245,7 +275,11 @@ export function SidebarBrowserGroups({
                     onClick={() => void actOnTab(tab, 'pin')}
                     className="shrink-0 rounded-md p-1 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
                   >
-                    {tab.pinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
+                    {tab.pinned ? (
+                      <PinOff className="size-3.5" />
+                    ) : (
+                      <Pin className="size-3.5" />
+                    )}
                   </button>
                   <button
                     type="button"
@@ -281,10 +315,17 @@ export function SidebarBrowserGroups({
                 </li>
               ))}
         </ul>
-        {!loading && !error &&
-          (section === 'tabs' ? filteredTabs.length === 0 : filteredBookmarks.length === 0) && (
+        {!loading &&
+          !error &&
+          (section === 'tabs'
+            ? filteredTabs.length === 0
+            : filteredBookmarks.length === 0) && (
             <p className="px-1 py-3 text-muted-foreground text-xs">
-              {query ? 'No matches.' : section === 'tabs' ? 'No other tabs in this window.' : 'No web bookmarks in this profile.'}
+              {query
+                ? 'No matches.'
+                : section === 'tabs'
+                  ? 'No other tabs in this window.'
+                  : 'No web bookmarks in this profile.'}
             </p>
           )}
       </div>
