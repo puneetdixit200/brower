@@ -15,7 +15,7 @@ The user explicitly requests **building all features**, including when the next 
 
 ## Verified progress accounting
 
-Feature matrix snapshot: **72 total; 2 PASS (2.8%), 31 partial including one blocked, 39 NOT_STARTED** as of the remote implementation batch. Thirty-three features (45.8%) have implementation/evidence work recorded. This is status coverage; remaining effort is not uniform across features. No reliable weighted code/effort completion percentage has been measured.
+Feature matrix snapshot: **72 total; 2 PASS (2.8%), 32 partial including one blocked, 38 NOT_STARTED** as of the remote implementation batch. Thirty-four features (47.2%) have implementation/evidence work recorded. This is status coverage; remaining effort is not uniform across features. No reliable weighted code/effort completion percentage has been measured.
 
 PASS rows are U04 and U05. Native browser acceptance, package release, performance and broad security gates remain open.
 
@@ -141,7 +141,7 @@ The canonical descriptions, dependencies and evidence remain in FEATURE_MATRIX.m
 | U14 | Side panel attached to current page | PARTIAL |
 | U15 | Per-tab side-panel draft persistence | PARTIAL |
 | U16 | Task detail timeline and artifacts | PARTIAL |
-| U17 | User-friendly permissions dialog | NOT_STARTED |
+| U17 | User-friendly permissions dialog | PARTIAL (source + focused CI) |
 | U18 | Onboarding/import and privacy explanation | NOT_STARTED |
 | A01 | Ask basic page question | PARTIAL |
 | A02 | Multi-page browse/click/type/navigation | PARTIAL |
@@ -192,3 +192,8 @@ The canonical descriptions, dependencies and evidence remain in FEATURE_MATRIX.m
 ## Subsequent remote implementation checkpoint — 2026-10-28
 
 User resumed the project. The cloud session could not clone through container Git because GitHub DNS resolution failed, but the authenticated GitHub connector committed a substantial, source-only batch: real resizable Aster UI sidebar (U01), current-window tab/HTTP(S)-bookmark/conversation sidebar (U02), real credential-filtered local task cards (U03), safer one-time private tab/prompt handoff (U06/S01), and persisted extension-only scaling, theme and reduced motion (additional U09 work). An isolated TypeScript helper strict check plus 3 Node assertions pass; no full WXT/native build ran remotely. See [remote batch evidence](evidence/aster-remote-implementation-2026-10-28.md). The feature matrix, progress and next steps are canonical; release signing, native binary and remaining subtasks are still open.
+
+
+## Focused browser and approval feature batch — 2026-10-28
+
+After the prior remote checkpoint, commits on `feat/aster-linux-ui` added bounded Chromium bookmark tree paths, current-window tab pin/unpin/close actions, stricter server approval for mutating tabs/history, credential-redacted human tool-review previews, and explicit local Markdown export of real task summaries without raw tool input/output. The [focused Linux GitHub Actions run](https://github.com/puneetdixit200/brower/actions/runs/40682050699) passed extension TypeScript, server TypeScript, 12 focused Bun tests, and pinned Biome. No native binary, Omarchy GUI session, full workspace suite or release verification was executed. The canonical feature accounting is **2 PASS / 32 PARTIAL / 38 NOT_STARTED**. U17 is PARTIAL, not PASS. See [batch evidence](evidence/aster-feature-batch2-2026-10-28.md).
