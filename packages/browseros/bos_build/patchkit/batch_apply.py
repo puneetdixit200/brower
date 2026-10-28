@@ -125,6 +125,17 @@ def apply_single_patch(
             log_error(f"  ✗ Would fail: {display_path}")
             return False, error
     else:
+        # A prior run may already have applied this patch to a reused checkout.
+        # Confirm the exact reverse patch matches before treating it as complete;
+        # this is read-only and leaves unrelated working-tree edits untouched.
+        reverse_check = run_git_command(
+            ["git", "apply", "--reverse", "--check", "-p1", str(patch_path)],
+            cwd=chromium_src,
+        )
+        if reverse_check.returncode == 0:
+            log_info(f"  ✓ Already applied: {display_path}")
+            return True, None
+
         # Try standard apply first
         result = run_git_command(
             [

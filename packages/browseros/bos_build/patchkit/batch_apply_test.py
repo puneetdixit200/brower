@@ -86,6 +86,33 @@ class BatchApplyTest(unittest.TestCase):
         self.assertEqual((applied, failed), (1, []))
         self.assertIn("line two changed", (self.repo / "chrome" / "a.txt").read_text())
 
+    def test_reapplying_tracked_and_new_file_patches_is_idempotent(self):
+        _make_patch(self.repo, self.patches_dir)
+        new_file_patch = self.patches_dir / "chrome" / "new.txt"
+        new_file_patch.write_text(
+            "diff --git a/chrome/new.txt b/chrome/new.txt\n"
+            "new file mode 100644\n"
+            "--- /dev/null\n"
+            "+++ b/chrome/new.txt\n"
+            "@@ -0,0 +1 @@\n"
+            "+created by patch\n"
+        )
+
+        self.assertEqual(apply_all_patches(self._ctx()), (2, []))
+        (self.repo / "chrome" / "unrelated.txt").write_text("local edit\n")
+
+        self.assertEqual(apply_all_patches(self._ctx()), (2, []))
+        self.assertEqual(
+            (self.repo / "chrome" / "a.txt").read_text(),
+            "line one\nline two changed\n",
+        )
+        self.assertEqual(
+            (self.repo / "chrome" / "new.txt").read_text(), "created by patch\n"
+        )
+        self.assertEqual(
+            (self.repo / "chrome" / "unrelated.txt").read_text(), "local edit\n"
+        )
+
     def test_corrupt_patch_reports_failure(self):
         bad = self.patches_dir / "chrome" / "a.txt"
         bad.parent.mkdir(parents=True)
