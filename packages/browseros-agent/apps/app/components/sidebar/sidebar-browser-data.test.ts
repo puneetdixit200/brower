@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import {
   recentSidebarBookmarks,
+  flattenSidebarBookmarkTree,
   safeSidebarBookmarkUrl,
   visibleSidebarTabs,
 } from './sidebar-browser-data'
@@ -29,6 +30,24 @@ describe('sidebar browser data boundaries', () => {
       { id: '3', title: 'example.net', url: 'http://example.net/page' },
     ])
     expect(recentSidebarBookmarks([{ id: '1', url: 'https://example.org' }], 0)).toEqual([])
+  })
+
+  it('preserves folder paths and bounds bookmark tree traversal', () => {
+    const tree = [{ id: '0', title: '', children: [
+      { id: '1', title: 'Bookmarks bar', children: [
+        { id: '2', title: 'Docs', children: [
+          { id: '3', title: 'API', url: 'https://example.org/docs' },
+          { id: '4', title: 'Unsafe', url: 'javascript:alert(1)' },
+        ] },
+      ] },
+    ] }]
+    expect(flattenSidebarBookmarkTree(tree)).toEqual([{
+      id: '3',
+      title: 'API',
+      url: 'https://example.org/docs',
+      folderPath: 'Bookmarks bar / Docs',
+    }])
+    expect(flattenSidebarBookmarkTree(tree, 0)).toEqual([])
   })
 
   it('excludes Aster application tabs and invalid tab identifiers', () => {
