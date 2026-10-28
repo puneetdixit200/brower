@@ -4,6 +4,8 @@ import {
   ExternalLink,
   Globe2,
   RotateCw,
+  History,
+  Puzzle,
   Settings2,
   SquarePlus,
 } from 'lucide-react'
@@ -30,6 +32,8 @@ function activeWebTab(tabs: readonly chrome.tabs.Tab[]): chrome.tabs.Tab | undef
 export function BrowserQuickControls() {
   const [address, setAddress] = useState('')
   const [downloads, setDownloads] = useState<DownloadRow[]>([])
+  const [history, setHistory] = useState<{ id: string; title: string; url: string }[]>([])
+  const [showHistory, setShowHistory] = useState(false)
   const [privateWindow, setPrivateWindow] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -113,6 +117,44 @@ export function BrowserQuickControls() {
     })
   }
 
+  const restoreClosed = () =>
+    void action(async () => {
+      if (privateWindow) throw new Error('Unavailable in private windows')
+      const currentWindow = await chrome.windows.getCurrent()
+      const closed = await chrome.sessions.getRecentlyClosed({ maxResults: 15 })
+      const lastTab = closed.find((session) =>
+        session.tab?.sessionId &&
+        session.tab.windowId === currentWindow.id &&
+        !session.tab.incognito,
+      )
+      if (!lastTab?.tab?.sessionId) {
+        setError('No recently closed tab in this window.')
+        return
+      }
+      await chrome.sessions.restore(lastTab.tab.sessionId)
+    })
+
+  const showRecentHistory = () =>
+    void action(async () => {
+      if (privateWindow) throw new Error('Unavailable in private windows')
+      const items = await chrome.history.search({
+        text: '',
+        startTime: 0,
+        maxResults: 8,
+      })
+      setHistory(items.flatMap((item) =>
+        item.url && /^https?:\\/\\//i.test(item.url)
+          ? [{ id: item.id, title: item.title || item.url, url: item.url }]
+          : [],
+      ))
+      setShowHistory(true)
+    })
+
+  const openExtensionsManager = () =>
+    void action(async () => {
+      await chrome.tabs.create({ url: 'chrome://extensions' })
+    })
+
   const openNativeSettings = () =>
     void action(async () => {
       await chrome.tabs.create({ url: 'chrome://settings/content' })
@@ -147,14 +189,17 @@ export function BrowserQuickControls() {
         {[
           { name: 'New tab', Icon: SquarePlus, run: () => void action(() => chrome.tabs.create({})) },
           { name: 'Reload active webpage', Icon: RotateCw, run: reload },
+          { name: 'Reopen closed tab', Icon: History, run: restoreClosed },
+          { name: 'Recent history', Icon: History, run: showRecentHistory },
           { name: 'Downloads', Icon: Download, run: listDownloads },
           { name: 'Screenshot', Icon: Camera, run: screenshot },
           { name: 'Website permissions', Icon: Settings2, run: openNativeSettings },
+          { name: 'Extensions', Icon: Puzzle, run: openExtensionsManager },
         ].map(({ name, Icon, run }) => (
           <button
             key={name}
             type="button"
-            disabled={busy || (privateWindow && (name === 'Downloads' || name === 'Screenshot'))}
+            disabled={busy || (privateWindow && ['Downloads', 'Screenshot', 'Reopen closed tab', 'Recent history'].includes(name))}
             onClick={run}
             aria-label={name}
             title={name}
@@ -179,7 +224,23 @@ export function BrowserQuickControls() {
           ))}
         </ul>
       )}
-      {privateWindow && <p className="text-muted-foreground text-xs">History and screenshots stay hidden in private windows.</p>}
+      {showHistory && !privateWindow && (
+        <ul className="space-y-1 text-xs" aria-label="Recent browser history">
+          {history.length === 0 ? <li>No recent web history.</li> : history.map((item) => (
+            <li key={item.id}>
+              <button
+                type="button"
+                className="block w-full truncate text-left underline-offset-2 hover:underline"
+                title={item.url}
+                onClick={() => void action(() => chrome.tabs.create({ url: item.url }))}
+              >
+                {item.title}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {privateWindow && <p className="text-muted-foreground text-xs">History, closed-tab restore and screenshots stay hidden in private windows.</p>}
     </section>
   )
 }
