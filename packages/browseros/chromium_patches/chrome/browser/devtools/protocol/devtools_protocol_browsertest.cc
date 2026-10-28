@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/devtools/protocol/devtools_protocol_browsertest.cc b/chrome/browser/devtools/protocol/devtools_protocol_browsertest.cc
-index fdf0973f53f6b26814596bcdcd0e2a2caa29727c..cc537f1c3900b6d30291a898c15729f1e045f1d2 100644
+index fdf0973f53f6b26814596bcdcd0e2a2caa29727c..0ddf647b77ab17b9570f79158b465f5a3b50b5d5
 --- a/chrome/browser/devtools/protocol/devtools_protocol_browsertest.cc
 +++ b/chrome/browser/devtools/protocol/devtools_protocol_browsertest.cc
 @@ -23,6 +23,8 @@
@@ -149,24 +149,24 @@ index fdf0973f53f6b26814596bcdcd0e2a2caa29727c..cc537f1c3900b6d30291a898c15729f1
 +IN_PROC_BROWSER_TEST_F(DevToolsProtocolTest,
 +                       BrowserSetWindowVisibilityRejectsHideWithoutMutation) {
 +  AttachToBrowserTarget();
-+  ASSERT_TRUE(browser()->window()->IsVisible());
++  ASSERT_TRUE(browser()->GetWindow()->IsVisible());
 +
 +  SendCommandSync("Browser.setWindowVisibility",
 +                  base::DictValue()
-+                      .Set("windowId", browser()->session_id().id())
++                      .Set("windowId", browser()->GetSessionID().id())
 +                      .Set("visible", false));
 +
 +  ASSERT_TRUE(error());
 +  EXPECT_THAT(error()->FindInt("code"), testing::Optional(-32602));
 +  EXPECT_EQ("Hidden windows are no longer supported.",
 +            *error()->FindString("message"));
-+  EXPECT_TRUE(browser()->window()->IsVisible());
++  EXPECT_TRUE(browser()->GetWindow()->IsVisible());
 +}
 +
 +IN_PROC_BROWSER_TEST_F(DevToolsProtocolTest,
 +                       BrowserSetWindowVisibilityShowsInPlace) {
 +  AttachToBrowserTarget();
-+  const int window_id = browser()->session_id().id();
++  const int window_id = browser()->GetSessionID().id();
 +
 +  const base::DictValue* result = SendCommandSync(
 +      "Browser.setWindowVisibility", base::DictValue()
@@ -278,7 +278,7 @@ index fdf0973f53f6b26814596bcdcd0e2a2caa29727c..cc537f1c3900b6d30291a898c15729f1
 +  AttachToBrowserTarget();
 +
 +  history::HistoryService* history_service =
-+      HistoryServiceFactory::GetForProfile(browser()->profile(),
++      HistoryServiceFactory::GetForProfile(browser()->GetProfile(),
 +                                           ServiceAccessType::EXPLICIT_ACCESS);
 +  ui_test_utils::WaitForHistoryToLoad(history_service);
 +

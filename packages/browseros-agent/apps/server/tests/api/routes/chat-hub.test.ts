@@ -12,6 +12,36 @@ const localServer = {
 } as never
 
 describe('/chat server-owned run routes', () => {
+  it('returns persisted interruption metadata from state without exposing a stream', async () => {
+    const lifecycleStore = {
+      start: () => {},
+      finish: () => {},
+      get: (conversationId: string) => ({
+        conversationId,
+        runId: 'interrupted-run',
+        status: 'interrupted' as const,
+        startedAt: 100,
+        finishedAt: 200,
+      }),
+    }
+    const runs = new ConversationRuns({ lifecycleStore })
+    const conversationId = crypto.randomUUID()
+    const app = route(runs)
+    const state = await requestFromExtension(app, `/${conversationId}/state`)
+    expect(state.status).toBe(200)
+    expect(await state.json()).toMatchObject({
+      conversationId,
+      runId: 'interrupted-run',
+      status: 'interrupted',
+      chunkCount: 0,
+      startedAt: 100,
+      finishedAt: 200,
+    })
+    expect(
+      (await requestFromExtension(app, `/${conversationId}/stream`)).status,
+    ).toBe(204)
+  })
+
   it('serves canonical state and a reconnect stream from the same hub', async () => {
     const runs = new ConversationRuns()
     const conversationId = crypto.randomUUID()

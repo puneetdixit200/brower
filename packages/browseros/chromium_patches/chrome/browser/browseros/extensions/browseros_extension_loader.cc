@@ -1,6 +1,6 @@
 diff --git a/chrome/browser/browseros/extensions/browseros_extension_loader.cc b/chrome/browser/browseros/extensions/browseros_extension_loader.cc
 new file mode 100644
-index 0000000000000000000000000000000000000000..c7fb41d2ca313acc489b49396a4116659ae3eb7e
+index 0000000000000000000000000000000000000000..eb5b6380d364c4b599fa834b2acaab390e5fada2
 --- /dev/null
 +++ b/chrome/browser/browseros/extensions/browseros_extension_loader.cc
 @@ -0,0 +1,706 @@
@@ -73,8 +73,8 @@ index 0000000000000000000000000000000000000000..c7fb41d2ca313acc489b49396a411665
 +          IsAsterProduct()
 +              ? GURL()
 +              : (base::FeatureList::IsEnabled(features::kBrowserOsAlphaFeatures)
-+                     ? kBrowserOSAlphaConfigUrl
-+                     : kBrowserOSConfigUrl)),
++                     ? GURL(kBrowserOSAlphaConfigUrl)
++                     : GURL(kBrowserOSConfigUrl))),
 +      primary_id_(GetPrimaryBrowserOSExtensionId()),
 +      installer_(std::make_unique<BrowserOSExtensionInstaller>()),
 +      maintainer_(std::make_unique<BrowserOSExtensionMaintainer>(profile)) {

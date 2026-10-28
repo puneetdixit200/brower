@@ -4,8 +4,10 @@ import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { UIMessage } from 'ai'
+import { eq } from 'drizzle-orm'
 import { DbConversationStore } from '../../../src/lib/conversations/conversation-store'
-import { closeDb, initializeDb } from '../../../src/lib/db'
+import { closeDb, getDb, initializeDb } from '../../../src/lib/db'
+import { conversationRunState } from '../../../src/lib/db/schema'
 
 describe('DbConversationStore', () => {
   const tempDirs: string[] = []
@@ -154,10 +156,27 @@ describe('DbConversationStore', () => {
       messages: [userMessage('u1', 'hello')],
       targetType: 'browseros',
     })
+    getDb()
+      .insert(conversationRunState)
+      .values({
+        conversationId: CONVERSATION_ID,
+        runId: 'run-delete',
+        status: 'completed',
+        startedAt: 10,
+        finishedAt: 20,
+      })
+      .run()
 
     expect(await store.delete(CONVERSATION_ID)).toBe(true)
     expect(await store.delete(CONVERSATION_ID)).toBe(false)
     expect(await store.get(CONVERSATION_ID)).toBeNull()
+    expect(
+      getDb()
+        .select()
+        .from(conversationRunState)
+        .where(eq(conversationRunState.conversationId, CONVERSATION_ID))
+        .all(),
+    ).toEqual([])
   })
 
   test('history survives closing and reopening the database', async () => {

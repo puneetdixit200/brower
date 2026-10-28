@@ -11,6 +11,7 @@ export const ConversationRunStatusSchema = z.enum([
   'completed',
   'aborted',
   'failed',
+  'interrupted',
 ])
 
 /**

@@ -26,7 +26,7 @@ This checkpoint describes the current uncommitted source changes in the local `f
 
 - The Aster-only Chromium patch guard rejects direct Autofill `list`, `add`, and `fill` operations with `approval_unavailable`; the legacy BrowserOS behavior remains outside this Aster guard. This is a fail-closed boundary, not an autofill implementation or user-consent flow.
 - Aster must keep these operations unavailable until real browser-owned credential selection and consent are implemented and validated. Do not expose stored passwords to extension JavaScript or model content as a substitute.
-- The patch applies to pristine pinned inputs, but the native checkout has not yet had these new changes applied. No native compile or browser test has run. P03 remains NOT_STARTED.
+- At the original source checkpoint, the native checkout had not yet received these changes and no native compile or browser test had run. The later native build checkpoint below supersedes that build status. P03 remains NOT_STARTED because there is no autofill implementation or browser-owned consent flow.
 
 ## U02 — nested bookmark folders in sidebar (PARTIAL)
 
@@ -35,10 +35,17 @@ This checkpoint describes the current uncommitted source changes in the local `f
 
 ## Next validation and implementation
 
-1. Inspect the pinned native checkout and actual build processes before staging anything. Apply the latest reviewed source/patch changes through the normal native pipeline; verify patch provenance and the target Chromium revision.
-2. Generate GN as needed, compile the changed Autofill translation unit and focused DevTools browser-test target, then run the focused native test. Continue with the pinned two-job browser build only after the focused checks pass; do not share the Ninja output directory with another live build.
+1. Inspect the pinned native checkout and actual build processes; preserve and verify the current native state, including the GURL fix, patch provenance and target Chromium revision before starting further work.
+2. Continue from the native build checkpoint below: complete the pinned browser and `browser_tests` build/link with the low-concurrency configuration, then run the focused DevTools browser test. Do not share the Ninja output directory with another live build.
 3. Stage the matching app/server resources and launch the resulting Aster binary with a disposable profile. Verify ordinary scheduled tasks still create separate conversations, heartbeat runs retain one conversation ID across a completed run, and failed/interrupted runs stop without replay. Exercise scheduled-task mode selection, history, failure UI, persistence, and restart behavior in the actual browser.
 4. Through Aster's live browser-owned DevTools path, verify `list`, `add`, and `fill` each fail with `approval_unavailable`; verify the corresponding BrowserOS behavior is unchanged. A later P03 implementation needs real browser-owned consent and origin binding before any operation can be enabled.
 5. Continue the complete 95-subtask plan and remaining matrix rows. Keep native linking/runtime, broader live feature tests, privacy/security acceptance, performance, signing and update ownership open until verified.
 
 Use Luna medium for implementation, focused checks, and documentation, with independent review as requested. At 5% remaining account allowance, checkpoint source and docs, record exact next steps and live process state, stop owned builds/tests/agents, push if that is the active user instruction, and pause; never call the overall project complete at that threshold.
+
+### Superseding native build checkpoint — 2026-10-28
+
+- Pinned Aster Debug GN regeneration succeeded. All 11 Aster server translation units compiled successfully (exit 0) using their exact extracted CXX commands: server config, manager, proxy, appcast parser, prefs, updater, utils, health checker, process controller, launcher, and state store. Also compiled successfully: `browseros_extension_loader.o` after the GURL fix, `chrome_crash_reporter_client.o`, and `devtools/autofill_handler.o`.
+- The focused DevTools browser-test object now compiles successfully (object size 4,561,960 bytes). The first attempt exposed five API accessor errors in added patch hunks; these were corrected to use `BrowserWindowInterface::GetWindow`, `GetSessionID`, and `GetProfile`. The overlay hash matches the patch and reverse-apply validation passes.
+- The full server GN label expanded to 22,621 tasks, but that build was interrupted early. The 11 successful server object commands are focused compile evidence, not completion of the full server target.
+- No `browser_tests` binary/link or browser binary was produced, and no browser test or runtime check was performed. Browser build/link, packaged launch, live-browser behavior, crash/restart acceptance and the complete project goal remain open. P03 is still NOT_STARTED: compiling its guard does not implement credential selection or browser-owned consent.

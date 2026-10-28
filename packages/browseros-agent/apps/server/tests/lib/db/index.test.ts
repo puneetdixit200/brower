@@ -19,6 +19,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
+import { DbConversationRunLifecycleStore } from '../../../src/lib/conversations/conversation-run-lifecycle-store'
 import { closeDb, initializeDb } from '../../../src/lib/db'
 import { providers } from '../../../src/lib/db/schema'
 
@@ -153,6 +154,62 @@ describe('database initialization', () => {
     })
   })
 
+  it('upgrades a v19 profile and converts an orphaned running conversation run to interrupted', () => {
+    const dir = mkTempDir()
+    const dbPath = join(dir, 'browseros.sqlite')
+    const v19Migrations = join(dir, 'migrations-v19')
+    const currentMigrations = join(
+      import.meta.dir,
+      '../../../src/lib/db/migrations',
+    )
+    const journal = JSON.parse(
+      readFileSync(join(currentMigrations, 'meta/_journal.json'), 'utf8'),
+    )
+    journal.entries = journal.entries.filter(
+      (entry: { idx: number }) => entry.idx <= 19,
+    )
+    mkdirSync(join(v19Migrations, 'meta'), { recursive: true })
+    writeFileSync(
+      join(v19Migrations, 'meta/_journal.json'),
+      JSON.stringify(journal),
+    )
+    for (const entry of journal.entries as { tag: string }[]) {
+      cpSync(
+        join(currentMigrations, `${entry.tag}.sql`),
+        join(v19Migrations, `${entry.tag}.sql`),
+      )
+    }
+    const legacy = new BunDatabase(dbPath)
+    migrate(drizzle(legacy), { migrationsFolder: v19Migrations })
+    legacy.close()
+
+    const upgraded = initializeDb({ dbPath })
+    upgraded.sqlite.exec(
+      "INSERT INTO conversation_run_state (conversation_id, run_id, status, started_at) VALUES ('persisted-conversation', 'run-1', 'running', 123)",
+    )
+    const store = new DbConversationRunLifecycleStore()
+    expect(store.get('persisted-conversation')).toMatchObject({
+      conversationId: 'persisted-conversation',
+      runId: 'run-1',
+      status: 'interrupted',
+      startedAt: 123,
+    })
+    expect(store.get('persisted-conversation')?.finishedAt).toBeNumber()
+    store.start('fresh-conversation', 'run-2', 456)
+    expect(store.get('fresh-conversation')).toMatchObject({
+      runId: 'run-2',
+      status: 'running',
+      startedAt: 456,
+      finishedAt: null,
+    })
+    store.finish('fresh-conversation', 'run-2', 'completed', 789)
+    expect(store.get('fresh-conversation')).toMatchObject({
+      status: 'completed',
+      startedAt: 456,
+      finishedAt: 789,
+    })
+  })
+
   it.each([false, true])(
     'upgrades an existing provider without changing credentials or selection (missing migrations: %s)',
     (missingMigrations) => {
@@ -162,6 +219,7 @@ describe('database initialization', () => {
       old.sqlite.exec('ALTER TABLE memories DROP COLUMN source_title')
       old.sqlite.exec('ALTER TABLE memories DROP COLUMN source_id')
       dropHeartbeatColumns(old.sqlite)
+      old.sqlite.exec('DROP TABLE conversation_run_state')
       // Drizzle replays from the newest recorded marker, so rewinding to
       // before the headers migration means clearing everything from it
       // onwards, not just its own row.
@@ -384,6 +442,7 @@ describe('database initialization', () => {
     old.sqlite.exec('ALTER TABLE memories DROP COLUMN source_title')
     old.sqlite.exec('ALTER TABLE memories DROP COLUMN source_id')
     dropHeartbeatColumns(old.sqlite)
+    old.sqlite.exec('DROP TABLE conversation_run_state')
     // Stand the database up as it was before the hosted provider was retired,
     // by undoing the migration that removes it and re-inserting the row.
     old.sqlite

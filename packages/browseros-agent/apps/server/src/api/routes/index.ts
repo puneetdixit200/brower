@@ -9,6 +9,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { AcpAgentRuntime } from '../../lib/agents/acp/acp-agent-runtime'
 import type { OAuthTokenManager } from '../../lib/clients/oauth/token-manager'
+import type { ConversationRunLifecycleStore } from '../../lib/conversations/conversation-run-lifecycle-store'
 import { updateMetricsConsent } from '../../lib/metrics'
 import {
   reloadTelemetryConsent,
@@ -23,8 +24,8 @@ import type { Env, HttpServerConfig } from '../types'
 import { defaultCorsConfig } from '../utils/cors'
 import { requireTrustedAppOrigin } from '../utils/request-auth'
 import { createAcpxProbeRoutes } from './acpx-probe'
-import { createAsterCliRoutes } from './aster-cli'
 import { createAgentRoutes } from './agents'
+import { createAsterCliRoutes } from './aster-cli'
 import { createChatRoutes } from './chat'
 import { createConversationRoutes } from './conversations'
 import { createHealthRoute } from './health'
@@ -39,13 +40,14 @@ import { createProvidersRoutes } from './providers'
 import { createRefinePromptRoutes } from './refine-prompt'
 import { createScheduledJobRunRoutes } from './scheduled-job-runs'
 import { createScheduledJobRoutes } from './scheduled-jobs'
-import { createSiteRecipeRoutes } from './site-recipes'
 import { createShutdownRoute } from './shutdown'
+import { createSiteRecipeRoutes } from './site-recipes'
 import { createStatusRoute } from './status'
 
 interface CreateApiRoutesDeps {
   agentRoutes?: Hono<Env>
   config: HttpServerConfig
+  conversationRunLifecycleStore?: ConversationRunLifecycleStore
   klavis: KlavisService
   onShutdown: () => void
   privacy?: PrivacyRouteDependencies
@@ -54,12 +56,22 @@ interface CreateApiRoutesDeps {
 
 /** Composes the BrowserOS HTTP API from the existing route factories. */
 export function createApiRoutes(deps: CreateApiRoutesDeps) {
-  const { agentRoutes, config, klavis, onShutdown, tokenManager } = deps
+  const {
+    agentRoutes,
+    config,
+    conversationRunLifecycleStore,
+    klavis,
+    onShutdown,
+    tokenManager,
+  } = deps
   const { browser, browserosId, browserSession, port, resourcesDir, version } =
     config
   const { activity } = config
   const acpRuntime = new AcpAgentRuntime({ serverPort: port, resourcesDir })
-  const conversationRuns = new ConversationRuns({ activity })
+  const conversationRuns = new ConversationRuns({
+    activity,
+    lifecycleStore: conversationRunLifecycleStore,
+  })
   // One deep module owns every browser-tool lease and execution effect;
   // both /chat and /mcp must share it for loopback calls to recover context.
   const browserMcp = new BrowserMcpModule({
@@ -137,10 +149,13 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
 
   return (
     app
-      .route('/devcli', createAsterCliRoutes({
-        runs: conversationRuns,
-        token: config.mcpAccessToken ?? '',
-      }))
+      .route(
+        '/devcli',
+        createAsterCliRoutes({
+          runs: conversationRuns,
+          token: config.mcpAccessToken ?? '',
+        }),
+      )
       .route('/system/health', createHealthRoute({ browser }))
       .route('/system/diagnostics', createDiagnosticsRoute(version))
       .route('/system/shutdown', createShutdownRoute({ onShutdown }))

@@ -319,6 +319,11 @@ const currentMigrationHistory = [
     hash: '9c67ccbb30ba65ee390ebc41fdd5e7738ad2876c2d6814904c8e3d0522038c5c',
     createdAt: 1793200000000,
   },
+  {
+    tag: '0020_add_conversation_run_state',
+    hash: '8457cf0c9efbc63f77bca3976e310f7286c712071eda86e7c03b2a237ef7d6d5',
+    createdAt: 1793232000000,
+  },
 ]
 
 // TODO(nikhil): Remove this fallback once Windows/Linux packaging always includes Drizzle migrations.
@@ -441,6 +446,16 @@ const currentSchemaStatements = [
     CREATE INDEX IF NOT EXISTS conversations_last_messaged_at_idx
     ON conversations (last_messaged_at)
   `,
+  `
+    CREATE TABLE IF NOT EXISTS conversation_run_state (
+      conversation_id text PRIMARY KEY NOT NULL,
+      run_id text NOT NULL,
+      status text NOT NULL,
+      started_at integer NOT NULL,
+      finished_at integer
+    )
+  `,
+  `CREATE INDEX IF NOT EXISTS conversation_run_state_status_idx ON conversation_run_state (status)`,
   `
     CREATE TABLE IF NOT EXISTS memories (
       id text PRIMARY KEY NOT NULL,

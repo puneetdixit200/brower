@@ -7,7 +7,11 @@
 import type { UIMessage } from 'ai'
 import { desc, eq } from 'drizzle-orm'
 import { type BrowserOsDatabase, getDb } from '../db'
-import { type ConversationRow, conversations } from '../db/schema'
+import {
+  type ConversationRow,
+  conversationRunState,
+  conversations,
+} from '../db/schema'
 import { logger } from '../logger'
 
 export type ConversationTargetType = 'browseros' | 'claude' | 'codex' | 'custom'
@@ -124,7 +128,12 @@ export class DbConversationStore implements ConversationStore {
         .where(eq(conversations.id, id))
         .get()
       if (!existing) return false
-      this.db.delete(conversations).where(eq(conversations.id, id)).run()
+      this.db.transaction((tx) => {
+        tx.delete(conversationRunState)
+          .where(eq(conversationRunState.conversationId, id))
+          .run()
+        tx.delete(conversations).where(eq(conversations.id, id)).run()
+      })
       logger.info('Conversation deleted', { conversationId: id })
       return true
     })

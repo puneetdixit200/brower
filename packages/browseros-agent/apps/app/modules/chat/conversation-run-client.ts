@@ -3,8 +3,20 @@ import type { UIMessage } from 'ai'
 export interface ConversationRunState {
   conversationId: string
   runId: string
-  status: 'running' | 'completed' | 'aborted' | 'failed'
-  messages: UIMessage[]
+  status: 'running' | 'completed' | 'aborted' | 'failed' | 'interrupted'
+  /** Omitted for metadata-only snapshots after a server restart. */
+  messages?: UIMessage[]
+  startedAt?: number
+  finishedAt?: number | null
+}
+
+/** Prefer a hydrated transcript; metadata-only snapshots must preserve a view's current messages. */
+export function resolveConversationRunMessages(
+  state: ConversationRunState,
+  currentMessages: UIMessage[],
+  persistedMessages?: UIMessage[],
+): UIMessage[] {
+  return state.messages ?? persistedMessages ?? currentMessages
 }
 
 export async function fetchConversationRunState(
@@ -42,9 +54,14 @@ function isConversationRunState(value: unknown): value is ConversationRunState {
   return (
     typeof candidate.conversationId === 'string' &&
     typeof candidate.runId === 'string' &&
-    ['running', 'completed', 'aborted', 'failed'].includes(
+    ['running', 'completed', 'aborted', 'failed', 'interrupted'].includes(
       String(candidate.status),
     ) &&
-    Array.isArray(candidate.messages)
+    (candidate.messages === undefined || Array.isArray(candidate.messages)) &&
+    (candidate.startedAt === undefined ||
+      typeof candidate.startedAt === 'number') &&
+    (candidate.finishedAt === undefined ||
+      candidate.finishedAt === null ||
+      typeof candidate.finishedAt === 'number')
   )
 }

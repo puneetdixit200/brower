@@ -9,6 +9,7 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { toChatError } from '../agent/chat-error'
 import { HttpAgentError } from '../agent/errors'
 import { initializeOAuth, shutdownOAuth } from '../lib/clients/oauth'
+import { DbConversationRunLifecycleStore } from '../lib/conversations/conversation-run-lifecycle-store'
 import { getDb } from '../lib/db'
 import { logger } from '../lib/logger'
 import { loadOrCreateMcpAccessToken } from '../lib/mcp-access-token'
@@ -60,6 +61,7 @@ export async function createHttpServer(config: HttpServerConfig) {
 
   const app = createApiRoutes({
     config: { ...config, activity, mcpAccessToken },
+    conversationRunLifecycleStore: new DbConversationRunLifecycleStore(),
     klavis,
     tokenManager,
     onShutdown: () => {

@@ -19,6 +19,77 @@ const secondChunk: UIMessageChunk = {
 }
 
 describe('ConversationRuns', () => {
+  it('persists lifecycle metadata and returns a non-resumable interruption snapshot', async () => {
+    const rows = new Map<
+      string,
+      {
+        conversationId: string
+        runId: string
+        status: 'running' | 'completed' | 'aborted' | 'failed' | 'interrupted'
+        startedAt: number
+        finishedAt: number | null
+      }
+    >()
+    const lifecycleStore = {
+      start: (conversationId: string, runId: string, startedAt: number) => {
+        rows.set(conversationId, {
+          conversationId,
+          runId,
+          status: 'running',
+          startedAt,
+          finishedAt: null,
+        })
+      },
+      finish: (
+        conversationId: string,
+        runId: string,
+        status: 'completed' | 'aborted' | 'failed' | 'interrupted',
+        finishedAt: number,
+      ) => {
+        const row = rows.get(conversationId)
+        if (row?.runId === runId)
+          rows.set(conversationId, { ...row, status, finishedAt })
+      },
+      get: (conversationId: string) => rows.get(conversationId),
+      delete: (conversationId: string) => rows.delete(conversationId),
+    }
+    const source = controlledSource()
+    const runs = new ConversationRuns({ lifecycleStore })
+    const started = await runs.start({
+      conversationId: 'durable-run',
+      messages: [],
+      createStream: () => source.stream,
+    })
+    const saved = rows.get('durable-run')
+    expect(saved).toMatchObject({ runId: started.runId, status: 'running' })
+    if (!saved) throw new Error('Expected persisted run metadata')
+
+    // Simulate process restart: the next process reconciles the persisted row.
+    rows.set('durable-run', {
+      ...saved,
+      status: 'interrupted',
+      finishedAt: Date.now(),
+    })
+    const restarted = new ConversationRuns({ lifecycleStore })
+    expect(await restarted.getPreparedSnapshot('durable-run')).toMatchObject({
+      conversationId: 'durable-run',
+      runId: started.runId,
+      status: 'interrupted',
+      chunkCount: 0,
+    })
+    expect(restarted.activeRun('durable-run')).toBeUndefined()
+    expect(() => restarted.subscribe('durable-run')).toThrow(
+      'Conversation run not found',
+    )
+    source.close()
+    await eventually(() =>
+      expect(rows.get('durable-run')?.status).toBe('completed'),
+    )
+    expect(await restarted.delete('durable-run')).toBe(true)
+    expect(rows.has('durable-run')).toBe(false)
+    expect(await runs.delete('durable-run')).toBe(true)
+  })
+
   it('publishes one canonical run to streams and panel assignments', async () => {
     const source = controlledSource()
     const runs = new ConversationRuns()
@@ -379,7 +450,7 @@ describe('ConversationRuns', () => {
 
     releasePreparation()
     await starting
-    expect((await hydrating)?.messages[0]?.id).toBe('canonical-user')
+    expect((await hydrating)?.messages?.[0]?.id).toBe('canonical-user')
     await runs.stop('hydrating')
   })
 
@@ -414,7 +485,7 @@ describe('ConversationRuns', () => {
         { id: 'current', role: 'user', parts: [] },
       ]),
     ).toBe(true)
-    expect(runs.getSnapshot('conversation-messages')?.messages[0]?.id).toBe(
+    expect(runs.getSnapshot('conversation-messages')?.messages?.[0]?.id).toBe(
       'current',
     )
     await runs.stop('conversation-messages')

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
+export * from './conversation-run-state'
 export * from './conversations'
 export * from './memories'
 export * from './oauth'

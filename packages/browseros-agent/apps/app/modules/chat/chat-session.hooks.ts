@@ -63,6 +63,7 @@ import { addContentFilterNotice } from './content-filter-notice'
 import {
   conversationReconnectUrl,
   fetchConversationRunState,
+  resolveConversationRunMessages,
 } from './conversation-run-client'
 import { useExecutionHistoryTracker } from './execution-history-tracker.hooks'
 import { PanelConversationAttachment } from './panel-conversation-attachment'
@@ -591,10 +592,22 @@ export const useChatSession = (options?: ChatSessionOptions) => {
         await detachView()
         if (!isCurrent()) return
         const id = state.conversationId as ReturnType<typeof crypto.randomUUID>
+        const persistedMessages =
+          state.messages === undefined
+            ? (await fetchServerConversation(id))?.messages
+            : undefined
+        if (!isCurrent()) return
+        const retainedMessages =
+          conversationIdRef.current === id ? messagesRef.current : []
+        const messages = resolveConversationRunMessages(
+          state,
+          retainedMessages,
+          persistedMessages,
+        )
         conversationIdRef.current = id
-        messagesRef.current = state.messages
+        messagesRef.current = messages
         setConversationId(id)
-        setMessages(state.messages)
+        setMessages(messages)
         setSearchParamsRef.current({}, { replace: true })
         if (state.status === 'running') {
           streamRequestRef.current = resumeStream({

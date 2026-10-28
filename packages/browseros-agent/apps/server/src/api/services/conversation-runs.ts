@@ -9,6 +9,7 @@ import type {
   ConversationRunStatus,
 } from '@browseros/shared/schemas/conversation-panels'
 import type { UIMessage, UIMessageChunk } from 'ai'
+import type { ConversationRunLifecycleStore } from '../../lib/conversations/conversation-run-lifecycle-store'
 
 export type { ConversationRunStatus } from '@browseros/shared/schemas/conversation-panels'
 
@@ -18,8 +19,11 @@ export interface ConversationRunSnapshot {
   conversationId: string
   runId: string
   status: ConversationRunStatus
-  messages: UIMessage[]
+  /** Omitted when only lifecycle metadata survived a restart. */
+  messages?: UIMessage[]
   chunkCount: number
+  startedAt?: number
+  finishedAt?: number | null
 }
 
 export interface ConversationTabGroupPresentation {
@@ -72,6 +76,8 @@ interface ConversationRunRecord {
   conversationId: string
   runId: string
   status: ConversationRunStatus
+  startedAt: number
+  finishedAt: number | null
   messages: UIMessage[]
   chunks: UIMessageChunk[]
   panelsVisible: boolean
@@ -97,6 +103,7 @@ interface PanelAssignmentsSubscriber {
 
 interface ConversationRunsDeps {
   activity?: ConversationRunActivity
+  lifecycleStore?: ConversationRunLifecycleStore
   /** Lower values heal clients faster at the cost of more loopback traffic. */
   panelAssignmentsHeartbeatMs?: number
   /** Caps simultaneous model/browser runs, not retained finished histories. */
@@ -112,7 +119,9 @@ export class ConversationRunAlreadyActiveError extends Error {
 
 export class ConversationCapacityError extends Error {
   constructor() {
-    super('Aster is at its concurrent agent-task limit; finish or stop a task first')
+    super(
+      'Aster is at its concurrent agent-task limit; finish or stop a task first',
+    )
     this.name = 'ConversationCapacityError'
   }
 }
@@ -165,6 +174,8 @@ export class ConversationRuns {
       conversationId: input.conversationId,
       runId: crypto.randomUUID(),
       status: 'running',
+      startedAt: Date.now(),
+      finishedAt: null,
       messages: [...input.messages],
       chunks: [],
       panelsVisible: input.panelsVisible ?? true,
@@ -188,6 +199,16 @@ export class ConversationRuns {
     // Install before any provider/MCP preparation awaits. This both rejects a
     // concurrent POST and gives loopback MCP calls an authoritative active run.
     this.runs.set(input.conversationId, record)
+    try {
+      this.deps.lifecycleStore?.start(
+        record.conversationId,
+        record.runId,
+        record.startedAt,
+      )
+    } catch (error) {
+      this.runs.delete(input.conversationId)
+      throw error
+    }
     this.deps.activity?.beginChatStream()
     record.activityStarted = true
     this.attachInitialPanels(record, input.panelTabIds ?? [])
@@ -303,7 +324,8 @@ export class ConversationRuns {
 
   async delete(conversationId: string): Promise<boolean> {
     const record = this.runs.get(conversationId)
-    if (!record) return false
+    if (!record)
+      return this.deps.lifecycleStore?.delete(conversationId) ?? false
     // Prevent a replacement turn until late stream construction has unwound.
     record.deleting = true
     // Retire routing before waiting for provider cancellation. Panels must not
@@ -321,6 +343,7 @@ export class ConversationRuns {
     if (this.runs.get(conversationId) !== record) return false
 
     this.runs.delete(conversationId)
+    this.deps.lifecycleStore?.delete(conversationId)
     return true
   }
 
@@ -340,7 +363,18 @@ export class ConversationRuns {
   ): Promise<ConversationRunSnapshot | undefined> {
     while (true) {
       const record = this.runs.get(conversationId)
-      if (!record) return undefined
+      if (!record) {
+        const durable = this.deps.lifecycleStore?.get(conversationId)
+        if (!durable) return undefined
+        return {
+          conversationId: durable.conversationId,
+          runId: durable.runId,
+          status: durable.status === 'running' ? 'interrupted' : durable.status,
+          chunkCount: 0,
+          startedAt: durable.startedAt,
+          finishedAt: durable.finishedAt,
+        }
+      }
       await record.prepared
       if (this.runs.get(conversationId) === record) {
         return this.snapshot(record)
@@ -355,6 +389,8 @@ export class ConversationRuns {
       status: record.status,
       messages: [...record.messages],
       chunkCount: record.chunks.length,
+      startedAt: record.startedAt,
+      finishedAt: record.finishedAt,
     }
   }
 
@@ -509,6 +545,7 @@ export class ConversationRuns {
     if (record.ended) return
     record.ended = true
     record.status = status
+    record.finishedAt = Date.now()
     // Setup failures have no stream-return point, but panel hydration must still
     // resolve to the visible failed/aborted state instead of hanging forever.
     this.markPrepared(record)
@@ -527,7 +564,16 @@ export class ConversationRuns {
     try {
       if (record.activityStarted) this.deps.activity?.endChatStream()
     } finally {
-      record.resolveFinished()
+      try {
+        this.deps.lifecycleStore?.finish(
+          record.conversationId,
+          record.runId,
+          status,
+          record.finishedAt,
+        )
+      } finally {
+        record.resolveFinished()
+      }
     }
   }
 
