@@ -21,14 +21,17 @@ function cleanText(value: string): string {
       const address = new URL(value)
       if (address.username || address.password) return '[redacted URL credentials]'
       // Query and fragment frequently carry reset tokens or session state.
-      if (address.search || address.hash) return address.origin + address.pathname + ' [query/fragment omitted]'
+      if (SENSITIVE_VALUE.test(address.pathname)) return `${address.origin}/[sensitive path omitted]`
+      if (address.search || address.hash) {
+        return `${address.origin}${address.pathname} [query/fragment omitted]`
+      }
       return address.toString()
     } catch {
       return '[invalid URL]'
     }
   }
   if (SENSITIVE_VALUE.test(value)) return '[redacted: credential-shaped content]'
-  if (value.length > MAX_STRING) return value.slice(0, MAX_STRING) + '… [truncated]'
+  if (value.length > MAX_STRING) return `${value.slice(0, MAX_STRING)}… [truncated]`
   return value
 }
 
@@ -69,7 +72,7 @@ export function formatApprovalInput(input: unknown): string {
     const summary = JSON.stringify(sanitizedPreview(input, 0, new WeakSet()), null, 2)
     if (!summary) return 'No action details were provided.'
     if (summary.length > MAX_OUTPUT) {
-      return summary.slice(0, MAX_OUTPUT) + '\n… [additional action details omitted]'
+      return `${summary.slice(0, MAX_OUTPUT)}\n… [additional action details omitted]`
     }
     return summary
   } catch {
