@@ -11,7 +11,7 @@ const UUID_PATTERN =
 export async function getServerConversationLiveness(input: {
   conversationId: string
   agentServerUrl: string
-  fetcher?: typeof fetch
+  fetcher?: (url: string, init: RequestInit) => Promise<Response>
   timeoutMs?: number
 }): Promise<ServerConversationLiveness> {
   const { conversationId, agentServerUrl } = input
