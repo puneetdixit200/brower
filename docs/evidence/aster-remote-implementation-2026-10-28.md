@@ -49,3 +49,8 @@ All changes in this batch were committed directly on the authenticated GitHub fe
 ## Continued U09 source implementation
 
 Additional source commits created `lib/display/aster-display-settings.ts` and `screens/customization/AsterDisplaySettingsCard.tsx`, installed the setting applier in the app entrypoint, and added CSS restricted to `html[data-aster-reduced-motion='true']`. The UI now offers existing persisted light/dark/system theme, 90/100/110% rem-based interface scaling, and reduced decorative motion with explicit scope limited to extension UI. A normalization Bun test was added but **not run**. This is not a website zoom control, system battery manager, or proven performance improvement. U09 remains PARTIAL until WXT/GUI/runtime verification.
+
+
+## Final targeted security correction
+
+A final review found that `(tabIdsParam ?? '').split(',').map(Number)` could turn a missing `tabs` parameter into numeric tab ID `0`. `NewTabChat.tsx` now treats absent/empty legacy tab selection as **no tabs**, rejects empty elements before parsing, and preserves the explicit current-window membership check. This source correction was committed after the primary batch. No headed execution claimed.
