@@ -325,3 +325,9 @@ The extension app router now lazily loads 15 secondary views (settings, task his
 - Final independent staging review fixed root/ancestor symlink redirects before copy/delete/write; combined focused driver/staging/resource suites pass 28 tests. Native descriptor tests remain uncompiled.
 
 - Development fixture smoke now passes command-palette keyboard/focus/Escape, lazy settings and Task History/sidebar/history navigation with server disabled and isolated profile/network. Pinned Chromium source/dependency provisioning completed at 155.0.8059.26 (`16c3e55476d3564bea713314b2fff638749ce3e6`); actual native build is next.
+
+### Actual native bootstrap trials — 2026-10-28
+
+- The jobs=2 pipeline now executes common/server resources, copied resources and unpacked extension staging. Fixed product-owned version lookup and bracketed font filenames with focused regressions. All 424 native patches applied successfully after repairing pinned-context/hunk errors and making retries idempotent.
+- Linux sysroot is prepared. GN/autoninja now use adjacent depot_tools rather than depending on global PATH. Actual GN generation is exposing and driving further GN corrections; no C++ compile, binary, package or native runtime is verified yet. Detailed executed evidence remains in `evidence/aster-local-resume-2026-10-28.md`.
+- Full-project GN generation now passes: 35,759 targets / 5,077 files, exit 0. The unused `enable_js_type_check` warning remains. No native compile or runtime acceptance is claimed.

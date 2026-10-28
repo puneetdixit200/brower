@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000..e9c2702ebc12a
 --- /dev/null
 +++ b/chrome/browser/browseros/buildflags.gni
-@@ -0,0 +1,52 @@
+@@ -0,0 +1,51 @@
 +# Copyright 2024 The Chromium Authors
 +# Use of this source code is governed by a BSD-style license that can be
 +# found in the LICENSE file.
@@ -14,12 +14,11 @@ index 0000000000000..e9c2702ebc12a
 +  browseros_product = "browseros"
 +  # Explicitly disabled unless the Python planner selects Aster Linux debug.
 +  aster_use_unpacked_dev_extension = false
-+
-+  # Dev/test only for the existing BrowserOS/BrowserClaw products.
-+  browseros_allow_runtime_product_override = browseros_product != "aster"
 +}
 +
 +declare_args() {
++  # Dev/test only for the existing BrowserOS/BrowserClaw products.
++  browseros_allow_runtime_product_override = browseros_product != "aster"
 +  # Usually follows runtime override, but can be forced on for packaging tests.
 +  # Aster must never package BrowserOS or BrowserClaw server payloads.
 +  browseros_package_all_server_resources = browseros_product != "aster"
