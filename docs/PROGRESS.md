@@ -364,3 +364,8 @@ A normal Git clone failed because the isolated workspace could not resolve `gith
 ### Additional display customization source batch — 2026-10-28
 
 U09 (already PARTIAL) now has actual theme/extension scale/reduced-motion controls using `AsterDisplaySettingsCard.tsx`, persistent `chrome.storage.local` settings, a bootstrap storage observer and CSS motion suppression scoped to Aster's document. The change does not affect website content or native Chromium zoom. Normalization regression source was added. **No full app build, Bun tests, headed display, battery or CPU measurement was run in this session.** See [cloud batch evidence](evidence/aster-remote-implementation-2026-10-28.md).
+
+
+### Browser sidebar, approvals and local task-export implementation — 2026-10-28
+
+Committed a second feature batch: real bookmark tree folder paths, scoped tab pin/close actions, server-enforced approval for tab/history mutations, bounded/redacted inline approval details, and user-triggered local Markdown task reports with raw tool input/output omitted. Linux GitHub Actions [run 40682050699](https://github.com/puneetdixit200/brower/actions/runs/40682050699) **PASSED**: WXT extension typecheck, server typecheck, 12 targeted Bun tests and Biome formatting. No native compilation or UI acceptance is inferred. The 72-feature matrix currently contains **2 PASS, 32 PARTIAL including one blocked, 38 NOT_STARTED**; U17 now PARTIAL, while U02/U16/A06 remain PARTIAL. Release signing and all native/Wayland/security-performance acceptance gates remain open. See [batch-2 source and test evidence](evidence/aster-feature-batch2-2026-10-28.md).
