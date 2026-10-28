@@ -22,7 +22,7 @@ import type {
   ExecutionTaskRecord,
 } from '@/lib/execution-history/types'
 import { resolveAgentServerUrl } from '@/modules/browseros/agent-server-url.helpers'
-import { downloadTaskReport } from './export-task-report'
+import { downloadTaskReport, saveTaskReportToChosenDirectory } from './export-task-report'
 import { flattenExecutionHistory, getTaskResult } from './task-history'
 
 function formatDate(value?: string): string {
@@ -412,6 +412,18 @@ export const TaskHistoryPage: FC = () => {
                   >
                     <Download className="mr-2 size-4" />
                     Download Markdown report
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      void saveTaskReportToChosenDirectory(selectedTask)
+                        .then(() => setError(null))
+                        .catch(() => setError('Could not save to the chosen folder. No arbitrary path access was granted.'))
+                    }}
+                  >
+                    Save into chosen folder
                   </Button>
                 </section>
               </article>
