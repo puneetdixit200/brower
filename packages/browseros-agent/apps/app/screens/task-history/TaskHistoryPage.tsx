@@ -392,9 +392,10 @@ export const TaskHistoryPage: FC = () => {
                 <section className="space-y-2">
                   <h3 className="font-medium">Local report</h3>
                   <p className="text-muted-foreground text-sm">
-                    Download this task’s saved summary and visible timeline as Markdown.
-                    Raw tool inputs, outputs and stored credentials are not exported.
-                    This is not a full agent workspace artifact archive.
+                    Download this task’s saved summary and visible timeline as
+                    Markdown. Raw tool inputs, outputs and stored credentials
+                    are not exported. This is not a full agent workspace
+                    artifact archive.
                   </p>
                   <Button
                     type="button"
