@@ -209,4 +209,19 @@ export const scheduledJobRuns = async () => {
     await cleanupStaleJobRuns()
     await syncAlarmState()
   })
+
+  // Chrome idle->active can follow a suspended laptop. It is not a guaranteed
+  // OS resume event, but safely reconciles server history and future alarms.
+  // No missed alarms are replayed or auto-caught-up after resume.
+  chrome.idle.setDetectionInterval(60)
+  chrome.idle.onStateChanged.addListener((state) => {
+    if (state !== 'active') return
+    void (async () => {
+      await cleanupStaleJobRuns()
+      await syncAlarmState()
+    })().catch(() => {
+      // Server may be restarting after sleep; a later startup/idle
+      // transition can retry. Do not claim a task succeeded.
+    })
+  })
 }
