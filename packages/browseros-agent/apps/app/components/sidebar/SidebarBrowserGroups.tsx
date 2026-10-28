@@ -42,6 +42,7 @@ export function SidebarBrowserGroups({
   )
   const visible = expanded && section !== null
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the explicit refresh token intentionally refetches this panel without being read in the effect body
   useEffect(() => {
     if (!visible) return
     let active = true
@@ -270,7 +271,7 @@ export function SidebarBrowserGroups({
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{item.title}</span>
                       {item.folderPath && (
-                        <span className="block truncate text-muted-foreground text-[10px]">
+                        <span className="block truncate text-[10px] text-muted-foreground">
                           {item.folderPath}
                         </span>
                       )}
