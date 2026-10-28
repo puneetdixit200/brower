@@ -1,10 +1,10 @@
-import { Bookmark, ChevronDown, ExternalLink, Globe2, RefreshCw } from 'lucide-react'
+import { Bookmark, ChevronDown, ExternalLink, Globe2, Pin, PinOff, RefreshCw, X } from 'lucide-react'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import {
   type SidebarBookmark,
   type SidebarTab,
-  recentSidebarBookmarks,
+  flattenSidebarBookmarkTree,
   visibleSidebarTabs,
 } from './sidebar-browser-data'
 import { CurrentWindowTabs } from '../layout/command-palette-tabs'
@@ -27,6 +27,7 @@ export function SidebarBrowserGroups({
   const [bookmarks, setBookmarks] = useState<SidebarBookmark[]>([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
+  const [pendingTabId, setPendingTabId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
   const id = useId()
@@ -62,8 +63,8 @@ export function SidebarBrowserGroups({
             if (active) setBookmarks([])
             if (active) setError('Bookmarks are unavailable in private windows.')
           } else {
-            const results = await chrome.bookmarks.getRecent(30)
-            if (active) setBookmarks(recentSidebarBookmarks(results, 30))
+            const roots = await chrome.bookmarks.getTree()
+            if (active) setBookmarks(flattenSidebarBookmarkTree(roots, 500))
           }
         }
       } catch {
@@ -121,7 +122,8 @@ export function SidebarBrowserGroups({
       (item) =>
         !term ||
         item.title.toLocaleLowerCase().includes(term) ||
-        item.url.toLocaleLowerCase().includes(term),
+        item.url.toLocaleLowerCase().includes(term) ||
+        (item.folderPath ?? '').toLocaleLowerCase().includes(term),
     )
   }, [bookmarks, query])
 
@@ -132,6 +134,28 @@ export function SidebarBrowserGroups({
       onNavigate?.()
     } catch {
       setError('That tab is no longer in this window. Refresh the list.')
+    }
+  }
+
+  const actOnTab = async (tab: SidebarTab & { id: number }, action: 'pin' | 'close') => {
+    if (pendingTabId !== null) return
+    setPendingTabId(tab.id)
+    setError(null)
+    try {
+      // Re-check actual membership before a destructive tab action.
+      const current = await chrome.tabs.query({ currentWindow: true })
+      const live = current.find(
+        (entry) => entry.id === tab.id &&
+          !entry.url?.startsWith(chrome.runtime.getURL('')),
+      )
+      if (!live) throw new Error('Tab moved or closed')
+      if (action === 'close') await chrome.tabs.remove(tab.id)
+      else await chrome.tabs.update(tab.id, { pinned: !live.pinned })
+      setRefreshToken((value) => value + 1)
+    } catch {
+      setError('Could not change this tab. Refresh the list and try again.')
+    } finally {
+      setPendingTabId(null)
     }
   }
 
@@ -198,7 +222,7 @@ export function SidebarBrowserGroups({
         <ul className="styled-scrollbar mt-1 max-h-[min(24rem,40dvh)] space-y-1 overflow-y-auto">
           {section === 'tabs'
             ? filteredTabs.map((tab) => (
-                <li key={tab.id}>
+                <li key={tab.id} className="flex min-w-0 items-center gap-1">
                   <button
                     type="button"
                     onClick={() => tab.id !== undefined && void activate(tab.id)}
@@ -212,6 +236,26 @@ export function SidebarBrowserGroups({
                     <Globe2 className="size-3.5 shrink-0" />
                     <span className="min-w-0 flex-1 truncate">{tab.title || tab.url || 'Untitled tab'}</span>
                   </button>
+                  <button
+                    type="button"
+                    disabled={pendingTabId !== null}
+                    aria-label={tab.pinned ? 'Unpin tab' : 'Pin tab'}
+                    title={tab.pinned ? 'Unpin tab' : 'Pin tab'}
+                    onClick={() => void actOnTab(tab, 'pin')}
+                    className="shrink-0 rounded-md p-1 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
+                  >
+                    {tab.pinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={pendingTabId !== null}
+                    aria-label="Close tab"
+                    title="Close tab"
+                    onClick={() => void actOnTab(tab, 'close')}
+                    className="shrink-0 rounded-md p-1 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
+                  >
+                    <X className="size-3.5" />
+                  </button>
                 </li>
               ))
             : filteredBookmarks.map((item) => (
@@ -223,7 +267,14 @@ export function SidebarBrowserGroups({
                     className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring"
                   >
                     <Bookmark className="size-3.5 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">{item.title}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{item.title}</span>
+                      {item.folderPath && (
+                        <span className="block truncate text-muted-foreground text-[10px]">
+                          {item.folderPath}
+                        </span>
+                      )}
+                    </span>
                     <ExternalLink className="size-3 shrink-0 opacity-50" />
                   </button>
                 </li>
@@ -232,7 +283,7 @@ export function SidebarBrowserGroups({
         {!loading && !error &&
           (section === 'tabs' ? filteredTabs.length === 0 : filteredBookmarks.length === 0) && (
             <p className="px-1 py-3 text-muted-foreground text-xs">
-              {query ? 'No matches.' : section === 'tabs' ? 'No other tabs in this window.' : 'No recent web bookmarks.'}
+              {query ? 'No matches.' : section === 'tabs' ? 'No other tabs in this window.' : 'No web bookmarks in this profile.'}
             </p>
           )}
       </div>
