@@ -5,12 +5,14 @@ import { ThemeProvider } from '@/components/theme-provider.tsx'
 import { Toaster } from '@/components/ui/sonner'
 import { AnalyticsProvider } from '@/lib/analytics/AnalyticsProvider.tsx'
 import { QueryProvider } from '@/lib/query/QueryProvider'
+import { installAsterDisplaySettings } from '@/lib/display/aster-display-settings'
 import { sentryRootErrorHandler } from '@/lib/sentry/sentryRootErrorHandler.ts'
 import { App } from './App'
 
 const $root = document.getElementById('root')
 
 if ($root) {
+  installAsterDisplaySettings()
   ReactDOM.createRoot($root, sentryRootErrorHandler).render(
     <React.StrictMode>
       <QueryProvider>
