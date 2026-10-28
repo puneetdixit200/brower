@@ -58,7 +58,10 @@ export function createMcpRoutes(deps: McpRouteDeps) {
     const leaseToken =
       req.headers.get(BROWSEROS_TOOL_LEASE_HEADER)?.trim() || undefined
     const includeStructuredContent = url.searchParams.get('structured') === '1'
-    const requestedReadOnly = url.searchParams.get('read_only') === '1'
+    // External bearer-token MCP clients receive read-only browser scopes.
+    // Only a conversation-scoped server-issued lease may request mutations.
+    const requestedReadOnly =
+      leaseToken === undefined || url.searchParams.get('read_only') === '1'
     const logContext: McpRequestLogContext = {
       leased: leaseToken !== undefined,
       requestedReadOnly,
