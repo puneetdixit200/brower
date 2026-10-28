@@ -21,7 +21,8 @@ export function safeSidebarBookmarkUrl(raw: string | undefined): string | null {
   try {
     const parsed = new URL(raw)
     return (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
-      !parsed.username && !parsed.password
+      !parsed.username &&
+      !parsed.password
       ? parsed.href
       : null
   } catch {
@@ -37,11 +38,13 @@ export function recentSidebarBookmarks(
     .flatMap((node) => {
       const url = safeSidebarBookmarkUrl(node.url)
       return url
-        ? [{
-            id: node.id,
-            title: node.title?.trim() || new URL(url).hostname,
-            url,
-          }]
+        ? [
+            {
+              id: node.id,
+              title: node.title?.trim() || new URL(url).hostname,
+              url,
+            },
+          ]
         : []
     })
     .slice(0, Math.max(0, limit))
@@ -61,12 +64,11 @@ export function visibleSidebarTabs(
   limit = 50,
 ): (SidebarTab & { id: number })[] {
   return tabs
-    .filter((tab): tab is SidebarTab & { id: number } =>
-      Number.isSafeInteger(tab.id) && (tab.id ?? -1) >= 0,
-    )
     .filter(
-      (tab) => !tab.url?.startsWith(extensionOrigin),
+      (tab): tab is SidebarTab & { id: number } =>
+        Number.isSafeInteger(tab.id) && (tab.id ?? -1) >= 0,
     )
+    .filter((tab) => !tab.url?.startsWith(extensionOrigin))
     .slice(0, Math.max(0, limit))
 }
 
@@ -82,7 +84,9 @@ export function flattenSidebarBookmarkTree(
   const maxItems = Math.max(0, Math.min(5000, Math.floor(limit)))
   if (!maxItems) return []
   const result: SidebarBookmark[] = []
-  const stack = roots.map((node) => ({ node, folders: [] as string[] })).reverse()
+  const stack = roots
+    .map((node) => ({ node, folders: [] as string[] }))
+    .reverse()
   let visited = 0
   while (stack.length && result.length < maxItems && visited++ < 12000) {
     const entry = stack.pop()
@@ -98,9 +102,8 @@ export function flattenSidebarBookmarkTree(
       })
     }
     if (node.children?.length) {
-      const path = node.title && node.id !== '0'
-        ? [...folders, node.title]
-        : folders
+      const path =
+        node.title && node.id !== '0' ? [...folders, node.title] : folders
       for (let index = node.children.length - 1; index >= 0; index--) {
         stack.push({ node: node.children[index], folders: path })
       }
