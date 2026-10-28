@@ -22,7 +22,7 @@ export interface SiteRecipe {
 const MAX_RECIPES = 150
 const STALE_AFTER_MS = 30 * 86_400_000
 const CREDENTIAL_ASSIGNMENT =
-  /(?:password|passphrase|api[_ -]?key|secret|access[_ -]?token|bearer|otp|totp)\\s*[:=]\\s*\\S+/i
+  /(?:password|passphrase|api[_ -]?key|secret|access[_ -]?token|bearer|otp|totp)\s*[:=]\s*\S+/i
 
 /** Recipes are instructions, never a password vault or model prompt cache. */
 function assertNonsecretInstructions(value: string): void {
