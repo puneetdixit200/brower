@@ -30,7 +30,15 @@ def _patches_dir(case: unittest.TestCase, files: List[str]) -> Path:
     for rel in files:
         path = root / rel
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("diff")
+        path.write_text(
+            f"diff --git a/{rel} b/{rel}\n"
+            "new file mode 100644\n"
+            "index 0000000..e69de29\n"
+            "--- /dev/null\n"
+            f"+++ b/{rel}\n"
+            "@@ -0,0 +1 @@\n"
+            "+fixture\n"
+        )
     return root
 
 
@@ -67,6 +75,31 @@ class EntryResolutionTest(unittest.TestCase):
             "two": _feature(["third_party/lib/"]),
         }
         self.assertEqual(check_repo(features, patches), [])
+
+    def test_corrupt_new_file_hunk_is_reported_and_valid_hunk_is_accepted(self):
+        patches = _patches_dir(self, ["chrome/valid.cc", "chrome/corrupt.h"])
+        (patches / "chrome/corrupt.h").write_text(
+            "diff --git a/chrome/corrupt.h b/chrome/corrupt.h\n"
+            "new file mode 100644\n"
+            "index 0000000..e69de29\n"
+            "--- /dev/null\n"
+            "+++ b/chrome/corrupt.h\n"
+            "@@ -0,0 +1,2 @@\n"
+            "+one line\n"
+        )
+        features = {
+            "one": _feature(["chrome/valid.cc", "chrome/corrupt.h"]),
+        }
+
+        findings = check_repo(features, patches)
+
+        self.assertEqual(len(findings), 1)
+        finding = findings[0]
+        self.assertEqual(
+            (finding.check, finding.severity, finding.feature, finding.path),
+            ("invalid-patch", "error", "one", "chrome/corrupt.h"),
+        )
+        self.assertIn("corrupt patch", finding.message)
 
     def test_missing_file_entry_reported_with_feature_and_path(self):
         patches = _patches_dir(self, ["chrome/a.cc"])

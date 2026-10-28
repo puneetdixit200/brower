@@ -10,6 +10,7 @@ findings — callers render and decide exit codes.
 
 from dataclasses import asdict, dataclass
 from pathlib import Path
+import subprocess
 from typing import Dict, List, Optional, Set
 
 from .batch_apply import MARKER_SUFFIXES, METADATA_ROOT_FILES
@@ -180,6 +181,45 @@ def _require_known_feature(features: Dict, feature: Optional[str]) -> None:
         )
 
 
+def check_patch_syntax(
+    patches_dir: Path,
+    claims: Dict[str, List[str]],
+    feature: Optional[str] = None,
+) -> List[Finding]:
+    """Parse selected patches without a Chromium checkout or tree mutation."""
+    from .batch_apply import find_patch_files
+
+    findings = []
+    for patch_path in find_patch_files(patches_dir):
+        relative = patch_path.relative_to(patches_dir).as_posix()
+        owners = claims.get(relative, [])
+        if feature is not None and feature not in owners:
+            continue
+        try:
+            result = subprocess.run(
+                ["git", "apply", "--numstat"],
+                input=patch_path.read_bytes(),
+                capture_output=True,
+                check=False,
+            )
+        except OSError as exc:
+            detail = str(exc)
+        else:
+            detail = result.stderr.decode("utf-8", errors="replace").strip()
+            if result.returncode == 0:
+                continue
+        findings.append(
+            Finding(
+                "invalid-patch",
+                "error",
+                f"patch syntax is invalid: {detail or 'git apply rejected the patch'}",
+                feature=feature or (owners[0] if owners else None),
+                path=relative,
+            )
+        )
+    return findings
+
+
 def check_repo(
     features: Dict, patches_dir: Path, feature: Optional[str] = None
 ) -> List[Finding]:
@@ -192,6 +232,7 @@ def check_repo(
         *check_feature_metadata(features, feature),
         *check_entries_resolve(features, bases, feature),
         *check_classification(claims, feature),
+        *check_patch_syntax(patches_dir, claims, feature),
     ]
     return sorted(findings, key=lambda f: (f.check, f.feature or "", f.path or ""))
 

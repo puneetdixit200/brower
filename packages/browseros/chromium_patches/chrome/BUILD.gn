@@ -70,14 +70,17 @@ index 8a60d7061bbfbeea1a15992ee0d9f2389b742f6e..9e10507fd5abfcad9ace0517945292ba
      configs += [ ":chrome_dll_symbol_order" ]
      if (!is_component_build && !using_sanitizer) {
        configs += [ ":chrome_dll_symbol_exports" ]
-@@ -2070,6 +2088,11 @@ if (enable_separate_renderer_binary) {
+@@ -2070,6 +2088,14 @@ if (enable_separate_renderer_binary) {
      "//content/public/app",
      "//v8",
    ]
 +  if (!is_win) {
-+    # These renderer targets compile the crash reporter client. Depend only on
-+    # its BrowserOS constants, keeping the browser implementation out.
-+    _chrome_renderer_deps += [ "//chrome/browser/browseros/core" ]
++    # These renderer targets compile the product-aware crash reporter.
++    _chrome_renderer_deps += [
++      "//chrome/browser/browseros/core",
++      "//chrome/browser/browseros/core:product",
++      "//chrome/browser/browseros:buildflags",
++    ]
 +  }
    if (is_win || is_linux || is_chromeos || is_mac) {
      _chrome_renderer_deps += [ "//components/webapps/isolated_web_apps:scheme" ]

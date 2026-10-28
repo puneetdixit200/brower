@@ -2,15 +2,16 @@ diff --git a/chrome/app/chrome_crash_reporter_client.cc b/chrome/app/chrome_cras
 index 64912e538f3b0b4acfbb21e0cd94a27b4329c7a2..fecf93d66ea720a3c4dab020e89037e1b76757fd 100644
 --- a/chrome/app/chrome_crash_reporter_client.cc
 +++ b/chrome/app/chrome_crash_reporter_client.cc
-@@ -17,6 +17,7 @@
+@@ -17,6 +17,8 @@
  #include "base/strings/utf_string_conversions.h"
  #include "build/branding_buildflags.h"
  #include "build/build_config.h"
 +#include "chrome/browser/browseros/core/browseros_constants.h"
++#include "chrome/browser/browseros/core/browseros_product.h"
  #include "chrome/common/channel_info.h"
  #include "chrome/common/chrome_paths.h"
  #include "chrome/common/chrome_paths_internal.h"
-@@ -134,18 +135,21 @@ void ChromeCrashReporterClient::GetProductInfo(ProductInfo* product_info) {
+@@ -134,19 +136,21 @@ void ChromeCrashReporterClient::GetProductInfo(ProductInfo* product_info) {
  
    const char* product_name = "";
  #if BUILDFLAG(IS_ANDROID)
@@ -21,6 +22,7 @@ index 64912e538f3b0b4acfbb21e0cd94a27b4329c7a2..fecf93d66ea720a3c4dab020e89037e1
 +  product_name = "BrowserOS_ChromeOS";
  #elif BUILDFLAG(IS_LINUX)
 -#if defined(ADDRESS_SANITIZER)
+-  product_name = "Chrome_Linux_ASan";
 +#if BUILDFLAG(BROWSEROS_PRODUCT_ASTER)
 +  product_name = "Aster_Linux";
 +#elif defined(ADDRESS_SANITIZER)

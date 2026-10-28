@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000000000..e35cbdaf72a25
 --- /dev/null
 +++ b/chrome/browser/browseros/core/browseros_product.h
-@@ -0,0 +1,110 @@
+@@ -0,0 +1,108 @@
 +// Copyright 2024 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.

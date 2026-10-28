@@ -19,13 +19,15 @@ index b58905ddb371f96377320c2948fe64bb17257663..52757c6073f53b89413387c3c105da6f
      "ENABLE_UPDATER=$enable_updater",
      "ENABLE_UPDATE_NOTIFICATIONS=$enable_update_notifications",
      "USE_MINIKIN_HYPHENATION=$use_minikin_hyphenation",
-@@ -933,6 +936,12 @@ source_set("core") {
+@@ -933,6 +936,14 @@ source_set("core") {
      "//chrome/browser/battery",
      "//chrome/browser/bluetooth",
      "//chrome/browser/browser_actuator/internals",
 +    # These sources include BrowserOS headers directly; the aggregate browser
 +    # target's private deps do not provide include access to the split core.
 +    "//chrome/browser/browseros/core",
++    "//chrome/browser/browseros/core:product",
++    "//chrome/browser/browseros:buildflags",
 +    "//chrome/browser/browseros/metrics",
 +    "//chrome/browser/browseros/onboarding",
 +    "//chrome/browser/browseros/server",
