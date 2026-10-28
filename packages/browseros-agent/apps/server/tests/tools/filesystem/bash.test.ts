@@ -1,15 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
+import { statSync } from 'node:fs'
 import {
   chmod,
   copyFile,
   mkdir,
   readFile,
+  rename,
   rm,
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createBashTool } from '../../../src/tools/filesystem/bash'
+import { pinWorkspaceRoot } from '../../../src/tools/filesystem/safe-file'
 import type { FilesystemToolResult } from '../../../src/tools/filesystem/utils'
 
 let tmpDir: string
@@ -41,6 +44,42 @@ describe('filesystem_bash', () => {
     const result = await exec({ command: 'pwd' })
     expect(result.isError).toBeUndefined()
     expect(result.text.trim()).toContain(tmpDir)
+  })
+
+  it('binds the pinned workspace inode after its path is replaced', async () => {
+    if (process.platform !== 'linux' || process.getuid?.() === 0) return
+
+    const movedWorkspace = `${tmpDir}-pinned-original`
+    const pinnedRoot = await pinWorkspaceRoot(tmpDir)
+    try {
+      await Bun.write(join(tmpDir, 'pinned-marker'), 'original workspace')
+      await rename(tmpDir, movedWorkspace)
+      await mkdir(tmpDir, { recursive: true })
+      await writeFile(
+        join(tmpDir, 'replacement-marker'),
+        'replacement workspace',
+      )
+
+      const pinnedTool = createBashTool(tmpDir, { workspaceRoot: pinnedRoot })
+      const pinnedExec = (params: Record<string, unknown>) => {
+        // biome-ignore lint/suspicious/noExplicitAny: test helper
+        return (pinnedTool as any).execute(params)
+      }
+      const expected = statSync(movedWorkspace)
+      const replacement = statSync(tmpDir)
+      expect(`${expected.dev}:${expected.ino}`).not.toBe(
+        `${replacement.dev}:${replacement.ino}`,
+      )
+      const result = await pinnedExec({
+        command: "stat -Lc '%d:%i' .",
+      })
+
+      expect(result.isError).toBeUndefined()
+      expect(result.text.trim()).toBe(`${expected.dev}:${expected.ino}`)
+    } finally {
+      await pinnedRoot.close()
+      await rm(movedWorkspace, { recursive: true, force: true })
+    }
   })
 
   it('captures stderr on failure', async () => {

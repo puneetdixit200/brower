@@ -9,7 +9,8 @@ import { basename, dirname, resolve, sep } from 'node:path'
 import { type Tool, tool } from 'ai'
 import { z } from 'zod/v4'
 import { resolveBundledBun } from '../../lib/agents/host-acp/bundled-bun'
-import type { PinnedWorkspaceRoot } from './safe-file'
+import type { SafeFileHandle } from './safe-file'
+import { openWorkspaceRoot, type PinnedWorkspaceRoot } from './safe-file'
 import {
   DEFAULT_BASH_TIMEOUT,
   executeWithMetrics,
@@ -83,7 +84,10 @@ function getLinuxSandboxArgs(
   cwd: string,
   resourcesDir?: string | null,
 ): string[] {
-  const root = realpathSync(resolve(cwd))
+  // For a pinned workspace, cwd may have been renamed or replaced since the
+  // session opened. Use its canonical display path only as the sandbox
+  // destination; the inherited descriptor is the bind source.
+  const root = resolve(cwd)
   if (root === '/' || root === '/tmp')
     throw new Error('Shell workspace cannot be a filesystem root.')
   for (const restricted of [
@@ -161,9 +165,9 @@ function getLinuxSandboxArgs(
       continue
     args.push('--dir', parent)
   }
-  // Bash remains pathname-bound: the tested Bubblewrap configuration denied
-  // access to /proc/<server-pid>/fd as a bind source.
-  args.push('--dir', root, '--bind', root, root, '--chdir', root)
+  // FD 3 is inherited directly by bwrap. This keeps the bind tied to the
+  // selected directory inode even if its host pathname is replaced.
+  args.push('--dir', root, '--bind', '/proc/self/fd/3', root, '--chdir', root)
 
   // Expose only a verified Bun executable, never the compiled server ELF,
   // the user's home directory, or host PATH entries.
@@ -193,8 +197,14 @@ function getLinuxSandboxArgs(
 function getShellInvocation(
   cwd: string,
   command: string,
+  workspaceFd?: number,
   resourcesDir?: string | null,
-): { command: string[]; cwd?: string; env?: Record<string, string> } {
+): {
+  command: string[]
+  cwd?: string
+  env?: Record<string, string>
+  workspaceFd?: number
+} {
   if (process.platform === 'win32') {
     return {
       command: ['cmd.exe', '/c', command],
@@ -208,6 +218,8 @@ function getShellInvocation(
       throw new Error(
         'filesystem_bash requires Bubblewrap (bwrap) on Linux; refusing to run unsandboxed.',
       )
+    if (workspaceFd === undefined)
+      throw new Error('filesystem_bash requires a pinned workspace descriptor.')
     return {
       command: [
         bwrap,
@@ -218,6 +230,7 @@ function getShellInvocation(
         command,
       ],
       env: {},
+      workspaceFd,
     }
   }
   return {
@@ -281,47 +294,72 @@ export function createBashTool(
           const timeoutMs = (params.timeout || DEFAULT_BASH_TIMEOUT) * 1000
           const resolvedCwd = options.workspaceRoot?.path ?? resolve(cwd)
           let invocation: ReturnType<typeof getShellInvocation>
+          let ownedWorkspaceHandle: SafeFileHandle | undefined
           try {
+            let workspaceFd: number | undefined
+            let invocationCwd = resolvedCwd
+            if (process.platform === 'linux') {
+              if (options.workspaceRoot) {
+                workspaceFd = options.workspaceRoot.handle.fd
+              } else {
+                invocationCwd = realpathSync(resolve(resolvedCwd))
+                ownedWorkspaceHandle = await openWorkspaceRoot(invocationCwd)
+                workspaceFd = ownedWorkspaceHandle.fd
+              }
+            }
             invocation = getShellInvocation(
-              resolvedCwd,
+              invocationCwd,
               params.command,
+              workspaceFd,
               options.resourcesDir,
             )
           } catch (error) {
+            await ownedWorkspaceHandle?.close()
             return {
               text: error instanceof Error ? error.message : String(error),
               isError: true,
             }
           }
 
-          const proc = Bun.spawn(invocation.command, {
-            cwd: invocation.cwd,
-            stdout: 'pipe',
-            stderr: 'pipe',
-            env: invocation.env,
-          })
+          try {
+            const proc = Bun.spawn(invocation.command, {
+              cwd: invocation.cwd,
+              stdout: 'pipe',
+              stderr: 'pipe',
+              stdio:
+                invocation.workspaceFd === undefined
+                  ? ['ignore', 'pipe', 'pipe']
+                  : ['ignore', 'pipe', 'pipe', invocation.workspaceFd],
+              env: invocation.env,
+            })
 
-          let timedOut = false
-          const timer = setTimeout(() => {
-            timedOut = true
-            proc.kill()
-          }, timeoutMs)
+            let timedOut = false
+            const timer = setTimeout(() => {
+              timedOut = true
+              proc.kill()
+            }, timeoutMs)
 
-          const [stdoutText, stderrText] = await Promise.all([
-            new Response(proc.stdout).text(),
-            new Response(proc.stderr).text(),
-          ])
+            try {
+              const [stdoutText, stderrText] = await Promise.all([
+                new Response(proc.stdout).text(),
+                new Response(proc.stderr).text(),
+              ])
 
-          const exitCode = await proc.exited
-          clearTimeout(timer)
+              const exitCode = await proc.exited
 
-          return formatBashResult(
-            stdoutText,
-            stderrText,
-            exitCode,
-            timedOut,
-            params.timeout || DEFAULT_BASH_TIMEOUT,
-          )
+              return formatBashResult(
+                stdoutText,
+                stderrText,
+                exitCode,
+                timedOut,
+                params.timeout || DEFAULT_BASH_TIMEOUT,
+              )
+            } finally {
+              clearTimeout(timer)
+            }
+          } finally {
+            await ownedWorkspaceHandle?.close()
+          }
         },
         options.workspaceRoot,
       ),

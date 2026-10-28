@@ -62,6 +62,8 @@ export interface AiSdkAgentConfig {
   aiSdkDevtoolsEnabled?: boolean
   outputFileAccess?: BrowserOutputFileAccess
   resourcesDir?: string | null
+  /** Override the workspace pin operation for lifecycle tests and embedders. */
+  pinWorkspaceRoot?: typeof pinWorkspaceRoot
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -190,7 +192,9 @@ export class AiSdkAgent {
     let workspaceRoot: PinnedWorkspaceRoot | undefined
     try {
       if (!config.resolvedConfig.chatMode && config.resolvedConfig.workingDir) {
-        workspaceRoot = await pinWorkspaceRoot(config.resolvedConfig.workingDir)
+        workspaceRoot = await (config.pinWorkspaceRoot ?? pinWorkspaceRoot)(
+          config.resolvedConfig.workingDir,
+        )
       }
       // BrowserOS tools and managed connectors use the same required loopback
       // MCP path as ACP/external clients. This keeps guards, effects, metrics,

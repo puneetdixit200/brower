@@ -120,6 +120,12 @@ Fetched `aster/feat/aster-linux-ui`; GitHub had no commits newer than `70060058f
 
 **Next:** continue T06 by finding a safe Bubblewrap bind strategy for the pinned directory and resolving non-Linux validation-to-use races; keep S02 PARTIAL until those boundaries and packaged sandbox interaction are covered. U13/U14 remain PARTIAL pending headed permission and native/browser acceptance. Continue the canonical 95-subtask plan, prioritizing native build/runtime gates and remaining MUST features; performance baselines and release ownership remain open. Preserve the dirty native Chromium checkout and stop/checkpoint/push when account allowance reaches 5% remaining.
 
+### T06 follow-up — 2026-10-28
+
+The Linux Bash pathname gap is closed in source: Bun inherits the session-pinned workspace descriptor as stdio fd 3 and Bubblewrap binds `/proc/self/fd/3`. A regression renames the workspace, replaces its former path, and confirms the original inode remains mounted. Focused filesystem/agent/ChatService-ACP/lifecycle tests pass 455/455; server typecheck, targeted Biome, `git diff --check`, and independent Luna review pass. GitHub fetch found no commits newer than `df9d2a270`.
+
+**Next:** resolve non-Linux validation-to-use races and verify confinement in the packaged runtime. Then perform headed permission/browser acceptance for U09/U13/U14, continue all remaining MUST items in the 95-subtask plan, and keep native build, performance, signing, and release gates open until evidenced. S02 remains PARTIAL. Preserve the dirty Chromium checkout and checkpoint/push/stop when the account allowance reaches 5% remaining.
+
 ### Superseding U16/P03 update — 2026-10-28
 
 U16 report markdown injection is fixed; focused tests pass 10/10 and the app typecheck passes. The saved prompt, ordered step summaries and saved final response are included in task detail. No headed UI run followed this change. Keep U16 PARTIAL until headed UI, persistence, and safe artifact/download behavior are verified.
