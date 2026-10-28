@@ -17,6 +17,7 @@ function containsCredentialShapedText(value: string): boolean {
     ) ||
     /\bxox(?:b|p|a|r|s)-[A-Za-z0-9-]{20,}\b/.test(value) ||
     /\bxapp-[A-Za-z0-9-]{20,}\b/.test(value) ||
+    /\bgithub_pat_[A-Za-z0-9_-]{50,}\b/.test(value) ||
     /\b(?:AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{24,}|gh[pousr]_[A-Za-z0-9]{30,})\b/.test(
       value,
     )

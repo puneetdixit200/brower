@@ -58,7 +58,7 @@ When account usage falls to 5% remaining, commit and push all current work, refr
 
 The local-only Linux x64 server archive includes verified Bun 1.4.2 and migration resources. Independent startup returned health OK with CDP connected, telemetry off and isolated Aster state. Python discovery ran 1,333 tests with three skipped; focused builder, state and filesystem checks and workspace typechecking pass. Native Aster browser and packaged MCP output verification remain open.
 
-The task-report exporter now rejects JWT-shaped response previews, Slack xapp tokens, and standard/encrypted PEM private keys in step errors in addition to existing credential patterns; the focused report suite passes 4/4 (13 assertions), including raw-tool-data omission and Markdown-fence handling. This is heuristic source coverage only: A03 remains PARTIAL pending broader sentinel coverage and selected-directory/native acceptance, and the matrix remains 2/72 PASS.
+The task-report exporter screens GitHub fine-grained PATs (`github_pat_` plus at least 50 URL-safe body characters) alongside JWT-shaped values, Slack xapp tokens, standard/encrypted PEM private keys, and existing credential patterns. The focused report suite passes 5/5 (14 assertions), including raw-tool-data omission and Markdown-fence handling. This is heuristic source coverage only: A03 remains PARTIAL pending broader sentinel coverage and selected-directory/native acceptance, and the matrix remains 2/72 PASS.
 
 ## User-requested stop checkpoint — 2026-10-28
 

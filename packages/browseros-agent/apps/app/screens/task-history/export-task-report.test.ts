@@ -91,6 +91,16 @@ describe('local task report export', () => {
     ).toThrow('cannot be exported')
   })
 
+  it('refuses GitHub fine-grained personal access tokens', () => {
+    const githubFineGrainedToken = `github_pat_${'A'.repeat(50)}`
+    expect(() =>
+      buildTaskReport({
+        ...safeTask,
+        responseText: `Provider error: ${githubFineGrainedToken}`,
+      }),
+    ).toThrow('cannot be exported')
+  })
+
   it('keeps newline and fence injection in a tool name inside its text block', () => {
     const report = buildTaskReport({
       ...safeTask,
