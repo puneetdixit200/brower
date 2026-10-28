@@ -29,6 +29,7 @@ export function BrowserQuickControls() {
   const [showHistory, setShowHistory] = useState(false)
   const [privateWindow, setPrivateWindow] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [lastActivationAckMs, setLastActivationAckMs] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showDownloads, setShowDownloads] = useState(false)
 
@@ -102,7 +103,9 @@ export function BrowserQuickControls() {
       const tabs = await chrome.tabs.query({ currentWindow: true })
       const target = tabs.find((tab) => tab.id === selectedTabId && tab.url?.startsWith('http'))
       if (target?.id === undefined) throw new Error('Tab no longer available')
+      const start = performance.now()
       await chrome.tabs.update(target.id, { active: true })
+      setLastActivationAckMs(Math.round((performance.now() - start) * 100) / 100)
     })
   }
 
@@ -260,6 +263,12 @@ export function BrowserQuickControls() {
           </button>
         ))}
       </div>
+      {lastActivationAckMs !== null && (
+        <p className="text-muted-foreground text-xs">
+          Last tab activation API acknowledgement: {lastActivationAckMs} ms.
+          This is not the time to paint the tab or proof of responsive input.
+        </p>
+      )}
       {error && <p role="alert" className="text-destructive text-xs">{error}</p>}
       {showDownloads && !privateWindow && (
         <ul className="space-y-1 text-xs" aria-label="Recent downloads">
