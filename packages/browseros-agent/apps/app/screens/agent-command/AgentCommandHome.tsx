@@ -91,25 +91,20 @@ export const AgentCommandHome: FC = () => {
       })
       return
     }
-    const search = new URLSearchParams({ q: input.text, mode: 'agent' })
-    if (
-      input.attachments.length > 0 ||
-      input.selectedMemories.length > 0 ||
-      input.selectedHistory.length > 0
-    ) {
-      search.set(
-        'handoff',
-        stagePendingHomeMessage({
-          text: message,
-          attachments: input.attachments,
-        }),
-      )
-    }
-    const tabIds = input.selectedTabs
-      .map((tab) => tab.id)
-      .filter((id): id is number => id !== undefined)
-    if (tabIds.length > 0) search.set('tabs', tabIds.join(','))
-    navigate(`/home/chat?${search.toString()}`)
+    // Never serialize raw prompts, selected contexts or tab IDs into a URL.
+    // The one-use token expires quickly and the underlying message stays
+    // inside this extension tab's memory until the chat route consumes it.
+    const handoff = stagePendingHomeMessage({
+      text: message,
+      attachments: input.attachments,
+      tabIds: input.selectedTabs
+        .map((tab) => tab.id)
+        .filter((id): id is number => id !== undefined),
+    })
+    navigate(`/home/chat?${new URLSearchParams({
+      handoff,
+      mode: 'agent',
+    }).toString()}`)
   }
 
   return (
