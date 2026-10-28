@@ -65,6 +65,7 @@ jobs:
       - name: Show formatter-only changes for review
         if: always()
         run: |
+          cd "$GITHUB_WORKSPACE"
           git diff --name-only -- apps/app apps/server > "${RUNNER_TEMP}/aster-formatted-files"
           if [ -s "${RUNNER_TEMP}/aster-formatted-files" ]; then
             while IFS= read -r file; do
