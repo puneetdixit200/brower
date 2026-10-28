@@ -323,3 +323,5 @@ The extension app router now lazily loads 15 secondary views (settings, task his
 - Reviewed corrections cover native pin verification, declared GN extension outputs and debug-only complete Aster sidecar resource/startup integration. These remain source-level native changes pending GN/C++ execution. Dedicated pinned Chromium provisioning is underway.
 - Evidence and explicit remaining gates: `evidence/aster-local-resume-2026-10-28.md`. The goal remains active/incomplete; release provisioning and native/runtime/performance acceptance remain open.
 - Final independent staging review fixed root/ancestor symlink redirects before copy/delete/write; combined focused driver/staging/resource suites pass 28 tests. Native descriptor tests remain uncompiled.
+
+- Development fixture smoke now passes command-palette keyboard/focus/Escape, lazy settings and Task History/sidebar/history navigation with server disabled and isolated profile/network. Pinned Chromium source/dependency provisioning completed at 155.0.8059.26 (`16c3e55476d3564bea713314b2fff638749ce3e6`); actual native build is next.

@@ -26,3 +26,9 @@ Dedicated checkout: `/home/puneet/Projects/aster-browser/chromium-aster-dev/src`
 ## Final staging review
 
 Independent review found source/target resolution occurred before root-symlink checks. Both staging actions now reject lexical root/ancestor symlinks before destructive copying or stamp writes. Sentinel-preservation regressions cover direct and ancestor redirects for both actions. Focused driver/staging and resource suites pass together: 28 tests. The native descriptor C++ test was updated for both debug buildflag states but was not compiled.
+
+## Development UI smoke and pinned source ready
+
+Luna exercised the current extension in BrowserOS v0.51.0 AppImage using a fresh profile, explicit disposable BROWSEROS_DIR and a loopback-only user/network namespace. The server was disabled; no provider calls were made. Ctrl+Alt+K opened the palette and focused search, Escape closed it, palette navigation opened lazy AI settings, browser history restored the previous route, and sidebar fallbacks opened Task History and Settings. Final route was home. Desktop viewport metrics were required for the sidebar. The exact browser process group exited and no matching test processes remained. This proves development extension behavior only, not native Aster acceptance.
+
+Pinned source provisioning completed successfully: Chromium 155.0.8059.26, HEAD `16c3e55476d3564bea713314b2fff638749ce3e6`, at `/home/puneet/Projects/aster-browser/chromium-aster-dev/src`; checkout and dependencies occupy about 30 GiB. Native compilation has not yet run. The accepted build CLI plan has ten source/resource/patch/configure/compile/package steps and requires no signing environment.
