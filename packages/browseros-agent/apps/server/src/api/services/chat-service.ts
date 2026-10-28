@@ -64,6 +64,7 @@ import {
 } from './chat-service.helpers'
 import {
   ConversationRunAlreadyActiveError,
+  ConversationCapacityError,
   type ConversationRunSnapshot,
   ConversationRuns,
   type ConversationTabGroupPresentation,
@@ -148,6 +149,12 @@ export class ChatService {
         return Response.json(
           { error: 'An agent turn is already running' },
           { status: 409 },
+        )
+      }
+      if (error instanceof ConversationCapacityError) {
+        return Response.json(
+          { error: 'Too many agent tasks are active. Finish or stop a task first.' },
+          { status: 429, headers: { 'Retry-After': '10' } },
         )
       }
       if (error instanceof ChatRequestError) return error.response
