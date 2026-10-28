@@ -22,8 +22,14 @@ import type {
   ExecutionTaskRecord,
 } from '@/lib/execution-history/types'
 import { resolveAgentServerUrl } from '@/modules/browseros/agent-server-url.helpers'
-import { downloadTaskReport, saveTaskReportToChosenDirectory } from './export-task-report'
-import { flattenExecutionHistory, getTaskResult } from './task-history'
+import {
+  downloadTaskReport,
+  saveTaskReportToChosenDirectory,
+} from './export-task-report'
+import {
+  flattenExecutionHistory,
+  getTaskTranscriptResponse,
+} from './task-history'
 
 function formatDate(value?: string): string {
   if (!value) return 'In progress'
@@ -114,6 +120,16 @@ function StepTimeline({ steps }: { steps: ExecutionStepRecord[] }) {
                 : step.approval.approved === true
                   ? 'Approved'
                   : 'Approval requested'}
+            </p>
+          )}
+          {step.approval?.reason && (
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm">
+              {step.approval.reason}
+            </p>
+          )}
+          {step.errorText && (
+            <p className="mt-2 whitespace-pre-wrap break-words text-destructive text-sm">
+              {step.errorText}
             </p>
           )}
         </li>
@@ -376,26 +392,48 @@ export const TaskHistoryPage: FC = () => {
                   <div>Errors: {selectedTask.errorCount}</div>
                 </dl>
 
-                <section className="space-y-2">
-                  <h3 className="font-medium">Response preview</h3>
-                  <p className="whitespace-pre-wrap break-words rounded-md border p-3 text-sm">
-                    {getTaskResult(selectedTask) ||
-                      'No response preview was recorded.'}
-                  </p>
+                <section className="space-y-3">
+                  <div>
+                    <h3 className="font-medium">Run transcript</h3>
+                    <p className="mt-1 text-muted-foreground text-xs">
+                      Locally saved prompt, tool-step summaries, and final
+                      response. Raw tool inputs and outputs are not stored in
+                      task history.
+                    </p>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <p className="mb-2 font-medium text-xs">You</p>
+                    <p className="whitespace-pre-wrap break-words text-sm">
+                      {selectedTask.promptText}
+                    </p>
+                  </div>
+                  <h4 className="font-medium text-sm">Tool timeline</h4>
+                  <StepTimeline steps={selectedTask.steps} />
+                  <div className="rounded-md border p-3">
+                    <p className="mb-2 font-medium text-xs">Assistant</p>
+                    <p className="whitespace-pre-wrap break-words text-sm">
+                      {getTaskTranscriptResponse(selectedTask) ||
+                        'No response was recorded.'}
+                    </p>
+                  </div>
                 </section>
 
-                <section className="space-y-3">
-                  <h3 className="font-medium">Timeline</h3>
-                  <StepTimeline steps={selectedTask.steps} />
+                <section className="space-y-2">
+                  <h3 className="font-medium">Artifacts</h3>
+                  <p className="text-muted-foreground text-sm">
+                    No downloadable artifact descriptors were recorded for this
+                    run. Task history does not turn arbitrary tool text or paths
+                    into file links.
+                  </p>
                 </section>
 
                 <section className="space-y-2">
                   <h3 className="font-medium">Local report</h3>
                   <p className="text-muted-foreground text-sm">
                     Download this task’s saved summary and visible timeline as
-                    Markdown. Raw tool inputs, outputs and stored credentials
-                    are not exported. This is not a full agent workspace
-                    artifact archive.
+                    Markdown. Raw tool inputs and outputs are omitted, and
+                    records matching known credential patterns are excluded.
+                    This is not a full agent workspace artifact archive.
                   </p>
                   <Button
                     type="button"
@@ -420,7 +458,11 @@ export const TaskHistoryPage: FC = () => {
                     onClick={() => {
                       void saveTaskReportToChosenDirectory(selectedTask)
                         .then(() => setError(null))
-                        .catch(() => setError('Could not save to the chosen folder. No arbitrary path access was granted.'))
+                        .catch(() =>
+                          setError(
+                            'Could not save to the chosen folder. No arbitrary path access was granted.',
+                          ),
+                        )
                     }}
                   >
                     Save into chosen folder

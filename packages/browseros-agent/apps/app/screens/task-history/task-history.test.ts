@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import type { ExecutionTaskRecord } from '@/lib/execution-history/types'
-import { flattenExecutionHistory, getTaskResult } from './task-history'
+import {
+  flattenExecutionHistory,
+  getTaskResult,
+  getTaskTranscriptResponse,
+} from './task-history'
 
 function task(
   id: string,
@@ -109,5 +113,71 @@ describe('task history helpers', () => {
         }),
       ),
     ).toBe('Short preview')
+  })
+
+  test('uses the saved full response in transcript and falls back to preview', () => {
+    const full = task('full', '2026-10-27T00:00:00.000Z', {
+      responseText: 'Complete answer',
+      responsePreview: 'Short answer',
+    })
+    const partial = task('partial', '2026-10-27T00:00:00.000Z', {
+      responseText: undefined,
+      responsePreview: 'Saved partial answer',
+    })
+
+    expect(getTaskTranscriptResponse(full)).toBe('Complete answer')
+    expect(getTaskTranscriptResponse(partial)).toBe('Saved partial answer')
+  })
+
+  test('excludes a run when a displayed approval reason contains credential-shaped text', () => {
+    const tasks = flattenExecutionHistory({
+      history: {
+        conversationId: 'history',
+        updatedAt: 1,
+        tasks: [
+          task('unsafe-approval', '2026-10-27T00:00:00.000Z', {
+            steps: [
+              {
+                id: 'approval',
+                toolName: 'browser.click',
+                order: 1,
+                state: 'approval-responded',
+                startedAt: '2026-10-27T00:00:00.000Z',
+                previewText: 'Clicked button',
+                approval: { id: 'approval', reason: 'password: fixture-value' },
+              },
+            ],
+          }),
+        ],
+      },
+    })
+
+    expect(tasks).toEqual([])
+  })
+
+  test('excludes a run when displayed error text matches a known credential pattern', () => {
+    const tasks = flattenExecutionHistory({
+      history: {
+        conversationId: 'history',
+        updatedAt: 1,
+        tasks: [
+          task('unsafe-error', '2026-10-27T00:00:00.000Z', {
+            steps: [
+              {
+                id: 'error',
+                toolName: 'browser.click',
+                order: 1,
+                state: 'output-error',
+                startedAt: '2026-10-27T00:00:00.000Z',
+                previewText: 'Click failed',
+                errorText: 'Bearer abcdefghijklmnopqrstuvwxyz',
+              },
+            ],
+          }),
+        ],
+      },
+    })
+
+    expect(tasks).toEqual([])
   })
 })

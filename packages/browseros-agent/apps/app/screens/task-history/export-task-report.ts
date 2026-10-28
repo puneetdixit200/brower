@@ -20,6 +20,11 @@ function textBlock(value: string | undefined): string {
   return fence + 'text\n' + safe + '\n' + fence
 }
 
+function safeToolNameBlock(value: string): string {
+  // Keep arbitrary tool names from reproducing a closing Markdown fence.
+  return textBlock(value.replaceAll(TICK, '\\u0060'))
+}
+
 /** Local user-initiated report. Never include raw tool input/output. */
 export function buildTaskReport(task: ExecutionTaskRecord): string {
   if (!isSafeTaskForDisplay(task)) {
@@ -54,15 +59,26 @@ export function buildTaskReport(task: ExecutionTaskRecord): string {
     '## Browser and tool steps',
   ]
   const ordered = [...task.steps].sort((a, b) => a.order - b.order)
-  for (const step of ordered.slice(0, MAX_STEPS)) {
+  for (const [index, step] of ordered.slice(0, MAX_STEPS).entries()) {
     lines.push(
       '',
-      '### ' + plain(step.toolName) + ' (' + step.state + ')',
+      '### Step ' + (index + 1),
       '',
+      '**Tool:**',
+      '',
+      safeToolNameBlock(step.toolName),
+      '',
+      '- State: ' + step.state,
       '- Started: ' + plain(step.startedAt),
       '- Finished: ' + plain(step.completedAt),
       '',
       textBlock(step.previewText),
+      ...(step.errorText
+        ? ['', '**Error detail:**', '', textBlock(step.errorText)]
+        : []),
+      ...(step.approval?.reason
+        ? ['', '**Approval reason:**', '', textBlock(step.approval.reason)]
+        : []),
     )
   }
   if (ordered.length > MAX_STEPS) lines.push('', 'Additional steps omitted.')
@@ -108,7 +124,9 @@ export async function saveTaskReportToChosenDirectory(
   task: ExecutionTaskRecord,
 ): Promise<void> {
   const picker = (
-    window as Window & { showDirectoryPicker?: () => Promise<AsterDirectoryHandle> }
+    window as Window & {
+      showDirectoryPicker?: () => Promise<AsterDirectoryHandle>
+    }
   ).showDirectoryPicker
   if (!picker) {
     throw new Error('Your browser does not support directory export')

@@ -24,7 +24,9 @@ export function isSafeTaskForDisplay(task: ExecutionTaskRecord): boolean {
     task.steps.every(
       (step) =>
         !containsCredentialShapedText(step.toolName) &&
-        !containsCredentialShapedText(step.previewText),
+        !containsCredentialShapedText(step.previewText) &&
+        !containsCredentialShapedText(step.errorText ?? '') &&
+        !containsCredentialShapedText(step.approval?.reason ?? ''),
     )
   )
 }
@@ -41,4 +43,9 @@ export function flattenExecutionHistory(
 
 export function getTaskResult(task: ExecutionTaskRecord): string {
   return task.responsePreview?.trim() || ''
+}
+
+/** Return the locally persisted final response for the transcript view. */
+export function getTaskTranscriptResponse(task: ExecutionTaskRecord): string {
+  return task.responseText?.trim() || getTaskResult(task)
 }

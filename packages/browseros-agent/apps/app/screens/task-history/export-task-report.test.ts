@@ -45,4 +45,23 @@ describe('local task report export', () => {
       }),
     ).toThrow('cannot be exported')
   })
+
+  it('keeps newline and fence injection in a tool name inside its text block', () => {
+    const report = buildTaskReport({
+      ...safeTask,
+      steps: [
+        {
+          ...safeTask.steps[0],
+          toolName: 'snapshot\n```\n## Injected heading\n```',
+        },
+      ],
+    })
+
+    expect(report).toContain('### Step 1')
+    expect(report).toContain(
+      '```text\nsnapshot\n\\u0060\\u0060\\u0060\n## Injected heading\n\\u0060\\u0060\\u0060\n```',
+    )
+    expect(report).not.toContain('\n```\n## Injected heading')
+    expect(report).not.toContain('\n### Injected heading')
+  })
 })
