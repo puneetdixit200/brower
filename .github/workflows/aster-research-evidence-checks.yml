@@ -1,0 +1,46 @@
+name: Aster research evidence checks
+
+on:
+  push:
+    branches:
+      - feat/aster-linux-ui
+    paths:
+      - ".github/workflows/aster-research-evidence-checks.yml"
+      - "packages/browseros-agent/apps/app/screens/sidepanel/index/research-source-ledger.ts"
+      - "packages/browseros-agent/apps/app/screens/sidepanel/index/research-source-ledger.test.ts"
+      - "packages/browseros-agent/apps/app/screens/sidepanel/index/ChatMessages.tsx"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  research-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: packages/browseros-agent
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: packages/browseros-agent/package.json
+      - run: bun ci
+      - run: cp .env.development.example .env.development
+      - name: Aster app typecheck
+        run: bun run --filter @browseros/app typecheck
+      - name: Source/citation regression tests
+        run: |
+          bun test apps/app/screens/sidepanel/index/research-request.test.ts \
+            apps/app/screens/sidepanel/index/research-source-ledger.test.ts
+      - name: Biome source check
+        run: |
+          bunx @biomejs/biome check \
+            apps/app/screens/sidepanel/index/research-source-ledger.ts \
+            apps/app/screens/sidepanel/index/research-source-ledger.test.ts \
+            apps/app/screens/sidepanel/index/ChatMessages.tsx
+      - name: Working tree whitespace check
+        run: git diff --check
