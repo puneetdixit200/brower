@@ -4,6 +4,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { getAgentServerUrl } from '@/lib/browseros/helpers'
 import { useIncognitoWindow } from '@/lib/browseros/use-incognito-window'
 import type { ExecutionTaskRecord } from '@/lib/execution-history/types'
+import { SiteRecipesPanel } from './SiteRecipesPanel'
 import { createTaskMemoryDraft } from './task-memory-draft'
 
 interface MemoryEntry {
@@ -274,6 +275,8 @@ export const MemoryPage: FC = () => {
           </label>
         </section>
       )}
+
+      <SiteRecipesPanel enabled={settings?.enabled ?? false} incognito={incognito} />
 
       {settings?.enabled && completedTasks.length > 0 && (
         <section className="space-y-3 rounded-lg border p-4">
