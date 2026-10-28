@@ -80,3 +80,10 @@ Source work committed on `feat/aster-linux-ui` since `3f701328`: U01 bounded/per
 
 
 **Next U09 verification:** compile the new customization card and bootstrap with WXT, test profile persistence, system theme changes, zoom/reduced-motion accessibility on a real extension view and confirm no effects on normal websites. Reduced animation cannot be called a battery optimization until measured. Continue all remaining native, security, agent and release requirements.
+
+
+## Verified source batch and next implementation — 2026-10-28
+
+[Focused GitHub Actions run 40682050699](https://github.com/puneetdixit200/brower/actions/runs/40682050699) passed extension and server TypeScript, 12 focused tests, and pinned Biome for sidebar, approval and task-export source. The code and [evidence](evidence/aster-feature-batch2-2026-10-28.md) are committed to `feat/aster-linux-ui`. **This is not a working native browser verification.** Full 72-row matrix: 2 PASS, 32 PARTIAL (including S05 blocked), 38 NOT_STARTED.
+
+Next implementation must complete native Chromium loader/linker and Aster window launch against the pinned source, then native tabs/split panes, real provider/model controls, durable non-replaying task recovery, offline/MFA assistance, origin-safe credential boundaries, and the remaining security/routine/memory subtasks. Continue to run focused CI for source additions, and preserve release-signing custody and update ownership as blocked. Do not mark release ready based on this branch alone.
