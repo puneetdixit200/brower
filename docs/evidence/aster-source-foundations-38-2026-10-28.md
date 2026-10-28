@@ -61,3 +61,21 @@ The scope below consists of source-level foundations. A row marked PARTIAL does 
 The actual linked native Aster binary has still not been built in this environment. Native HTTPS browsing, Wayland/X11 fallback, extension READY, product identity, sandbox, password-manager trust boundary, per-tab isolation, crash/restart recovery, file/download lifetime, outbound-data review, model routing, agent concurrency, permissions, site recipes and local CLI all need source review and runtime tests on a suitable Linux host.
 
 Maintain signed-release requirements, custody of keys and owned update feeds as blocked. Continue implementing the **95 original subtasks**, not just editing the 72-row status table. No release-ready claim is supported by this checkpoint.
+
+
+### Push-triggered CI and deferred-test boundary correction
+
+The existing branch-scoped GitHub Actions workflow triggered automatically on an
+intermediate source commit despite the user's instruction to leave testing until
+later. [Run 40695175449](https://github.com/puneetdixit200/brower/actions/runs/40695175449)
+reported extension typecheck PASS, server typecheck FAIL with one specific
+TypeScript error in `credential-tool-filter.ts` (tool description may be a
+function). That source error was subsequently fixed by narrowing descriptions
+to strings, but **was not rechecked**. The workflow was then changed to
+`workflow_dispatch` only to honor the requested deferred-testing policy.
+Later source commits remain untested and may have additional compiler/runtime
+issues. This historical CI result must not be reported as a passing check for
+the new foundation batch. The existing earlier passing CI run covers only
+previous source revisions.
+
+**Additional source hardening:** site-recipe instructions now reject credential-assignment-shaped text on save. This is best-effort pattern detection and not a guarantee that every possible secret is rejected. The native/browser and user-selected screenshot boundaries still require runtime review.
