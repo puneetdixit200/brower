@@ -23,7 +23,7 @@ export function SidebarBrowserGroups({
   onNavigate?: () => void
 }) {
   const [section, setSection] = useState<Section | null>(null)
-  const [tabs, setTabs] = useState<SidebarTab[]>([])
+  const [tabs, setTabs] = useState<(SidebarTab & { id: number })[]>([])
   const [bookmarks, setBookmarks] = useState<SidebarBookmark[]>([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
