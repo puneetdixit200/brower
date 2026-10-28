@@ -53,6 +53,37 @@ import type { ResolvedAgentConfig } from './types'
 // approval, so recovered tasks cannot execute an action approved by stale UI.
 const TOOL_APPROVAL_SECRET = randomBytes(32)
 
+/** The server-side approval check shared by production agents and fixture tests. */
+export async function handleToolApproval({
+  toolCall,
+  tools: availableTools,
+}: {
+  toolCall: { toolName: string; input: unknown }
+  tools?: ToolSet
+}) {
+  const tool = availableTools?.[toolCall.toolName] as
+    | { description?: string }
+    | undefined
+  const decision = await decideActionPolicy({
+    toolName: toolCall.toolName,
+    input: toolCall.input,
+    description: tool?.description,
+  })
+  if (decision.decision === 'deny') {
+    return {
+      type: 'denied' as const,
+      reason: 'Blocked by the saved action policy.',
+    }
+  }
+  if (decision.decision === 'ask') {
+    return {
+      type: 'user-approval' as const,
+      reason: decision.reason ?? 'Review this action before it runs.',
+    }
+  }
+  return undefined
+}
+
 export interface AiSdkAgentConfig {
   resolvedConfig: ResolvedAgentConfig
   serverPort: number
@@ -388,29 +419,7 @@ export class AiSdkAgent {
         model,
         instructions,
         tools,
-        toolApproval: async ({ toolCall, tools: availableTools }) => {
-          const tool = availableTools?.[toolCall.toolName] as
-            | { description?: string }
-            | undefined
-          const decision = await decideActionPolicy({
-            toolName: toolCall.toolName,
-            input: toolCall.input,
-            description: tool?.description,
-          })
-          if (decision.decision === 'deny') {
-            return {
-              type: 'denied',
-              reason: 'Blocked by the saved action policy.',
-            }
-          }
-          if (decision.decision === 'ask') {
-            return {
-              type: 'user-approval',
-              reason: decision.reason ?? 'Review this action before it runs.',
-            }
-          }
-          return undefined
-        },
+        toolApproval: handleToolApproval,
         experimental_toolApprovalSecret: TOOL_APPROVAL_SECRET,
         stopWhen: [stepCountIs(AGENT_LIMITS.MAX_TURNS)],
         prepareStep,
