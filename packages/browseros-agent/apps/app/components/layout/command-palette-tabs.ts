@@ -2,6 +2,8 @@ export interface CommandPaletteTab {
   id?: number
   title?: string
   url?: string
+  pinned?: boolean
+  active?: boolean
 }
 
 export interface CurrentWindowTabsApi {
