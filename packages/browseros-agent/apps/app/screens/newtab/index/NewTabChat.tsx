@@ -95,11 +95,14 @@ export const NewTabChat: FC = () => {
     const chatMode = searchParams.get('mode')
     const tabIdsParam = searchParams.get('tabs')
     const tabIds = pending?.tabIds ??
-      (tabIdsParam ?? '')
-        .split(',')
-        .map(Number)
-        .filter((id) => Number.isSafeInteger(id) && id >= 0)
-        .slice(0, 32)
+      (tabIdsParam
+        ? tabIdsParam
+            .split(',')
+            .filter((value) => value.trim() !== '')
+            .map(Number)
+            .filter((id) => Number.isSafeInteger(id) && id >= 0)
+            .slice(0, 32)
+        : [])
     if (!query && !pending?.files.length) return
 
     hasSentInitialRef.current = true
