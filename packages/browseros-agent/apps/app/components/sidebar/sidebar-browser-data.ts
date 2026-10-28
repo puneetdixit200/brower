@@ -52,6 +52,7 @@ export interface SidebarTab {
   title?: string
   url?: string
   active?: boolean
+  pinned?: boolean
 }
 
 export function visibleSidebarTabs(
