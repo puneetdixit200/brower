@@ -127,6 +127,12 @@ export const ScheduledTaskCard: FC<ScheduledTaskCardProps> = ({
           </p>
           <div className="flex items-center gap-2 text-muted-foreground text-xs">
             <span>{formatSchedule(job)}</span>
+            {job.mode === 'heartbeat' && (
+              <>
+                <span>•</span>
+                <span>Heartbeat</span>
+              </>
+            )}
             {providerInfo && (
               <>
                 <span>•</span>

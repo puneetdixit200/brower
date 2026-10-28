@@ -27,6 +27,8 @@ const MAX_INTERVAL = 60
 const UpsertJobSchema = z.object({
   name: z.string().min(1),
   query: z.string().min(1),
+  mode: z.enum(['task', 'heartbeat']).optional(),
+  conversationId: z.string().uuid().nullish(),
   scheduleType: z.enum(['daily', 'hourly', 'minutes']),
   scheduleTime: z.string().nullish(),
   scheduleInterval: z.number().nullish(),

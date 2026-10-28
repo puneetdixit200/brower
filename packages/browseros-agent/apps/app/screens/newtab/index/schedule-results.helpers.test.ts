@@ -12,6 +12,7 @@ const job = (id: string, name: string): ScheduledJob => ({
   id,
   name,
   query: 'q',
+  mode: 'task',
   scheduleType: 'daily',
   enabled: true,
   createdAt: '2026-01-01T00:00:00.000Z',

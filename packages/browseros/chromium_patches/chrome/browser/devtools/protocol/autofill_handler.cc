@@ -2,7 +2,7 @@ diff --git a/chrome/browser/devtools/protocol/autofill_handler.cc b/chrome/brows
 index bd7972bc4a5a4d52782724e1b9794e31deca0525..c8832d087c05c5e1267ff0c05de52d5ae991c7ab 100644
 --- a/chrome/browser/devtools/protocol/autofill_handler.cc
 +++ b/chrome/browser/devtools/protocol/autofill_handler.cc
-@@ -4,14 +4,28 @@
+@@ -4,14 +4,29 @@
  
  #include "chrome/browser/devtools/protocol/autofill_handler.h"
  
@@ -23,6 +23,7 @@ index bd7972bc4a5a4d52782724e1b9794e31deca0525..c8832d087c05c5e1267ff0c05de52d5a
 +#include "base/supports_user_data.h"
 +#include "base/timer/timer.h"
 +#include "base/uuid.h"
++#include "chrome/browser/browseros/buildflags.h"
 +#include "chrome/browser/devtools/devtools_browser_context_manager.h"
  #include "chrome/browser/devtools/protocol/autofill.h"
 +#include "chrome/browser/password_manager/chrome_password_manager_client.h"
@@ -50,7 +51,7 @@ index bd7972bc4a5a4d52782724e1b9794e31deca0525..c8832d087c05c5e1267ff0c05de52d5a
  
  namespace {
  
-@@ -71,6 +94,809 @@ std::optional<std::string> GetRenderFrameDevtoolsToken(
+@@ -71,6 +94,832 @@ std::optional<std::string> GetRenderFrameDevtoolsToken(
  
  }  // namespace
  
@@ -65,6 +66,17 @@ index bd7972bc4a5a4d52782724e1b9794e31deca0525..c8832d087c05c5e1267ff0c05de52d5a
 +Response CredentialError(const char* code) {
 +  // Fixed codes only: neither native exceptions nor supplied secrets reach CDP.
 +  return Response::ServerError(std::string("credentials:") + code);
++}
++
++// Aster currently has no browser-owned credential selection/approval UI. Keep
++// the legacy BrowserOS CDP contract intact while denying model-callable
++// inventory, storage, and fill operations in Aster until that UI is connected.
++bool IsAsterCredentialOperationBlocked() {
++#if BUILDFLAG(BROWSEROS_PRODUCT_ASTER)
++  return true;
++#else
++  return false;
++#endif
 +}
 +
 +std::string DocumentId(content::RenderFrameHost* frame) {
@@ -763,6 +775,10 @@ index bd7972bc4a5a4d52782724e1b9794e31deca0525..c8832d087c05c5e1267ff0c05de52d5a
 +    std::optional<int> limit,
 +    std::optional<String> cursor,
 +    std::unique_ptr<ListCredentialsCallback> callback) {
++  if (IsAsterCredentialOperationBlocked()) {
++    callback->sendFailure(CredentialError("approval_unavailable"));
++    return;
++  }
 +  Profile* profile = nullptr;
 +  content::WebContents* contents = nullptr;
 +  auto response = ResolveCredentialContext(
@@ -793,6 +809,10 @@ index bd7972bc4a5a4d52782724e1b9794e31deca0525..c8832d087c05c5e1267ff0c05de52d5a
 +    const String& username,
 +    const String& password,
 +    std::unique_ptr<AddCredentialCallback> callback) {
++  if (IsAsterCredentialOperationBlocked()) {
++    callback->sendFailure(CredentialError("approval_unavailable"));
++    return;
++  }
 +  Profile* profile = nullptr;
 +  content::WebContents* contents = nullptr;
 +  auto response = ResolveCredentialContext(target_id_, document_id,
@@ -823,6 +843,10 @@ index bd7972bc4a5a4d52782724e1b9794e31deca0525..c8832d087c05c5e1267ff0c05de52d5a
 +    std::optional<String> username,
 +    std::optional<String> password,
 +    std::unique_ptr<FillCredentialCallback> callback) {
++  if (IsAsterCredentialOperationBlocked()) {
++    callback->sendFailure(CredentialError("approval_unavailable"));
++    return;
++  }
 +  Profile* profile = nullptr;
 +  content::WebContents* contents = nullptr;
 +  auto response = ResolveCredentialContext(target_id_, document_id,

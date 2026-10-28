@@ -60,6 +60,7 @@ const ChatInputSchema = z.object({
   browserContext: BrowserContextSchema.optional(),
   userSystemPrompt: z.string().optional(),
   isScheduledTask: z.boolean().optional().default(false),
+  persistScheduledTask: z.boolean().optional().default(false),
   userWorkingDir: z.string().min(1).optional(),
   supportsImages: z.boolean().optional().default(true),
   supportsReasoning: z.boolean().optional().default(true),

@@ -28,6 +28,10 @@ export const scheduledJobs = sqliteTable(
     id: text('id').primaryKey(),
     name: text('name').notNull(),
     query: text('query').notNull(),
+    mode: text('mode', { enum: ['task', 'heartbeat'] })
+      .notNull()
+      .default('task'),
+    conversationId: text('conversation_id'),
     scheduleType: text('schedule_type', {
       enum: ['daily', 'hourly', 'minutes'],
     }).notNull(),

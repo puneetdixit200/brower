@@ -1,6 +1,7 @@
 import { onScheduleMessage } from '@/lib/messaging/schedules/scheduleMessages'
 import { createAlarmFromJob } from '@/lib/schedules/createAlarmFromJob'
 import { getChatServerResponse } from '@/lib/schedules/getChatServerResponse'
+import { mayContinueHeartbeat } from '@/lib/schedules/heartbeat-continuation'
 import { isAlarmWithinGracePeriod } from '@/lib/schedules/scheduled-run-policy'
 import type { ScheduledJobRun } from '@/lib/schedules/scheduleTypes'
 import {
@@ -70,12 +71,14 @@ export const scheduledJobRuns = async () => {
   const createJobRun = async (
     jobId: string,
     status: ScheduledJobRun['status'],
+    conversationId?: string,
   ): Promise<ScheduledJobRun> => {
     // Trimming to the per-job cap happens on the server now, so creating a run
     // no longer has to rewrite the job's whole history to stay bounded.
     const jobRun: ScheduledJobRun = {
       id: crypto.randomUUID(),
       jobId,
+      conversationId,
       startedAt: new Date().toISOString(),
       status,
     }
@@ -120,13 +123,43 @@ export const scheduledJobRuns = async () => {
         throw new Error(`Job not found: ${jobId}`)
       }
 
-      const jobRun = await createJobRun(jobId, 'running')
+      if (job.mode === 'heartbeat') {
+        const previousRuns = await listScheduledJobRunsOrNull()
+        if (previousRuns === null) {
+          throw new Error(
+            'Cannot verify the previous heartbeat before continuing',
+          )
+        }
+        const previous = previousRuns
+          .filter((run) => run.jobId === jobId)
+          .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))[0]
+        if (!mayContinueHeartbeat(previous?.status)) {
+          throw new Error(
+            'Heartbeat paused because its previous run did not complete; review the run before resuming',
+          )
+        }
+      }
+
+      let conversationId = job.conversationId
+      if (job.mode === 'heartbeat' && !conversationId) {
+        conversationId = crypto.randomUUID()
+        const updatedJob = {
+          ...job,
+          conversationId,
+          updatedAt: new Date().toISOString(),
+        }
+        await putScheduledJob(updatedJob)
+      }
+
+      const jobRun = await createJobRun(jobId, 'running', conversationId)
       const abortController = new AbortController()
       runAbortControllers.set(jobRun.id, abortController)
 
       try {
         const response = await getChatServerResponse({
           message: job.query,
+          conversationId,
+          persistScheduledTask: job.mode === 'heartbeat',
           signal: abortController.signal,
           providerId: job.providerId,
         })

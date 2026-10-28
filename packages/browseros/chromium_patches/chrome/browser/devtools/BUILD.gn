@@ -13,13 +13,14 @@ index 2e694986c7617565320e7259f4548ba6e75561b4..34eaeedaa4997dcc9f6e907a6c36f7b3
      "protocol/pwa.cc",
      "protocol/pwa.h",
      "protocol/security.cc",
-@@ -410,8 +414,12 @@ static_library("devtools") {
+@@ -410,8 +414,13 @@ static_library("devtools") {
      deps += [
        "//chrome/app:command_ids",
        "//chrome/browser/badging",
 +      "//chrome/browser/bookmarks",
 +      # Keep BrowserOS CDP prefs independent of the browser aggregator.
 +      "//chrome/browser/browseros/core:prefs",
++      "//chrome/browser/browseros:buildflags",
        "//chrome/browser/custom_handlers",
        "//chrome/browser/first_party_sets",
 +      "//chrome/browser/history",
@@ -51,3 +52,9 @@ index 2e694986c7617565320e7259f4548ba6e75561b4..34eaeedaa4997dcc9f6e907a6c36f7b3
        "protocol/cast_handler.cc",
        "protocol/cast_handler.h",
        "protocol/emulation_handler.cc",
+@@ -649,4 +649,5 @@ if (enable_devtools_frontend) {
+     deps = [
+       ":devtools",
+       ":test_support",
++      "//chrome/browser/browseros:buildflags",
+       "//base",

@@ -66,6 +66,7 @@ export interface ChatRequestBodyParams {
     title: string
   }
   isScheduledTask?: boolean
+  persistScheduledTask?: boolean
   approvalResponse?: { id: string; approved: boolean; reason?: string }
 }
 
@@ -85,6 +86,7 @@ export const buildChatRequestBody = ({
   selectedText,
   selectedTextSource,
   isScheduledTask,
+  persistScheduledTask,
   approvalResponse,
 }: ChatRequestBodyParams) => ({
   // The provider is named, not described. The server holds the list and which
@@ -113,5 +115,6 @@ export const buildChatRequestBody = ({
   selectedText,
   selectedTextSource,
   isScheduledTask,
+  ...(isScheduledTask && persistScheduledTask ? { persist: true } : {}),
   ...(approvalResponse ? { approvalResponse } : {}),
 })

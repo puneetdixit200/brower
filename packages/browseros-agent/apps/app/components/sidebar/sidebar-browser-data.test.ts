@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'bun:test'
 import {
   flattenSidebarBookmarkTree,
+  isSidebarSearchActive,
   recentSidebarBookmarks,
   safeSidebarBookmarkUrl,
+  sidebarBookmarkEntriesAtPath,
+  visibleSidebarBookmarkEntries,
   visibleSidebarTabs,
 } from './sidebar-browser-data'
 
@@ -70,6 +73,87 @@ describe('sidebar browser data boundaries', () => {
       },
     ])
     expect(flattenSidebarBookmarkTree(tree, 0)).toEqual([])
+  })
+
+  it('lists bookmark folders and opens only the selected nested folder', () => {
+    const tree = [
+      {
+        id: '0',
+        children: [
+          {
+            id: 'bar',
+            title: 'Bookmarks bar',
+            children: [
+              {
+                id: 'docs',
+                title: 'Docs',
+                children: [
+                  { id: 'api', title: 'API', url: 'https://example.org/api' },
+                  { id: 'unsafe', title: 'Unsafe', url: 'javascript:alert(1)' },
+                ],
+              },
+              { id: 'home', title: 'Home', url: 'https://example.net' },
+            ],
+          },
+        ],
+      },
+    ]
+
+    expect(sidebarBookmarkEntriesAtPath(tree)).toEqual([
+      { kind: 'folder', id: 'bar', title: 'Bookmarks bar' },
+    ])
+    expect(sidebarBookmarkEntriesAtPath(tree, ['bar'])).toEqual([
+      { kind: 'folder', id: 'docs', title: 'Docs' },
+      {
+        kind: 'bookmark',
+        bookmark: {
+          id: 'home',
+          title: 'Home',
+          url: 'https://example.net/',
+        },
+      },
+    ])
+    expect(sidebarBookmarkEntriesAtPath(tree, ['bar', 'docs'])).toEqual([
+      {
+        kind: 'bookmark',
+        bookmark: {
+          id: 'api',
+          title: 'API',
+          url: 'https://example.org/api',
+        },
+      },
+    ])
+    expect(sidebarBookmarkEntriesAtPath(tree, ['docs'])).toEqual([])
+  })
+
+  it('uses folder rows for the bookmark empty-state decision', () => {
+    const folderRows = [{ kind: 'folder' as const, id: 'docs', title: 'Docs' }]
+
+    expect(isSidebarSearchActive('   ')).toBe(false)
+    expect(isSidebarSearchActive(' api ')).toBe(true)
+    expect(visibleSidebarBookmarkEntries('   ', [], folderRows)).toEqual(
+      folderRows,
+    )
+    expect(visibleSidebarBookmarkEntries('', [], folderRows)).toEqual(
+      folderRows,
+    )
+    expect(visibleSidebarBookmarkEntries('api', [], folderRows)).toEqual([])
+    expect(
+      visibleSidebarBookmarkEntries(
+        ' api ',
+        [{ id: 'api', title: 'API', url: 'https://example.org/api' }],
+        folderRows,
+      ),
+    ).toEqual([
+      {
+        kind: 'bookmark',
+        bookmark: {
+          id: 'api',
+          title: 'API',
+          url: 'https://example.org/api',
+        },
+      },
+    ])
   })
 
   it('excludes Aster application tabs and invalid tab identifiers', () => {

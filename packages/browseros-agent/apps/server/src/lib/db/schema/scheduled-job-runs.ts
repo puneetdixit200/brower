@@ -43,6 +43,7 @@ export const scheduledJobRuns = sqliteTable(
     jobId: text('job_id')
       .notNull()
       .references(() => scheduledJobs.id, { onDelete: 'cascade' }),
+    conversationId: text('conversation_id'),
     status: text('status', {
       enum: ['running', 'completed', 'failed'],
     }).notNull(),

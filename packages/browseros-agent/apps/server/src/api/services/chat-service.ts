@@ -63,8 +63,8 @@ import {
   describeWorkspaceChange,
 } from './chat-service.helpers'
 import {
-  ConversationRunAlreadyActiveError,
   ConversationCapacityError,
+  ConversationRunAlreadyActiveError,
   type ConversationRunSnapshot,
   ConversationRuns,
   type ConversationTabGroupPresentation,
@@ -153,7 +153,10 @@ export class ChatService {
       }
       if (error instanceof ConversationCapacityError) {
         return Response.json(
-          { error: 'Too many agent tasks are active. Finish or stop a task first.' },
+          {
+            error:
+              'Too many agent tasks are active. Finish or stop a task first.',
+          },
           { status: 429, headers: { 'Retry-After': '10' } },
         )
       }
@@ -526,12 +529,15 @@ export class ChatService {
           })
 
           if (shouldPersist(request) && turnCompleted) {
-            await this.persistConversation({
-              id: request.conversationId,
-              messages: session.agent.messages,
-              targetType: 'browseros',
-              origin: request.origin,
-            })
+            await this.persistConversation(
+              {
+                id: request.conversationId,
+                messages: session.agent.messages,
+                targetType: 'browseros',
+                origin: request.origin,
+              },
+              { required: request.persistScheduledTask },
+            )
           }
 
           if (session.scheduledPageId) {
@@ -670,13 +676,16 @@ export class ChatService {
           ...messages.filter((message) => !existingIds.has(message.id)),
         )
         updateMessages(history)
-        await this.persistConversation({
-          id: request.conversationId,
-          messages: history,
-          targetType: agent.type,
-          origin: request.origin,
-          agentId: agent.id,
-        })
+        await this.persistConversation(
+          {
+            id: request.conversationId,
+            messages: history,
+            targetType: agent.type,
+            origin: request.origin,
+            agentId: agent.id,
+          },
+          { required: request.persistScheduledTask },
+        )
       },
     }
     // The run already authorizes this conversation before ACP stream setup;
@@ -763,6 +772,7 @@ export class ChatService {
   // Best-effort: a persistence failure must not fail an already-streamed turn.
   private async persistConversation(
     input: SaveConversationInput,
+    options: { required?: boolean } = {},
   ): Promise<void> {
     try {
       await this.getConversationStore().save(input)
@@ -771,6 +781,7 @@ export class ChatService {
         conversationId: input.id,
         error: error instanceof Error ? error.message : String(error),
       })
+      if (options.required) throw error
     }
   }
 

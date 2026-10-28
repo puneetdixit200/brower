@@ -18,8 +18,10 @@ export function shouldPersist(request: {
   persist?: boolean
   historyMode?: 'local' | 'cloud'
   isScheduledTask?: boolean
+  persistScheduledTask?: boolean
 }): boolean {
-  if (request.isScheduledTask) return false
+  if (request.isScheduledTask)
+    return request.persistScheduledTask === true && request.persist === true
   if (request.persist !== undefined) return request.persist
   if (request.historyMode !== undefined) return request.historyMode === 'local'
   return true

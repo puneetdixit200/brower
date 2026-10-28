@@ -2,6 +2,8 @@ export interface ScheduledJob {
   id: string
   name: string
   query: string
+  mode: 'task' | 'heartbeat'
+  conversationId?: string
   scheduleType: 'daily' | 'hourly' | 'minutes'
   scheduleTime?: string
   scheduleInterval?: number
@@ -24,6 +26,7 @@ export interface ToolCallExecution {
 export interface ScheduledJobRun {
   id: string
   jobId: string
+  conversationId?: string
   startedAt: string
   completedAt?: string
   status: 'running' | 'completed' | 'failed'

@@ -31,6 +31,7 @@ const ToolCallSchema = z.object({
  */
 const UpsertRunSchema = z.object({
   jobId: z.string().min(1),
+  conversationId: z.string().uuid().nullish(),
   status: z.enum(['running', 'completed', 'failed']),
   startedAt: z.number(),
   completedAt: z.number().nullish(),

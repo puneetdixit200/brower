@@ -173,6 +173,29 @@ function bootstrapCurrentSchema(sqlite: BunDatabase): void {
     if (!memoryColumns.some((column) => column.name === 'source_title')) {
       sqlite.exec('ALTER TABLE memories ADD COLUMN source_title text')
     }
+    const scheduledJobColumns = sqlite
+      .query<{ name: string }, []>('PRAGMA table_info(scheduled_jobs)')
+      .all()
+    if (!scheduledJobColumns.some((column) => column.name === 'mode')) {
+      sqlite.exec(
+        "ALTER TABLE scheduled_jobs ADD COLUMN mode text NOT NULL DEFAULT 'task'",
+      )
+    }
+    if (
+      !scheduledJobColumns.some((column) => column.name === 'conversation_id')
+    ) {
+      sqlite.exec('ALTER TABLE scheduled_jobs ADD COLUMN conversation_id text')
+    }
+    const scheduledRunColumns = sqlite
+      .query<{ name: string }, []>('PRAGMA table_info(scheduled_job_runs)')
+      .all()
+    if (
+      !scheduledRunColumns.some((column) => column.name === 'conversation_id')
+    ) {
+      sqlite.exec(
+        'ALTER TABLE scheduled_job_runs ADD COLUMN conversation_id text',
+      )
+    }
     const insertMigration = sqlite.prepare(`
       INSERT INTO __drizzle_migrations ("hash", "created_at")
       SELECT ?, ?
@@ -291,6 +314,11 @@ const currentMigrationHistory = [
     hash: 'a81b3155883222281a811ea4184289084722cfe60985c7ea69330064cf8f288d',
     createdAt: 1793101052721,
   },
+  {
+    tag: '0019_add_heartbeat_continuation',
+    hash: '9c67ccbb30ba65ee390ebc41fdd5e7738ad2876c2d6814904c8e3d0522038c5c',
+    createdAt: 1793200000000,
+  },
 ]
 
 // TODO(nikhil): Remove this fallback once Windows/Linux packaging always includes Drizzle migrations.
@@ -336,6 +364,8 @@ const currentSchemaStatements = [
       id text PRIMARY KEY NOT NULL,
       name text NOT NULL,
       query text NOT NULL,
+      mode text DEFAULT 'task' NOT NULL,
+      conversation_id text,
       schedule_type text NOT NULL,
       schedule_time text,
       schedule_interval integer,
@@ -355,6 +385,7 @@ const currentSchemaStatements = [
     CREATE TABLE IF NOT EXISTS scheduled_job_runs (
       id text PRIMARY KEY NOT NULL,
       job_id text NOT NULL,
+      conversation_id text,
       status text NOT NULL,
       started_at integer NOT NULL,
       completed_at integer,

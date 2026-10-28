@@ -12,6 +12,25 @@ export interface SidebarBookmarkNode {
   children?: SidebarBookmarkNode[]
 }
 
+export type SidebarBookmarkEntry =
+  | { kind: 'folder'; id: string; title: string }
+  | { kind: 'bookmark'; bookmark: SidebarBookmark }
+
+export function isSidebarSearchActive(query: string): boolean {
+  return query.trim().length > 0
+}
+
+/** Keep rendering and empty-state decisions tied to the same visible rows. */
+export function visibleSidebarBookmarkEntries(
+  query: string,
+  searchResults: readonly SidebarBookmark[],
+  folderEntries: readonly SidebarBookmarkEntry[],
+): SidebarBookmarkEntry[] {
+  return isSidebarSearchActive(query)
+    ? searchResults.map((bookmark) => ({ kind: 'bookmark', bookmark }))
+    : [...folderEntries]
+}
+
 /**
  * Bookmarks can contain javascript:, data:, or extension URLs. Never route
  * those through a sidebar action without an explicit supported scheme.
@@ -110,4 +129,54 @@ export function flattenSidebarBookmarkTree(
     }
   }
   return result
+}
+
+/**
+ * Return only the immediate children of a bookmark folder. Folder navigation
+ * uses Chromium IDs rather than titles so duplicate folder names remain
+ * distinct. The walk is bounded because imported profiles can be very large.
+ */
+export function sidebarBookmarkEntriesAtPath(
+  roots: readonly SidebarBookmarkNode[],
+  folderIds: readonly string[] = [],
+  limit = 500,
+): SidebarBookmarkEntry[] {
+  const maxItems = Math.max(0, Math.min(5000, Math.floor(limit)))
+  if (!maxItems) return []
+
+  let children = roots.flatMap((root) =>
+    root.id === '0' && root.children ? root.children : [root],
+  )
+  let visited = children.length
+  for (const id of folderIds) {
+    if (visited > 12000) return []
+    const folder = children.find((node) => node.id === id)
+    // Reject stale paths rather than accidentally showing another folder.
+    if (!folder?.children) return []
+    children = folder.children
+    visited += children.length
+  }
+  const entries: SidebarBookmarkEntry[] = []
+  for (const node of children) {
+    if (entries.length >= maxItems) break
+    if (node.children) {
+      entries.push({
+        kind: 'folder',
+        id: node.id,
+        title: node.title?.trim() || 'Untitled folder',
+      })
+      continue
+    }
+    const url = safeSidebarBookmarkUrl(node.url)
+    if (!url) continue
+    entries.push({
+      kind: 'bookmark',
+      bookmark: {
+        id: node.id,
+        title: node.title?.trim() || new URL(url).hostname,
+        url,
+      },
+    })
+  }
+  return entries
 }

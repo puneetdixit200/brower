@@ -1,7 +1,9 @@
 import {
   Bookmark,
   ChevronDown,
+  ChevronLeft,
   ExternalLink,
+  Folder,
   Globe2,
   Pin,
   PinOff,
@@ -13,8 +15,13 @@ import { cn } from '@/lib/utils'
 import { CurrentWindowTabs } from '../layout/command-palette-tabs'
 import {
   flattenSidebarBookmarkTree,
+  isSidebarSearchActive,
   type SidebarBookmark,
+  type SidebarBookmarkEntry,
+  type SidebarBookmarkNode,
   type SidebarTab,
+  sidebarBookmarkEntriesAtPath,
+  visibleSidebarBookmarkEntries,
   visibleSidebarTabs,
 } from './sidebar-browser-data'
 
@@ -34,6 +41,10 @@ export function SidebarBrowserGroups({
   const [section, setSection] = useState<Section | null>(null)
   const [tabs, setTabs] = useState<(SidebarTab & { id: number })[]>([])
   const [bookmarks, setBookmarks] = useState<SidebarBookmark[]>([])
+  const [bookmarkTree, setBookmarkTree] = useState<SidebarBookmarkNode[]>([])
+  const [bookmarkFolderPath, setBookmarkFolderPath] = useState<
+    { id: string; title: string }[]
+  >([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [pendingTabId, setPendingTabId] = useState<number | null>(null)
@@ -51,6 +62,21 @@ export function SidebarBrowserGroups({
   )
   const visible = expanded && section !== null
 
+  const loadBookmarks = async (isActive: () => boolean) => {
+    const currentWindow = await chrome.windows.getCurrent()
+    if (currentWindow.incognito) {
+      if (isActive()) setBookmarks([])
+      if (isActive()) setBookmarkTree([])
+      if (isActive()) setError('Bookmarks are unavailable in private windows.')
+      return
+    }
+    const roots = await chrome.bookmarks.getTree()
+    if (isActive()) {
+      setBookmarkTree(roots)
+      setBookmarks(flattenSidebarBookmarkTree(roots, 500))
+    }
+  }
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: the explicit refresh token intentionally refetches this panel without being read in the effect body
   useEffect(() => {
     if (!visible) return
@@ -66,15 +92,7 @@ export function SidebarBrowserGroups({
             setTabs(visibleSidebarTabs(result, chrome.runtime.getURL('')))
           }
         } else {
-          const currentWindow = await chrome.windows.getCurrent()
-          if (currentWindow.incognito) {
-            if (active) setBookmarks([])
-            if (active)
-              setError('Bookmarks are unavailable in private windows.')
-          } else {
-            const roots = await chrome.bookmarks.getTree()
-            if (active) setBookmarks(flattenSidebarBookmarkTree(roots, 500))
-          }
+          await loadBookmarks(() => active)
         }
       } catch {
         if (active) setError('Browser data could not be loaded. Try again.')
@@ -135,6 +153,34 @@ export function SidebarBrowserGroups({
         (item.folderPath ?? '').toLocaleLowerCase().includes(term),
     )
   }, [bookmarks, query])
+  const currentBookmarkEntries = useMemo(
+    () =>
+      sidebarBookmarkEntriesAtPath(
+        bookmarkTree,
+        bookmarkFolderPath.map((folder) => folder.id),
+      ),
+    [bookmarkTree, bookmarkFolderPath],
+  )
+  const visibleBookmarks = useMemo(
+    () =>
+      visibleSidebarBookmarkEntries(
+        query,
+        filteredBookmarks,
+        currentBookmarkEntries,
+      ),
+    [query, filteredBookmarks, currentBookmarkEntries],
+  )
+  const isSearching = isSidebarSearchActive(query)
+
+  const openBookmarkFolder = (
+    entry: Extract<SidebarBookmarkEntry, { kind: 'folder' }>,
+  ) => {
+    setQuery('')
+    setBookmarkFolderPath((path) => [
+      ...path,
+      { id: entry.id, title: entry.title },
+    ])
+  }
 
   const activate = async (id: number) => {
     setError(null)
@@ -201,6 +247,7 @@ export function SidebarBrowserGroups({
             onClick={() => {
               setSection((previous) => (previous === key ? null : key))
               setQuery('')
+              if (key === 'bookmarks') setBookmarkFolderPath([])
             }}
             className={cn(
               'flex h-9 min-w-0 flex-1 items-center justify-center gap-1 rounded-md text-xs hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring',
@@ -246,6 +293,25 @@ export function SidebarBrowserGroups({
             Loading…
           </p>
         )}
+        {section === 'bookmarks' &&
+          !query.trim() &&
+          bookmarkFolderPath.length > 0 && (
+            <div className="mt-1 flex min-w-0 items-center gap-1 text-xs">
+              <button
+                type="button"
+                aria-label="Back to parent bookmark folder"
+                onClick={() =>
+                  setBookmarkFolderPath((path) => path.slice(0, -1))
+                }
+                className="shrink-0 rounded-md p-1 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <ChevronLeft className="size-4" />
+              </button>
+              <span className="truncate text-muted-foreground">
+                {bookmarkFolderPath.map((folder) => folder.title).join(' / ')}
+              </span>
+            </div>
+          )}
         <ul className="styled-scrollbar mt-1 max-h-[min(24rem,40dvh)] space-y-1 overflow-y-auto">
           {section === 'tabs'
             ? filteredTabs.map((tab) => (
@@ -293,39 +359,58 @@ export function SidebarBrowserGroups({
                   </button>
                 </li>
               ))
-            : filteredBookmarks.map((item) => (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    onClick={() => void openBookmark(item)}
-                    title={item.url}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring"
-                  >
-                    <Bookmark className="size-3.5 shrink-0" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate">{item.title}</span>
-                      {item.folderPath && (
-                        <span className="block truncate text-[10px] text-muted-foreground">
-                          {item.folderPath}
+            : visibleBookmarks.map((entry) =>
+                entry.kind === 'folder' ? (
+                  <li key={`folder:${entry.id}`}>
+                    <button
+                      type="button"
+                      onClick={() => openBookmarkFolder(entry)}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring"
+                    >
+                      <Folder className="size-3.5 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">
+                        {entry.title}
+                      </span>
+                    </button>
+                  </li>
+                ) : (
+                  <li key={entry.bookmark.id}>
+                    <button
+                      type="button"
+                      onClick={() => void openBookmark(entry.bookmark)}
+                      title={entry.bookmark.url}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring"
+                    >
+                      <Bookmark className="size-3.5 shrink-0" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">
+                          {entry.bookmark.title}
                         </span>
-                      )}
-                    </span>
-                    <ExternalLink className="size-3 shrink-0 opacity-50" />
-                  </button>
-                </li>
-              ))}
+                        {entry.bookmark.folderPath && (
+                          <span className="block truncate text-[10px] text-muted-foreground">
+                            {entry.bookmark.folderPath}
+                          </span>
+                        )}
+                      </span>
+                      <ExternalLink className="size-3 shrink-0 opacity-50" />
+                    </button>
+                  </li>
+                ),
+              )}
         </ul>
         {!loading &&
           !error &&
           (section === 'tabs'
             ? filteredTabs.length === 0
-            : filteredBookmarks.length === 0) && (
+            : visibleBookmarks.length === 0) && (
             <p className="px-1 py-3 text-muted-foreground text-xs">
-              {query
+              {isSearching
                 ? 'No matches.'
                 : section === 'tabs'
                   ? 'No other tabs in this window.'
-                  : 'No web bookmarks in this profile.'}
+                  : bookmarkFolderPath.length
+                    ? 'No web bookmarks in this folder.'
+                    : 'No web bookmarks in this profile.'}
             </p>
           )}
       </div>

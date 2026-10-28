@@ -18,6 +18,7 @@ export interface ChatServerRequest {
   message: string
   mode?: ChatMode
   conversationId?: string
+  persistScheduledTask?: boolean
   windowId?: number
   activeTab?: ActiveTab
   signal?: AbortSignal
@@ -114,6 +115,7 @@ export async function getChatServerResponse(
             : undefined,
         userSystemPrompt: `${personalization}\n${scheduleSystemPrompt}`,
         isScheduledTask: true,
+        persistScheduledTask: request.persistScheduledTask,
       }),
     }),
   })

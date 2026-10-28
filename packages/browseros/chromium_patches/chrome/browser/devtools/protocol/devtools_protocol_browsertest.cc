@@ -2,13 +2,14 @@ diff --git a/chrome/browser/devtools/protocol/devtools_protocol_browsertest.cc b
 index fdf0973f53f6b26814596bcdcd0e2a2caa29727c..cc537f1c3900b6d30291a898c15729f1e045f1d2 100644
 --- a/chrome/browser/devtools/protocol/devtools_protocol_browsertest.cc
 +++ b/chrome/browser/devtools/protocol/devtools_protocol_browsertest.cc
-@@ -23,6 +23,7 @@
+@@ -23,6 +23,8 @@
  #include "base/test/test_switches.h"
  #include "base/test/values_test_util.h"
  #include "base/threading/thread_restrictions.h"
 +#include "base/time/time.h"
  #include "base/values.h"
  #include "build/build_config.h"
++#include "chrome/browser/browseros/buildflags.h"
  #include "chrome/browser/apps/app_service/app_service_proxy.h"
 @@ -34,6 +35,7 @@
  #include "chrome/browser/devtools/protocol/devtools_protocol_test_support.h"
@@ -35,6 +36,47 @@ index fdf0973f53f6b26814596bcdcd0e2a2caa29727c..cc537f1c3900b6d30291a898c15729f1
  #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
  #include "chrome/browser/ui/tabs/tab_strip_model.h"
  #include "chrome/browser/ui/web_applications/test/isolated_web_app_test_utils.h"
+@@ -156,5 +156,40 @@
+ using DevToolsProtocolTest = DevToolsProtocolTestBase;
++#if BUILDFLAG(BROWSEROS_PRODUCT_ASTER)
++IN_PROC_BROWSER_TEST_F(DevToolsProtocolTest,
++                       AsterCredentialOperationsFailClosed) {
++  Attach();
++
++  base::DictValue list_params;
++  list_params.Set("operationId", "test-list");
++  EXPECT_FALSE(SendCommandSync("Autofill.listCredentials",
++                               std::move(list_params)));
++  ASSERT_TRUE(error());
++  EXPECT_EQ("credentials:approval_unavailable",
++            *error()->FindString("message"));
++
++  base::DictValue add_params;
++  add_params.Set("operationId", "test-add");
++  add_params.Set("documentId", "test-document");
++  add_params.Set("username", "synthetic-user");
++  add_params.Set("password", "synthetic-test-secret");
++  EXPECT_FALSE(SendCommandSync("Autofill.addCredential",
++                               std::move(add_params)));
++  ASSERT_TRUE(error());
++  EXPECT_EQ("credentials:approval_unavailable",
++            *error()->FindString("message"));
++
++  base::DictValue fill_params;
++  fill_params.Set("operationId", "test-fill");
++  fill_params.Set("documentId", "test-document");
++  fill_params.Set("credentialId", "synthetic-id");
++  EXPECT_FALSE(SendCommandSync("Autofill.fillCredential",
++                               std::move(fill_params)));
++  ASSERT_TRUE(error());
++  EXPECT_EQ("credentials:approval_unavailable",
++            *error()->FindString("message"));
++}
++#endif  // BUILDFLAG(BROWSEROS_PRODUCT_ASTER)
+ using testing::AllOf;
+ using testing::Contains;
+ using testing::Eq;
+ using testing::Not;
 @@ -480,8 +485,8 @@ IN_PROC_BROWSER_TEST_F(DevToolsProtocolTest, CreateTargetWithFocus) {
  }
  

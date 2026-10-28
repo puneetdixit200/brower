@@ -34,13 +34,25 @@ describe('shouldPersist', () => {
     expect(shouldPersist({ isScheduledTask: true })).toBe(false)
   })
 
-  test('keeps a scheduled run out even when the caller asks to persist', () => {
-    // Nothing sends this combination today. It resolves the same way if
-    // something ever does, rather than by whichever check is written first.
+  test('persists heartbeat transcripts only with explicit opt-in', () => {
     expect(shouldPersist({ isScheduledTask: true, persist: true })).toBe(false)
     expect(shouldPersist({ isScheduledTask: true, historyMode: 'local' })).toBe(
       false,
     )
+    expect(
+      shouldPersist({
+        isScheduledTask: true,
+        persistScheduledTask: true,
+        persist: true,
+      }),
+    ).toBe(true)
+    expect(
+      shouldPersist({
+        isScheduledTask: true,
+        persistScheduledTask: true,
+        persist: false,
+      }),
+    ).toBe(false)
   })
 
   test('persists an ordinary chat that omits everything', () => {

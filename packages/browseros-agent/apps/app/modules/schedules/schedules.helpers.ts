@@ -9,6 +9,8 @@ export interface ScheduledJobRow {
   id: string
   name: string
   query: string
+  mode: ScheduledJob['mode']
+  conversationId: string | null
   scheduleType: ScheduledJob['scheduleType']
   scheduleTime: string | null
   scheduleInterval: number | null
@@ -23,6 +25,7 @@ export interface ScheduledJobRow {
 export interface ScheduledJobRunRow {
   id: string
   jobId: string
+  conversationId: string | null
   status: ScheduledJobRun['status']
   startedAt: number
   completedAt: number | null
@@ -52,6 +55,8 @@ export function toScheduledJob(row: ScheduledJobRow): ScheduledJob {
     id: row.id,
     name: row.name,
     query: row.query,
+    mode: row.mode,
+    conversationId: orUndefined(row.conversationId),
     scheduleType: row.scheduleType,
     scheduleTime: orUndefined(row.scheduleTime),
     scheduleInterval: orUndefined(row.scheduleInterval),
@@ -69,6 +74,8 @@ export function toScheduledJobPayload(job: ScheduledJob) {
   return {
     name: job.name,
     query: job.query,
+    mode: job.mode,
+    conversationId: job.conversationId,
     scheduleType: job.scheduleType,
     scheduleTime: job.scheduleTime,
     scheduleInterval: job.scheduleInterval,
@@ -102,6 +109,7 @@ export function toScheduledJobRun(row: ScheduledJobRunRow): ScheduledJobRun {
   return {
     id: row.id,
     jobId: row.jobId,
+    conversationId: orUndefined(row.conversationId),
     status: row.status,
     startedAt: new Date(row.startedAt).toISOString(),
     completedAt: toIso(row.completedAt),
@@ -116,6 +124,7 @@ export function toScheduledJobRun(row: ScheduledJobRunRow): ScheduledJobRun {
 export function toScheduledJobRunPayload(run: ScheduledJobRun) {
   return {
     jobId: run.jobId,
+    conversationId: run.conversationId,
     status: run.status,
     // Required by the server, and a run always carries the time it began.
     startedAt: toEpoch(run.startedAt) ?? Date.now(),

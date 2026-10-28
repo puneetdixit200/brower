@@ -54,6 +54,7 @@ const formSchema = z
       .min(1, 'Name is required')
       .max(100, 'Name must be 100 characters or less'),
     query: z.string().min(1, 'Prompt is required'),
+    mode: z.enum(['task', 'heartbeat']),
     scheduleType: z.enum(['daily', 'hourly', 'minutes']),
     scheduleTime: z.string().optional(),
     scheduleInterval: z.number().int().min(1).max(60).optional(),
@@ -109,6 +110,7 @@ export const NewScheduledTaskDialog: FC<NewScheduledTaskDialogProps> = ({
     defaultValues: {
       name: '',
       query: '',
+      mode: 'task',
       scheduleType: 'daily',
       scheduleTime: '09:00',
       scheduleInterval: 1,
@@ -134,6 +136,7 @@ export const NewScheduledTaskDialog: FC<NewScheduledTaskDialogProps> = ({
         form.reset({
           name: initialValues.name,
           query: initialValues.query,
+          mode: initialValues.mode,
           scheduleType: initialValues.scheduleType,
           scheduleTime: initialValues.scheduleTime || '09:00',
           scheduleInterval: initialValues.scheduleInterval || 1,
@@ -144,6 +147,7 @@ export const NewScheduledTaskDialog: FC<NewScheduledTaskDialogProps> = ({
         form.reset({
           name: '',
           query: '',
+          mode: 'task',
           scheduleType: 'daily',
           scheduleTime: '09:00',
           scheduleInterval: 1,
@@ -245,6 +249,8 @@ export const NewScheduledTaskDialog: FC<NewScheduledTaskDialogProps> = ({
     onSave({
       name: values.name.trim(),
       query: values.query.trim(),
+      mode: values.mode,
+      conversationId: initialValues?.conversationId,
       scheduleType: values.scheduleType,
       scheduleTime:
         values.scheduleType === 'daily' ? values.scheduleTime : undefined,
@@ -340,6 +346,36 @@ export const NewScheduledTaskDialog: FC<NewScheduledTaskDialogProps> = ({
                       The instruction that will be sent to the agent
                     </FormDescription>
                   )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="mode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Run behavior</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select run behavior" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="task">
+                        Start a new task each time
+                      </SelectItem>
+                      <SelectItem value="heartbeat">
+                        Continue this task&apos;s conversation
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Heartbeats keep the transcript across restarts and stop
+                    after an incomplete run.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

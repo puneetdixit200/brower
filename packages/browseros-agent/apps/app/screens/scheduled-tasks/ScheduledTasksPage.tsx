@@ -80,6 +80,7 @@ export const ScheduledTasksPage: FC = () => {
       id: '',
       name: searchParams.get('name') ?? '',
       query: searchParams.get('query') ?? '',
+      mode: 'task',
       scheduleType:
         (searchParams.get('scheduleType') as ScheduledJob['scheduleType']) ??
         'daily',

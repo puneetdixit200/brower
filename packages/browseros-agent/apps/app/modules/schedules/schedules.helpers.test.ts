@@ -21,6 +21,8 @@ function jobRow(overrides: Partial<ScheduledJobRow> = {}): ScheduledJobRow {
     id: 'job-1',
     name: 'Morning digest',
     query: 'summarise my inbox',
+    mode: 'task',
+    conversationId: null,
     scheduleType: 'daily',
     scheduleTime: '09:00',
     scheduleInterval: null,
@@ -39,6 +41,7 @@ function runRow(
   return {
     id: 'run-1',
     jobId: 'job-1',
+    conversationId: null,
     status: 'completed',
     startedAt: EPOCH,
     completedAt: null,

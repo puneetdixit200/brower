@@ -6,10 +6,19 @@
 import { Database as BunDatabase } from 'bun:sqlite'
 import { afterEach, describe, expect, it } from 'bun:test'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs'
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { drizzle } from 'drizzle-orm/bun-sqlite'
+import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import { closeDb, initializeDb } from '../../../src/lib/db'
 import { providers } from '../../../src/lib/db/schema'
 
@@ -45,6 +54,105 @@ describe('database initialization', () => {
     expect(second).toBe(first)
   })
 
+  it('upgrades a v18 profile and preserves scheduled rows while adding heartbeat conversation fields', () => {
+    const dir = mkTempDir()
+    const dbPath = join(dir, 'browseros.sqlite')
+    const v18Migrations = join(dir, 'migrations-v18')
+    const currentMigrations = join(
+      import.meta.dir,
+      '../../../src/lib/db/migrations',
+    )
+    const journal = JSON.parse(
+      readFileSync(join(currentMigrations, 'meta/_journal.json'), 'utf8'),
+    )
+    journal.entries = journal.entries.filter(
+      (entry: { idx: number }) => entry.idx <= 18,
+    )
+    mkdirSync(join(v18Migrations, 'meta'), { recursive: true })
+    writeFileSync(
+      join(v18Migrations, 'meta/_journal.json'),
+      JSON.stringify(journal),
+    )
+    for (const entry of journal.entries as { tag: string }[]) {
+      cpSync(
+        join(currentMigrations, `${entry.tag}.sql`),
+        join(v18Migrations, `${entry.tag}.sql`),
+      )
+    }
+
+    const legacy = new BunDatabase(dbPath)
+    migrate(drizzle(legacy), { migrationsFolder: v18Migrations })
+    legacy.exec(`
+      INSERT INTO scheduled_jobs (
+        id, name, query, schedule_type, created_at, updated_at
+      ) VALUES ('legacy-job', 'Legacy task', 'do work', 'daily', 1, 1);
+      INSERT INTO scheduled_job_runs (
+        id, job_id, status, started_at, created_at, updated_at
+      ) VALUES ('legacy-run', 'legacy-job', 'completed', 1, 1, 1);
+    `)
+    legacy.close()
+
+    const upgraded = initializeDb({ dbPath })
+    expect(
+      upgraded.sqlite
+        .query<
+          { id: string; mode: string; conversation_id: string | null },
+          []
+        >('SELECT id, mode, conversation_id FROM scheduled_jobs WHERE id = ?')
+        .get('legacy-job'),
+    ).toEqual({ id: 'legacy-job', mode: 'task', conversation_id: null })
+    expect(
+      upgraded.sqlite
+        .query<{ id: string; conversation_id: string | null }, []>(
+          'SELECT id, conversation_id FROM scheduled_job_runs WHERE id = ?',
+        )
+        .get('legacy-run'),
+    ).toEqual({ id: 'legacy-run', conversation_id: null })
+    expect(
+      upgraded.sqlite
+        .query<{ dflt_value: string }, []>(
+          "SELECT dflt_value FROM pragma_table_info('scheduled_jobs') WHERE name = 'mode'",
+        )
+        .get(),
+    ).toEqual({ dflt_value: "'task'" })
+
+    upgraded.sqlite.exec(`
+      INSERT INTO scheduled_jobs (
+        id, name, query, mode, schedule_type, conversation_id, created_at, updated_at
+      ) VALUES (
+        'heartbeat-job', 'Heartbeat', 'continue conversation', 'heartbeat',
+        'hourly', 'conversation-id', 2, 2
+      );
+      INSERT INTO scheduled_job_runs (
+        id, job_id, conversation_id, status, started_at, created_at, updated_at
+      ) VALUES (
+        'heartbeat-run', 'heartbeat-job', 'conversation-id', 'completed', 2, 2, 2
+      );
+    `)
+    expect(
+      upgraded.sqlite
+        .query<
+          {
+            mode: string
+            job_conversation_id: string
+            run_conversation_id: string
+          },
+          []
+        >(
+          `SELECT j.mode, j.conversation_id AS job_conversation_id,
+                  r.conversation_id AS run_conversation_id
+           FROM scheduled_jobs j
+           JOIN scheduled_job_runs r ON r.job_id = j.id
+           WHERE j.id = ?`,
+        )
+        .get('heartbeat-job'),
+    ).toEqual({
+      mode: 'heartbeat',
+      job_conversation_id: 'conversation-id',
+      run_conversation_id: 'conversation-id',
+    })
+  })
+
   it.each([false, true])(
     'upgrades an existing provider without changing credentials or selection (missing migrations: %s)',
     (missingMigrations) => {
@@ -53,6 +161,7 @@ describe('database initialization', () => {
       old.sqlite.exec('ALTER TABLE providers DROP COLUMN headers')
       old.sqlite.exec('ALTER TABLE memories DROP COLUMN source_title')
       old.sqlite.exec('ALTER TABLE memories DROP COLUMN source_id')
+      dropHeartbeatColumns(old.sqlite)
       // Drizzle replays from the newest recorded marker, so rewinding to
       // before the headers migration means clearing everything from it
       // onwards, not just its own row.
@@ -274,6 +383,7 @@ describe('database initialization', () => {
     const old = initializeDb({ dbPath })
     old.sqlite.exec('ALTER TABLE memories DROP COLUMN source_title')
     old.sqlite.exec('ALTER TABLE memories DROP COLUMN source_id')
+    dropHeartbeatColumns(old.sqlite)
     // Stand the database up as it was before the hosted provider was retired,
     // by undoing the migration that removes it and re-inserting the row.
     old.sqlite
@@ -365,6 +475,13 @@ function restoreProfileIdColumns(sqlite: BunDatabase): void {
     'CREATE INDEX scheduled_jobs_profile_id_idx ON scheduled_jobs (profile_id)',
   )
   sqlite.exec('ALTER TABLE scheduled_job_runs ADD COLUMN profile_id text')
+}
+
+/** Removes columns from migration 0019 before a test replays that migration. */
+function dropHeartbeatColumns(sqlite: BunDatabase): void {
+  sqlite.exec('ALTER TABLE scheduled_jobs DROP COLUMN conversation_id')
+  sqlite.exec('ALTER TABLE scheduled_jobs DROP COLUMN mode')
+  sqlite.exec('ALTER TABLE scheduled_job_runs DROP COLUMN conversation_id')
 }
 
 /**
