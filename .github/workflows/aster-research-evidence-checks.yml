@@ -38,9 +38,19 @@ jobs:
             apps/app/screens/sidepanel/index/research-source-ledger.test.ts
       - name: Biome source check
         run: |
-          bunx @biomejs/biome check \
+          bunx @biomejs/biome check --write \
             apps/app/screens/sidepanel/index/research-source-ledger.ts \
             apps/app/screens/sidepanel/index/research-source-ledger.test.ts \
             apps/app/screens/sidepanel/index/ChatMessages.tsx
+      - name: Export formatter changes for reviewed commit
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          git diff --name-only > "${RUNNER_TEMP}/aster-research-formatted"
+          if [ -s "${RUNNER_TEMP}/aster-research-formatted" ]; then
+            while IFS= read -r file; do
+              printf 'ASTER_RESEARCH_FORMATTED_FILE:%s:%s\\n' "$file" "$(base64 -w0 "$file")"
+            done < "${RUNNER_TEMP}/aster-research-formatted"
+            exit 1
+          fi
       - name: Working tree whitespace check
         run: git diff --check
