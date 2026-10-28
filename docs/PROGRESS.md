@@ -437,3 +437,17 @@ User requests Terra as main model with at most five Luna medium subagents, Luna 
 - The focused DevTools browser-test object now compiles successfully (4,561,960 bytes). Its initial five API accessor diagnostics were in added patch hunks and were fixed using `BrowserWindowInterface::GetWindow`, `GetSessionID`, and `GetProfile`; overlay hash matches the patch and reverse-apply validation passes.
 - The full server GN label expanded to 22,621 tasks, but that build was interrupted early. The successful extracted-command object builds are focused translation-unit evidence, not completion of the full server target.
 - No `browser_tests` binary/link or browser binary was produced, and no browser test or runtime check was performed. Browser build/link, packaged launch and live-browser acceptance remain open. P03 remains NOT_STARTED because the compiled Autofill guard is not a credential-selection or consent implementation. A05 remains PARTIAL, and the overall project goal remains incomplete. See the [native build checkpoint](evidence/aster-r02-p03-source-checkpoint-2026-10-28.md).
+
+### R03 daily alarm reliability — 2026-10-28
+
+- Daily schedules now use one-shot alarms rearmed for the configured local wall time, avoiding fixed 24-hour drift across DST. Alarm lateness uses the timestamp captured on listener entry, and stale alarms for disabled or deleted jobs do not run.
+- If schedule storage is unavailable or daily rearming fails, a periodic reconciliation alarm retries rebuilding schedules; successful startup/reconciliation clears the retry alarm. The one-minute missed-run grace policy remains skip-without-catch-up, and overlap protection remains worker-local.
+- Ten focused schedule tests pass, including delivery latency, unavailable storage, rearm failure, disabled jobs and UTC/New York DST boundaries. App typecheck and `git diff --check` pass; an independent Luna review found and verified the disabled-job guard.
+- No browser sleep/restart, live timezone change, duplicate cross-context, or packaged native acceptance was run. R03 remains PARTIAL. See [R03 evidence](evidence/aster-r03-daily-alarm-reliability-2026-10-28.md).
+
+### U07 provider/model/reasoning routing — 2026-10-28
+
+- The provider selector now displays and searches persisted model and reasoning effort. Chat request construction carries the selected provider ID, while the server hydrates model and reasoning settings from that stored row.
+- The server derives reasoning support from the shared `models.dev` snapshot for stored providers, overriding stale client flags. Unknown stored model IDs fail closed, including custom Azure deployment names; legacy inline requests without a stored row retain their supplied capability.
+- Seventy focused tests pass across eight files; app/server/shared typechecks and Biome pass. Independent Luna review verified unknown Azure models do not activate `forceReasoning`, and the inline compatibility test remains covered.
+- No headed model-switch or provider-runtime compatibility test was run. U07 remains PARTIAL. See [U07 evidence](evidence/aster-u07-provider-routing-2026-10-28.md).

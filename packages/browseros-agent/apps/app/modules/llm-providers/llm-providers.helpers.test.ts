@@ -49,6 +49,27 @@ function config(overrides: Partial<LlmProviderConfig> = {}) {
 }
 
 describe('toProviderConfig', () => {
+  it('round trips the configured model and reasoning controls', () => {
+    const converted = toProviderConfig(
+      row({
+        modelId: 'gpt-5.5',
+        reasoningEffort: 'high',
+        reasoningSummary: 'detailed',
+      }),
+    )
+
+    expect(converted).toMatchObject({
+      modelId: 'gpt-5.5',
+      reasoningEffort: 'high',
+      reasoningSummary: 'detailed',
+    })
+    expect(toProviderPayload(converted as LlmProviderConfig)).toMatchObject({
+      modelId: 'gpt-5.5',
+      reasoningEffort: 'high',
+      reasoningSummary: 'detailed',
+    })
+  })
+
   it('preserves headers through the settings read and write payloads', () => {
     const headers = { 'x-opencode-session': '{{conversationId}}' }
     const converted = toProviderConfig(row({ headers }))

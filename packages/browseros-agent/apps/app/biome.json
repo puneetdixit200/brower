@@ -14,7 +14,7 @@
       "!public",
       "!dist",
       "!**/*.svg",
-      "!lib/llm-providers/models-dev-data.json"
+      "!../../packages/shared/src/llm-providers/models-dev-data.json"
     ]
   },
   "formatter": {

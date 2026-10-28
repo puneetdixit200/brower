@@ -133,6 +133,9 @@ export function toProviderOption(target: SidepanelChatTarget): Provider {
     agentId: target.kind === 'acp' ? target.agentId : undefined,
     adapterName: target.kind === 'acp' ? target.adapterName : undefined,
     brandKey: target.kind === 'acp' ? target.brandKey : undefined,
+    modelId: target.kind === 'llm' ? target.provider.modelId : undefined,
+    reasoningEffort:
+      target.kind === 'llm' ? target.provider.reasoningEffort : undefined,
     modelLabel: target.kind === 'acp' ? target.modelLabel : undefined,
   }
 }

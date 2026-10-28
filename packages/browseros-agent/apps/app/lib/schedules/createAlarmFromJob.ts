@@ -1,15 +1,22 @@
 import type { ScheduledJob } from './scheduleTypes'
 
-const getNextScheduledTime = (timeString: string): number => {
+export const getNextScheduledTime = (
+  timeString: string,
+  now: Date = new Date(),
+): number => {
   const [hours, minutes] = timeString.split(':').map(Number)
-  const now = new Date()
-  const scheduled = new Date()
+  const scheduled = new Date(now)
 
-  scheduled.setHours(hours, minutes, 0, 0)
+  const setRequestedWallTime = () => scheduled.setHours(hours, minutes, 0, 0)
+  setRequestedWallTime()
 
   // If time has passed today, schedule for tomorrow
   if (scheduled.getTime() <= now.getTime()) {
     scheduled.setDate(scheduled.getDate() + 1)
+    // Reapply the requested time: on a DST gap, setting the wall time first
+    // normalizes (for example) 02:30 to 03:30. Carrying that normalized time
+    // into tomorrow would shift the schedule permanently.
+    setRequestedWallTime()
   }
 
   return scheduled.getTime()
@@ -23,7 +30,6 @@ export const createAlarmFromJob = async (job: ScheduledJob) => {
   if (job.scheduleType === 'daily' && job.scheduleTime) {
     time = {
       when: getNextScheduledTime(job.scheduleTime),
-      periodInMinutes: 24 * 60, // Repeat every 24 hours
     }
   } else if (job.scheduleType === 'hourly' && job.scheduleInterval) {
     const intervalInMinutes = job.scheduleInterval * 60

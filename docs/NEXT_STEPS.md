@@ -9,16 +9,15 @@ Checkpoint: 2026-10-28, branch `feat/aster-linux-ui`. This repository contains t
 ## Next execution order
 
 1. Complete local validation of the fetched source-only commits. Both onboarding branding modes now pass emitted title/favicon checks. Verify the new unpacked resource preparation/staging, extension build, native pin gate and incremental staging behavior; retain signed release validation.
-2. Pinned Chromium 155.0.8059.26 and Linux sysroot are ready in `../chromium-aster-dev/src`; all 424 patches have applied. Actual GN generation passes (35,759 targets); product/product-state/config/manager objects compile successfully; check the remaining loader/crash-reporter objects, then resume the full build and compile with `BROWSEROS_NINJA_JOBS=2`. Source preparation and patch doctor are not native compilation.
+2. Pinned Chromium 155.0.8059.26 and Linux sysroot are ready in `../chromium-aster-dev/src`; the Aster patch set is applied. Aster server, loader, crash-reporter, Autofill and focused DevTools test translation units compile. The `browser_tests` target expanded to 52,858 actions; the one-job build was stopped cleanly at 621 actions after slow progress. No linked test/browser binary exists. Preserve build outputs and the dirty native checkout; choose a narrower/reusable native build strategy before restarting.
 3. In the actual native binary, verify extension READY/new tab, sandbox, isolated profile/state, sidecar launch/authentication, privacy/restart and tool output. Complete broader provider/log-sink and outbound-data review.
 4. Verify the command palette and lazy routes in a disposable runtime. Measure bundle/startup/workload performance before claiming an improvement. Continue the remaining UI/agent/browser subtasks in `IMPLEMENTATION_PLAN.md` against the now-versioned master specification.
 5. Complete package/install/uninstall, release signing/update ownership, security, performance and lifecycle gates. Promote feature statuses only with matching evidence.
 
 ## Cost-conscious execution
 
-- Luna medium: routine implementation, focused tests and documentation.
-- Terra medium: primary planning, judging and independent review; difficult integration and work that repeatedly fails with Luna.
-- Sol: exceptional unresolved cases only, after Terra cannot resolve them.
+- Use Luna medium for all implementation, focused tests, planning, judging and independent review. Do not use Sol or Terra for project work.
+- Deploy no more than five Luna medium subagents at once; keep assignments narrow and file ownership separate.
 - Keep handoffs narrow, reserve file ownership, avoid duplicate investigations and repeat broad checks only after a relevant change or failure.
 
 ## Current evidence and limits
@@ -98,7 +97,7 @@ Of the 38 formerly NOT_STARTED feature rows, 36 received source-level foundation
 
 **Testing-deferred note:** An automatic push workflow on an intermediate commit caught a server TypeScript description-type error; the source was fixed but no follow-up CI run was initiated. The Aster-focused workflow is now manual-dispatch only. Reenable focused CI deliberately before any new PASS claims. See the latest foundation evidence for exact details.
 
-## Latest model policy and 3% stop checkpoint — 2026-10-28
+## Historical model policy and 3% stop checkpoint — 2026-10-28
 
 The user selected Terra as the main model and requests **Luna medium subagents only** for implementation and review, with a maximum of five concurrent subagents. Do not delegate work to Sol or Terra subagents. Keep handoffs narrow and conserve tokens. This supersedes older model-policy entries.
 
@@ -123,4 +122,12 @@ P03 remains NOT_STARTED. The exact Aster guard/test hunks have been applied to t
 
 ### A05 current source checkpoint — 2026-10-28
 
-The current uncommitted A05 implementation persists conversation/run identifiers, status and timestamps; startup marks leftover `running` rows `interrupted`; the app fetches and displays the existing transcript without opening a stream; and deletion removes lifecycle plus conversation data. Focused evidence: 63 server tests, 5 app tests, app/server typechecks and targeted Biome, recorded in [A05 lifecycle evidence](evidence/aster-a05-lifecycle-2026-10-28.md). A05 remains PARTIAL: stream/tool state, replay, execution continuation and approval/ownership recovery are absent, and no headed or packaged-native restart acceptance was run. After parent review, verify actual app/server process restart, transcript display, delete cleanup and no replay, then continue broader recovery and native gates.
+The committed A05 lifecycle implementation persists conversation/run identifiers, status and timestamps; startup marks leftover `running` rows `interrupted`; the app fetches and displays the existing transcript without opening a stream; and deletion removes lifecycle plus conversation data. Focused evidence: 63 server tests, 5 app tests, app/server typechecks and targeted Biome, recorded in [A05 lifecycle evidence](evidence/aster-a05-lifecycle-2026-10-28.md). A05 remains PARTIAL: stream/tool state, replay, execution continuation and approval/ownership recovery are absent, and no headed or packaged-native restart acceptance was run. Next verify actual app/server process restart, transcript display, delete cleanup and no replay, then continue broader recovery and native gates.
+
+### Current batch: R03 reliability, U07 routing, and native build — 2026-10-28
+
+R03 alarm reliability and U07 stored-provider routing have focused tests, typechecks and independent Luna reviews. Both remain PARTIAL pending headed/native acceptance. Evidence: [R03](evidence/aster-r03-daily-alarm-reliability-2026-10-28.md) and [U07](evidence/aster-u07-provider-routing-2026-10-28.md). Continue actual runtime coverage for schedule recovery, timezones, provider/model switching and provider compatibility.
+
+The pinned native checkout has the Aster patch set and the focused Autofill handler and DevTools test translation units compile. The one-job `browser_tests` build stopped cleanly at 621/52,858 actions after slow progress; no linked browser-test binary, native browser launch, or focused browser test has been verified. The stop left the dirty native checkout and generated outputs intact; the final snapshot was 4.8 GiB available RAM, 9.1 GiB swap used, and 267 GiB disk free. Pick a narrower/reusable build plan before another attempt; never report object compilation as browser-test success.
+
+The completion figure is evidence-based: **2/72 matrix features PASS (2.8%)**; the remaining rows are PARTIAL, PARTIAL/BLOCKED, or NOT_STARTED. This is not an effort-weighted estimate because the features and 95 implementation subtasks have different sizes and no validated weighting scheme. Continue the full 95-subtask plan; source foundations do not equal completed features.

@@ -2,7 +2,11 @@ import { onScheduleMessage } from '@/lib/messaging/schedules/scheduleMessages'
 import { createAlarmFromJob } from '@/lib/schedules/createAlarmFromJob'
 import { getChatServerResponse } from '@/lib/schedules/getChatServerResponse'
 import { mayContinueHeartbeat } from '@/lib/schedules/heartbeat-continuation'
-import { isAlarmWithinGracePeriod } from '@/lib/schedules/scheduled-run-policy'
+import {
+  handleScheduledAlarm,
+  SCHEDULE_RECONCILIATION_ALARM,
+  SCHEDULED_JOB_ALARM_PREFIX,
+} from '@/lib/schedules/scheduled-alarm-handler'
 import type { ScheduledJobRun } from '@/lib/schedules/scheduleTypes'
 import {
   listScheduledJobRunsOrNull,
@@ -44,9 +48,19 @@ export const scheduledJobRuns = async () => {
     }
   }
 
+  const scheduleAlarmReconciliation = async () => {
+    await chrome.alarms.create(SCHEDULE_RECONCILIATION_ALARM, {
+      delayInMinutes: 1,
+      periodInMinutes: 5,
+    })
+  }
+
   const syncAlarmState = async () => {
     const loaded = await listScheduledJobsOrNull()
-    if (loaded === null) return
+    if (loaded === null) {
+      await scheduleAlarmReconciliation()
+      return
+    }
     // Rebuild schedules from now on startup/install. An alarm that expired
     // while the browser was closed must not become an unattended catch-up run.
     const alarms = await chrome.alarms.getAll()
@@ -66,6 +80,7 @@ export const scheduledJobRuns = async () => {
         await createAlarmFromJob(job)
       }
     }
+    await chrome.alarms.clear(SCHEDULE_RECONCILIATION_ALARM)
   }
 
   const createJobRun = async (
@@ -195,21 +210,33 @@ export const scheduledJobRuns = async () => {
   }
 
   chrome.alarms.onAlarm.addListener(async (alarm) => {
-    if (!alarm.name.startsWith('scheduled-job-')) return
-    // A Chrome alarm may be delivered late after system sleep. Skip it after
-    // the supported one-minute grace window; the recurring alarm remains set.
-    if (!isAlarmWithinGracePeriod(alarm.scheduledTime, Date.now())) return
-    const jobId = alarm.name.replace('scheduled-job-', '')
-    try {
-      await executeScheduledJob(jobId)
-    } catch (error) {
-      if (
-        !(error instanceof Error) ||
-        error.message !== `Job is already running: ${jobId}`
-      ) {
-        throw error
-      }
+    if (alarm.name === SCHEDULE_RECONCILIATION_ALARM) {
+      await syncAlarmState()
+      return
     }
+    if (!alarm.name.startsWith(SCHEDULED_JOB_ALARM_PREFIX)) return
+
+    await handleScheduledAlarm(alarm, {
+      now: Date.now,
+      getJob: async (jobId) => {
+        const jobs = await listScheduledJobsOrNull()
+        return jobs === null ? null : jobs.find((each) => each.id === jobId)
+      },
+      rearmDaily: createAlarmFromJob,
+      scheduleReconciliation: scheduleAlarmReconciliation,
+      run: async (jobId) => {
+        try {
+          await executeScheduledJob(jobId)
+        } catch (error) {
+          if (
+            !(error instanceof Error) ||
+            error.message !== `Job is already running: ${jobId}`
+          ) {
+            throw error
+          }
+        }
+      },
+    })
   })
 
   onScheduleMessage('runScheduledJob', async ({ data }) => {

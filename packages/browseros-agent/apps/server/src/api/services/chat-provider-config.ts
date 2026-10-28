@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
+import { getModelsDevModels } from '@browseros/shared/llm-providers/models-dev'
 import type { LLMConfig } from '@browseros/shared/schemas/llm'
 import type { ProviderRow } from '../../lib/db/schema'
 import type {
@@ -29,6 +30,18 @@ export type HydrationResult =
       usedStoredProvider: boolean
     }
   | { ok: false; error: string }
+
+/**
+ * Provider rows are authoritative for model selection. Derive reasoning
+ * support from the saved model rather than trusting a client capability value
+ * computed against a possibly stale copy of that row.
+ */
+function supportsReasoning(provider: string, modelId: string): boolean {
+  return (
+    getModelsDevModels(provider).find((model) => model.id === modelId)
+      ?.supportsReasoning ?? false
+  )
+}
 
 /** The stored row as an outbound LLM config. Shared with /refine-prompt. */
 export function providerRowToLlmConfig(
@@ -106,6 +119,9 @@ export async function hydrateChatProvider(
       provider: hydrated.provider,
       contextWindowSize: row?.contextWindow ?? request.contextWindowSize,
       supportsImages: row ? row.supportsImages : request.supportsImages,
+      supportsReasoning: row
+        ? supportsReasoning(row.type, row.modelId ?? '')
+        : request.supportsReasoning,
       target: { type: 'browseros', providerId },
     },
   }

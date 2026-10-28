@@ -15,13 +15,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4,
@@ -39,13 +33,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -63,13 +51,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -91,13 +73,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -115,13 +91,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -139,13 +109,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -163,13 +127,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -187,12 +145,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -214,12 +167,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -241,11 +189,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           },
           {
             "type": "budget_tokens",
@@ -267,11 +211,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           },
           {
             "type": "budget_tokens",
@@ -371,14 +311,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.1,
@@ -396,14 +329,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -421,13 +347,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -445,14 +365,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4,
@@ -470,14 +383,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.2,
@@ -495,14 +401,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4,
@@ -520,14 +419,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -545,13 +437,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["minimal", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 4,
@@ -569,13 +455,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 5,
@@ -593,11 +473,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["medium", "high", "xhigh"]
           }
         ],
         "inputCost": 30,
@@ -615,13 +491,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 0.75,
@@ -639,13 +509,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 0.2,
@@ -663,13 +527,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 2.5,
@@ -687,11 +545,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["medium", "high", "xhigh"]
           }
         ],
         "inputCost": 30,
@@ -709,13 +563,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.75,
@@ -733,13 +581,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.75,
@@ -757,13 +599,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.75,
@@ -781,11 +617,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["medium", "high", "xhigh"]
           }
         ],
         "inputCost": 21,
@@ -803,12 +635,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["none", "low", "medium", "high"]
           }
         ],
         "inputCost": 1.25,
@@ -826,9 +653,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "high"
-            ]
+            "values": ["high"]
           }
         ],
         "inputCost": 15,
@@ -846,12 +671,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 1.25,
@@ -869,12 +689,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.25,
@@ -892,12 +707,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.05,
@@ -915,11 +725,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 20,
@@ -937,11 +743,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 2,
@@ -1037,11 +839,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.75,
@@ -1059,11 +857,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.75,
@@ -1081,11 +875,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.75,
@@ -1103,12 +893,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.3,
@@ -1126,12 +911,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.75,
@@ -1149,12 +929,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.3,
@@ -1172,12 +947,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 1.5,
@@ -1195,12 +965,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.25,
@@ -1274,12 +1039,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.75,
@@ -1321,11 +1081,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 2,
@@ -1343,11 +1099,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 2,
@@ -1365,12 +1117,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.5,
@@ -1495,13 +1242,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4,
@@ -1537,14 +1278,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.1,
@@ -1562,14 +1296,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.1,
@@ -1587,14 +1314,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -1612,14 +1332,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -1673,12 +1386,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.6,
@@ -1718,10 +1426,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "medium",
-              "xhigh"
-            ]
+            "values": ["medium", "xhigh"]
           }
         ],
         "inputCost": 0.075,
@@ -1739,11 +1444,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "high",
-              "max"
-            ]
+            "values": ["low", "high", "max"]
           }
         ],
         "inputCost": 0.37,
@@ -1799,11 +1500,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "high",
-              "max"
-            ]
+            "values": ["low", "high", "max"]
           }
         ],
         "inputCost": 0.1,
@@ -1825,11 +1522,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "high",
-              "max"
-            ]
+            "values": ["low", "high", "max"]
           }
         ],
         "inputCost": 0.4,
@@ -1871,13 +1564,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -1895,14 +1582,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.1,
@@ -1920,14 +1600,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -1945,14 +1618,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -1970,11 +1636,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -1992,11 +1654,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -2018,11 +1676,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "high",
-              "max"
-            ]
+            "values": ["low", "high", "max"]
           }
         ],
         "inputCost": 0.15,
@@ -2076,12 +1730,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["none", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.04,
@@ -2099,11 +1748,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "medium",
-              "high"
-            ]
+            "values": ["none", "medium", "high"]
           }
         ],
         "inputCost": 0.025,
@@ -2121,11 +1766,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "medium",
-              "high"
-            ]
+            "values": ["none", "medium", "high"]
           }
         ],
         "inputCost": 0,
@@ -2143,11 +1784,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "medium",
-              "high"
-            ]
+            "values": ["none", "medium", "high"]
           }
         ],
         "inputCost": 0.075,
@@ -2165,11 +1802,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "medium",
-              "high"
-            ]
+            "values": ["none", "medium", "high"]
           }
         ],
         "inputCost": 0,
@@ -2205,13 +1838,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -2229,13 +1856,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -2253,11 +1874,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.75,
@@ -2275,14 +1892,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["minimal", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 1.25,
@@ -2300,14 +1910,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["minimal", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.1,
@@ -2325,13 +1928,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["minimal", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 2,
@@ -2349,13 +1946,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -2377,11 +1968,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "high",
-              "max"
-            ]
+            "values": ["low", "high", "max"]
           }
         ],
         "inputCost": 0.22,
@@ -2399,11 +1986,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "high"
-            ]
+            "values": ["none", "low", "high"]
           }
         ],
         "inputCost": 0.06,
@@ -2421,11 +2004,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "high"
-            ]
+            "values": ["none", "low", "high"]
           }
         ],
         "inputCost": 0.834,
@@ -2443,11 +2022,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "high",
-              "max"
-            ]
+            "values": ["low", "high", "max"]
           }
         ],
         "inputCost": 0.075,
@@ -2523,11 +2098,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "high",
-              "max"
-            ]
+            "values": ["low", "high", "max"]
           }
         ],
         "inputCost": 0.15,
@@ -2549,11 +2120,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "high",
-              "max"
-            ]
+            "values": ["low", "high", "max"]
           }
         ],
         "inputCost": 0.498696,
@@ -2571,13 +2138,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["minimal", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 0.1,
@@ -2619,11 +2180,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "high",
-              "max"
-            ]
+            "values": ["low", "high", "max"]
           }
         ],
         "inputCost": 0.5625,
@@ -2675,11 +2232,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "xhigh"]
           }
         ],
         "inputCost": 0.42,
@@ -2701,11 +2254,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "xhigh"]
           }
         ],
         "inputCost": 0,
@@ -2723,11 +2272,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "high",
-              "max"
-            ]
+            "values": ["low", "high", "max"]
           }
         ],
         "inputCost": 0.84,
@@ -2745,11 +2290,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.75,
@@ -2785,11 +2326,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "xhigh"]
           }
         ],
         "inputCost": 2,
@@ -2807,12 +2344,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 2,
@@ -2878,12 +2410,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 0.3,
@@ -2927,13 +2454,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["minimal", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.25,
@@ -2951,10 +2472,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "high"
-            ]
+            "values": ["none", "high"]
           }
         ],
         "inputCost": 0.95,
@@ -2976,11 +2494,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "high",
-              "max"
-            ]
+            "values": ["low", "high", "max"]
           }
         ],
         "inputCost": 0.038,
@@ -3002,11 +2516,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "high",
-              "max"
-            ]
+            "values": ["low", "high", "max"]
           }
         ],
         "inputCost": 0.04,
@@ -3024,14 +2534,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "minimal",
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["none", "minimal", "low", "medium", "high", "max"]
           }
         ],
         "inputCost": 0.45,
@@ -3049,14 +2552,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "minimal",
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["none", "minimal", "low", "medium", "high", "max"]
           }
         ],
         "inputCost": 0,
@@ -3078,13 +2574,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -3120,12 +2610,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.3,
@@ -3143,12 +2628,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.75,
@@ -3228,11 +2708,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "high",
-              "max"
-            ]
+            "values": ["low", "high", "max"]
           }
         ],
         "inputCost": 3,
@@ -3272,14 +2748,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "minimal",
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["none", "minimal", "low", "medium", "high", "max"]
           }
         ],
         "inputCost": 1,
@@ -3297,14 +2766,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "minimal",
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["none", "minimal", "low", "medium", "high", "max"]
           }
         ],
         "inputCost": 0,
@@ -3334,13 +2796,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["minimal", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.25,
@@ -3358,14 +2814,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.2,
@@ -3383,14 +2832,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.2,
@@ -3408,14 +2850,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -3433,14 +2868,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -3458,14 +2886,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -3483,14 +2904,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -3508,12 +2922,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.6,
@@ -3531,11 +2940,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 2,
@@ -3577,11 +2982,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "high"
-            ]
+            "values": ["none", "low", "high"]
           }
         ],
         "inputCost": 0.132,
@@ -3639,13 +3040,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -3681,11 +3076,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -3717,10 +3108,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "high",
-              "xhigh"
-            ]
+            "values": ["high", "xhigh"]
           }
         ],
         "inputCost": 0.6496,
@@ -3742,10 +3130,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "high",
-              "xhigh"
-            ]
+            "values": ["high", "xhigh"]
           }
         ],
         "inputCost": 0,
@@ -3775,13 +3160,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -3799,13 +3178,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -3827,10 +3200,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "medium",
-              "high"
-            ]
+            "values": ["medium", "high"]
           },
           {
             "type": "budget_tokens",
@@ -3856,10 +3226,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "medium",
-              "high"
-            ]
+            "values": ["medium", "high"]
           },
           {
             "type": "budget_tokens",
@@ -3953,11 +3320,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.2,
@@ -3979,13 +3342,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -4033,12 +3390,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 1.5,
@@ -4078,12 +3430,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.25,
@@ -4113,10 +3460,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "high"
-            ]
+            "values": ["none", "high"]
           }
         ],
         "inputCost": 1.5,
@@ -4178,13 +3522,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -4202,11 +3540,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.75,
@@ -4224,11 +3558,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 2,
@@ -4250,11 +3580,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "high",
-              "max"
-            ]
+            "values": ["low", "high", "max"]
           }
         ],
         "inputCost": 1.4989,
@@ -4272,13 +3598,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 0.75,
@@ -4336,10 +3656,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "high",
-              "xhigh"
-            ]
+            "values": ["high", "xhigh"]
           }
         ],
         "inputCost": 0.088606,
@@ -4361,10 +3678,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "high",
-              "xhigh"
-            ]
+            "values": ["high", "xhigh"]
           }
         ],
         "inputCost": 0.95526,
@@ -4382,13 +3696,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 5,
@@ -4406,11 +3714,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["medium", "high", "xhigh"]
           }
         ],
         "inputCost": 30,
@@ -4482,13 +3786,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4,
@@ -4552,11 +3850,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "high"
-            ]
+            "values": ["none", "low", "high"]
           }
         ],
         "inputCost": 0.18,
@@ -4592,12 +3886,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["none", "low", "medium", "high"]
           }
         ],
         "inputCost": 1.25,
@@ -4619,13 +3908,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -4799,12 +4082,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.25,
@@ -4870,13 +4148,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 0.75,
@@ -4894,13 +4166,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 0.2,
@@ -4918,10 +4184,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "high"
-            ]
+            "values": ["none", "high"]
           }
         ],
         "inputCost": 0.15,
@@ -4961,12 +4224,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -4992,12 +4250,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           }
         ],
         "inputCost": 3,
@@ -5019,10 +4272,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium"
-            ]
+            "values": ["low", "medium"]
           },
           {
             "type": "budget_tokens",
@@ -5048,10 +4298,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium"
-            ]
+            "values": ["low", "medium"]
           },
           {
             "type": "budget_tokens",
@@ -5073,13 +4320,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 2.5,
@@ -5097,11 +4338,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["medium", "high", "xhigh"]
           }
         ],
         "inputCost": 30,
@@ -5119,12 +4356,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["none", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.25,
@@ -5146,12 +4378,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.25,
@@ -5283,11 +4510,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 2,
@@ -5305,11 +4528,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 2,
@@ -5367,11 +4586,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.5,
@@ -5393,12 +4608,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.25,
@@ -5420,12 +4630,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.1,
@@ -5503,13 +4708,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.75,
@@ -5551,13 +4750,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["none", "minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.15,
@@ -5705,12 +4898,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.5,
@@ -5746,13 +4934,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.75,
@@ -5770,12 +4952,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.75,
@@ -5793,11 +4970,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["medium", "high", "xhigh"]
           }
         ],
         "inputCost": 21,
@@ -5969,12 +5142,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["none", "low", "medium", "high"]
           }
         ],
         "inputCost": 1.25,
@@ -5992,11 +5160,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 1.25,
@@ -6014,12 +5178,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.25,
@@ -6041,11 +5200,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.25,
@@ -6099,11 +5254,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.075,
@@ -6199,9 +5350,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "high"
-            ]
+            "values": ["high"]
           }
         ],
         "inputCost": 15,
@@ -6513,12 +5662,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 1.25,
@@ -6536,12 +5680,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.25,
@@ -6559,12 +5698,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.05,
@@ -6600,11 +5734,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.15,
@@ -6622,11 +5752,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.018,
@@ -7148,9 +6274,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "high"
-            ]
+            "values": ["high"]
           }
         ],
         "inputCost": 1.1,
@@ -7450,9 +6574,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "high"
-            ]
+            "values": ["high"]
           }
         ],
         "inputCost": 1.1,
@@ -8128,13 +7250,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4,
@@ -8152,14 +7268,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.1,
@@ -8177,14 +7286,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -8202,14 +7304,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -8227,13 +7322,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -8251,12 +7340,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "high", "xhigh"]
           }
         ]
       },
@@ -8272,13 +7356,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -8296,12 +7374,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -8323,14 +7396,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.2,
@@ -8348,14 +7414,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4,
@@ -8373,14 +7432,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -8402,13 +7454,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -8438,13 +7484,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -8462,13 +7502,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -8486,13 +7520,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -8510,11 +7538,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 5,
@@ -8556,13 +7580,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 5,
@@ -8598,13 +7616,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -8646,13 +7658,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 0.75,
@@ -8670,13 +7676,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 0.2,
@@ -8694,12 +7694,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -8721,13 +7716,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 2.5,
@@ -8745,11 +7734,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["medium", "high", "xhigh"]
           }
         ],
         "inputCost": 30,
@@ -8767,13 +7752,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.75,
@@ -8809,12 +7788,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.75,
@@ -8832,13 +7806,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.75,
@@ -8946,12 +7914,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["none", "low", "medium", "high"]
           }
         ],
         "inputCost": 1.25,
@@ -8969,11 +7932,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 1.25,
@@ -8991,11 +7950,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.25,
@@ -9013,12 +7968,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.25,
@@ -9036,9 +7986,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "high"
-            ]
+            "values": ["high"]
           }
         ],
         "inputCost": 15,
@@ -9056,11 +8004,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 1.25,
@@ -9078,12 +8022,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 1.25,
@@ -9101,12 +8040,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.25,
@@ -9124,12 +8058,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.05,
@@ -9147,11 +8076,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           },
           {
             "type": "budget_tokens",
@@ -9209,11 +8134,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 2,
@@ -9429,13 +8350,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4,
@@ -9453,13 +8368,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4.4,
@@ -9477,13 +8386,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4.4,
@@ -9501,13 +8404,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4,
@@ -9525,14 +8422,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.1,
@@ -9550,14 +8440,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -9575,13 +8458,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4.4,
@@ -9599,13 +8476,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4.4,
@@ -9623,14 +8494,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.11,
@@ -9648,14 +8512,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2.2,
@@ -9673,13 +8530,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -9697,13 +8548,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 11,
@@ -9721,13 +8566,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 11,
@@ -9745,13 +8584,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -9769,13 +8602,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -9793,13 +8620,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 11,
@@ -9817,12 +8638,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 2,
@@ -9840,12 +8656,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 2.2,
@@ -9863,12 +8674,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 2.2,
@@ -9890,13 +8696,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -9918,13 +8718,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5.5,
@@ -9946,13 +8740,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5.5,
@@ -9974,13 +8762,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -10002,13 +8784,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5.5,
@@ -10030,13 +8806,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5.5,
@@ -10078,14 +8848,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.2,
@@ -10103,14 +8866,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4,
@@ -10128,14 +8884,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -10153,14 +8902,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.22,
@@ -10178,14 +8920,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2.2,
@@ -10203,14 +8938,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.22,
@@ -10228,14 +8956,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4.4,
@@ -10253,14 +8974,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2.2,
@@ -10278,14 +8992,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.22,
@@ -10303,14 +9010,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4.4,
@@ -10328,14 +9028,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2.2,
@@ -10357,13 +9050,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -10385,13 +9072,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2.2,
@@ -10413,13 +9094,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2.2,
@@ -10441,13 +9116,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -10469,13 +9138,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2.2,
@@ -10497,13 +9160,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2.2,
@@ -10521,12 +9178,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["none", "low", "medium", "high"]
           }
         ],
         "inputCost": 1.25,
@@ -10544,13 +9196,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -10568,13 +9214,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 11,
@@ -10592,13 +9232,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -10616,13 +9250,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 11,
@@ -10640,13 +9268,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 2.75,
@@ -10664,13 +9286,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 5.5,
@@ -10692,13 +9308,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -10720,13 +9330,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5.5,
@@ -10748,13 +9352,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5.5,
@@ -10776,13 +9374,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -10804,13 +9396,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5.5,
@@ -10832,13 +9418,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5.5,
@@ -10860,13 +9440,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -10888,13 +9462,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5.5,
@@ -10916,13 +9484,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5.5,
@@ -10944,13 +9506,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -10972,13 +9528,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5.5,
@@ -11000,13 +9550,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5.5,
@@ -11024,10 +9568,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "high"
-            ]
+            "values": ["none", "high"]
           }
         ],
         "inputCost": 0.13,
@@ -11045,10 +9586,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "high"
-            ]
+            "values": ["none", "high"]
           }
         ],
         "inputCost": 0.14,
@@ -11066,10 +9604,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "high"
-            ]
+            "values": ["none", "high"]
           }
         ],
         "inputCost": 0.04,
@@ -11121,12 +9656,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -11152,12 +9682,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -11183,12 +9708,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -11214,12 +9734,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -11245,12 +9760,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -11276,12 +9786,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -11307,12 +9812,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -11338,12 +9838,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -11369,12 +9864,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -11400,12 +9890,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -11431,12 +9916,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -11654,11 +10134,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.33,
@@ -11680,11 +10156,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.374,
@@ -11706,11 +10178,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.3,
@@ -11732,11 +10200,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.396,
@@ -11758,11 +10222,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.33,
@@ -11808,11 +10268,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           },
           {
             "type": "budget_tokens",
@@ -11838,11 +10294,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           },
           {
             "type": "budget_tokens",
@@ -11868,11 +10320,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           },
           {
             "type": "budget_tokens",
@@ -11898,11 +10346,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           },
           {
             "type": "budget_tokens",
@@ -11924,11 +10368,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.15,
@@ -11946,11 +10386,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.07,
@@ -12352,11 +10788,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.15,
@@ -12374,11 +10806,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.15,
@@ -12396,11 +10824,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.07,
@@ -12418,11 +10842,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.07,
@@ -12440,11 +10860,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.18,
@@ -12462,11 +10878,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.084,
@@ -12935,11 +11347,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0,
@@ -12992,11 +11400,7 @@
           },
           {
             "type": "effort",
-            "values": [
-              "low",
-              "high",
-              "max"
-            ]
+            "values": ["low", "high", "max"]
           }
         ],
         "inputCost": 3,
@@ -13063,13 +11467,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4,
@@ -13087,14 +11485,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.1,
@@ -13112,14 +11503,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -13137,12 +11521,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 2,
@@ -13160,13 +11539,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -13184,11 +11557,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.75,
@@ -13206,13 +11575,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -13230,11 +11593,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.75,
@@ -13252,12 +11611,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 2,
@@ -13275,11 +11629,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.2,
@@ -13297,13 +11647,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -13321,12 +11665,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           },
           {
             "type": "budget_tokens",
@@ -13348,11 +11687,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "high",
-              "max"
-            ]
+            "values": ["low", "high", "max"]
           }
         ],
         "inputCost": 3,
@@ -13370,14 +11705,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.2,
@@ -13395,14 +11723,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4,
@@ -13420,14 +11741,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -13445,11 +11759,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 2,
@@ -13467,13 +11777,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -13503,13 +11807,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -13527,11 +11825,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.75,
@@ -13549,13 +11843,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -13573,12 +11861,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           },
           {
             "type": "budget_tokens",
@@ -13600,13 +11883,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 5,
@@ -13624,13 +11901,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 5,
@@ -13648,13 +11919,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 0.75,
@@ -13684,12 +11949,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "max"]
           },
           {
             "type": "budget_tokens",
@@ -13711,13 +11971,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 2.5,
@@ -13735,12 +11989,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.75,
@@ -13776,11 +12025,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["low", "medium", "high"]
           }
         ],
         "inputCost": 0.25,
@@ -13804,14 +12049,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.1,
@@ -13829,14 +12067,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -13854,13 +12085,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 10,
@@ -13878,14 +12103,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4,
@@ -13903,14 +12121,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 0.2,
@@ -13928,14 +12139,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 4,
@@ -13953,14 +12157,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh", "max"]
           }
         ],
         "inputCost": 2,
@@ -13978,13 +12175,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 5,
@@ -14002,13 +12193,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 0.75,
@@ -14026,13 +12211,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 0.2,
@@ -14050,13 +12229,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 2.5,
@@ -14074,13 +12247,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.75,
@@ -14098,13 +12265,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.75,
@@ -14122,13 +12283,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ],
         "inputCost": 1.75,
@@ -14146,13 +12301,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ]
       },
@@ -14168,12 +12317,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["none", "low", "medium", "high"]
           }
         ],
         "inputCost": 1.25,
@@ -14191,13 +12335,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ]
       },
@@ -14213,13 +12351,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ]
       },
@@ -14235,13 +12367,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
+            "values": ["none", "low", "medium", "high", "xhigh"]
           }
         ]
       },
@@ -14257,12 +12383,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 1.25,
@@ -14280,12 +12401,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.25,
@@ -14303,12 +12419,7 @@
         "reasoningControls": [
           {
             "type": "effort",
-            "values": [
-              "minimal",
-              "low",
-              "medium",
-              "high"
-            ]
+            "values": ["minimal", "low", "medium", "high"]
           }
         ],
         "inputCost": 0.05,

@@ -28,6 +28,8 @@ describe('chat request preparation', () => {
     // The provider is named, not described: its configuration is resolved
     // from the id on the server.
     expect('provider' in request.body).toBe(false)
+    expect('model' in request.body).toBe(false)
+    expect('reasoningEffort' in request.body).toBe(false)
   })
 
   it('sends ACP agents to the same endpoint without provider fields', () => {
@@ -172,6 +174,8 @@ const fallbackProvider: LlmProviderConfig = {
   supportsImages: true,
   contextWindow: 200000,
   temperature: 0.2,
+  reasoningEffort: 'high',
+  reasoningSummary: 'detailed',
   createdAt: 1,
   updatedAt: 1,
 }

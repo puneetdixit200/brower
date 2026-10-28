@@ -38,6 +38,8 @@ export function getProviderSearchValue(
     provider.type,
     groupLabel,
     provider.adapterName,
+    provider.modelId,
+    provider.reasoningEffort,
     provider.modelLabel,
   ]
     .filter(Boolean)
@@ -45,7 +47,18 @@ export function getProviderSearchValue(
 }
 
 export function getProviderSubtitle(provider: Provider): string | undefined {
-  if (provider.kind !== 'acp') return undefined
+  if (provider.kind === 'llm') {
+    return (
+      [
+        provider.modelId,
+        provider.reasoningEffort
+          ? `${provider.reasoningEffort} reasoning`
+          : undefined,
+      ]
+        .filter(Boolean)
+        .join(' · ') || undefined
+    )
+  }
   return [
     provider.adapterName,
     provider.modelLabel,

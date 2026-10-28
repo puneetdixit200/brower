@@ -222,6 +222,28 @@ Current feature accounting: **72 total; 2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, 1
 
 Use Luna medium for implementation, focused validation, and documentation, including independent review as requested. At 5% remaining allowance, checkpoint source/docs, exact TODO and live process state, stop owned tests/builds/agents, push if the active instruction requires it, and pause. Never mark the complete project done at the threshold.
 
+## Current continuation update — 2026-10-28
+
+The user's latest model instruction supersedes prior model-policy text: use Luna
+medium for all project work, including planning and independent review; do not
+use Sol or Terra, and keep Luna subagents at five or fewer. Latest matrix count
+remains **2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, 1 NOT_STARTED**. R03 and U07
+have new focused evidence in `PROGRESS.md`; each remains PARTIAL pending actual
+headed/native checks. A05's lifecycle metadata and interrupted transcript
+visibility are committed, but A05 remains PARTIAL because execution resumption,
+stream/tool recovery, approval recovery and packaged restart acceptance remain
+open.
+
+The pinned checkout's loader, crash reporter, Autofill handler, and focused
+DevTools test object compile. The linked `browser_tests` target expanded to
+52,858 actions; its one-job build stopped cleanly at 621 actions due to slow
+progress. No linked binary or test run exists. The final snapshot was 4.8 GiB
+available RAM, 9.1 GiB swap used, and 267 GiB disk free. Preserve the dirty
+Chromium checkout and generated outputs; choose a narrower/reusable build plan
+before another attempt. Do not count object compilation as runtime or
+browser-test acceptance. At 5% remaining allowance, checkpoint and stop as the
+user instructed; keep the full Aster goal active/incomplete otherwise.
+
 ### Heartbeat missing-run-history follow-up — 2026-10-28
 
 Current source tightens the first-run exception: continuation is allowed with no previous run only when the job has no saved conversation ID. A saved conversation with missing run history now fails closed. The four heartbeat helper tests pass (4/4); the focused `ChatService` suite passes (18/18), including a synthetic-model SQLite close/reopen integration that verifies transcript continuation and that ordinary scheduled tasks stay out of chat history. Independent review passed. The pinned Chromium staging check applied only exact committed guard/test hunks to two already-dirty files, and reconstructed expected patched files byte-match. Aster Debug GN regeneration succeeded. The single-object Ninja target was unknown and no archive/browser-test binary was available, so no compile or browser test ran; no broad build was started. Native compile/browser acceptance remains pending. Interrupted-execution replay remains unimplemented, as do lease/ownership and approval recovery, so R02 remains PARTIAL. See [R02/P03 evidence](evidence/aster-r02-p03-source-checkpoint-2026-10-28.md).

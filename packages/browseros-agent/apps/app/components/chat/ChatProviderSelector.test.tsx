@@ -7,7 +7,14 @@ import {
 import type { Provider } from './chatComponentTypes'
 
 const options: Provider[] = [
-  { kind: 'llm', id: 'openai-1', name: 'OpenAI', type: 'openai' },
+  {
+    kind: 'llm',
+    id: 'openai-1',
+    name: 'OpenAI',
+    type: 'openai',
+    modelId: 'gpt-5.5',
+    reasoningEffort: 'high',
+  },
   {
     kind: 'llm',
     id: 'anthropic-sonnet',
@@ -63,6 +70,15 @@ describe('getProviderSearchValue', () => {
       'Claude Code',
     )
   })
+
+  it('matches persisted model and reasoning controls', () => {
+    expect(
+      getProviderSearchValue(options[0], 'BrowserOS agent + your LLM'),
+    ).toContain('gpt-5.5')
+    expect(
+      getProviderSearchValue(options[0], 'BrowserOS agent + your LLM'),
+    ).toContain('high')
+  })
 })
 
 describe('getProviderSubtitle', () => {
@@ -71,6 +87,6 @@ describe('getProviderSubtitle', () => {
       'Claude Code · Haiku · best effort',
     )
     expect(getProviderSubtitle(options[3])).toBe('Codex · GPT-5.5')
-    expect(getProviderSubtitle(options[0])).toBeUndefined()
+    expect(getProviderSubtitle(options[0])).toBe('gpt-5.5 · high reasoning')
   })
 })

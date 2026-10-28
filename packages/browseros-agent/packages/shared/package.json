@@ -62,6 +62,10 @@
       "types": "./src/schemas/llm.ts",
       "default": "./src/schemas/llm.ts"
     },
+    "./llm-providers/models-dev": {
+      "types": "./src/llm-providers/models-dev.ts",
+      "default": "./src/llm-providers/models-dev.ts"
+    },
     "./schemas/agent": {
       "types": "./src/schemas/agent.ts",
       "default": "./src/schemas/agent.ts"

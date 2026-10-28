@@ -69,6 +69,19 @@ describe('buildAgentReasoningConfig', () => {
     })
   })
 
+  test('custom Azure deployments with unknown model support do not enable reasoning', () => {
+    expect(
+      buildAgentReasoningConfig(
+        cfg({
+          provider: LLM_PROVIDERS.AZURE,
+          model: 'team-prod-deployment',
+          reasoningEffort: 'high',
+          supportsReasoning: false,
+        }),
+      ),
+    ).toEqual({})
+  })
+
   test('GOOGLE gemini-2.5 sends a thinking budget, gemini-3+ sends a level', () => {
     const g25 = buildAgentReasoningConfig(
       cfg({

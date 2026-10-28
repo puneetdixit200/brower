@@ -11,6 +11,10 @@ export interface Provider {
   adapterName?: string
   /** Brand id for the agent's logo (its type, or a popular-agent id). */
   brandKey?: string
+  /** Persisted provider model selected in AI Settings. */
+  modelId?: string
+  /** Persisted provider reasoning controls selected in AI Settings. */
+  reasoningEffort?: string
   modelLabel?: string
   modelControl?: 'runtime-supported' | 'best-effort'
 }

@@ -84,6 +84,85 @@ describe('hydrateChatProvider', () => {
     })
   })
 
+  it('uses the selected provider row model and reasoning settings for chat', async () => {
+    const selected = row({
+      modelId: 'claude-sonnet-4-6',
+      reasoningEffort: 'high',
+      reasoningSummary: 'detailed',
+    })
+    const result = await hydrateChatProvider(
+      request({ target: { type: 'browseros', providerId: selected.id } }),
+      lookup([selected]),
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.request).toMatchObject({
+      target: { providerId: selected.id },
+      model: 'claude-sonnet-4-6',
+      reasoningEffort: 'high',
+      reasoningSummary: 'detailed',
+    })
+  })
+
+  it('recomputes reasoning support from the stored model over a stale client flag', async () => {
+    const selected = row({
+      type: 'openai',
+      modelId: 'gpt-4.1',
+      reasoningEffort: 'high',
+    })
+    const result = await hydrateChatProvider(
+      request({
+        target: { type: 'browseros', providerId: selected.id },
+        supportsReasoning: true,
+      }),
+      lookup([selected]),
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.request.model).toBe('gpt-4.1')
+    expect(result.request.supportsReasoning).toBe(false)
+  })
+
+  it('fails closed for a custom Azure deployment missing from the model catalog', async () => {
+    const selected = row({
+      id: 'azure-custom',
+      type: 'azure',
+      modelId: 'team-prod-deployment',
+      reasoningEffort: 'high',
+    })
+    const result = await hydrateChatProvider(
+      request({
+        target: { type: 'browseros', providerId: selected.id },
+        supportsReasoning: true,
+      }),
+      lookup([selected]),
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.request.model).toBe('team-prod-deployment')
+    expect(result.request.supportsReasoning).toBe(false)
+  })
+
+  it('preserves the legacy inline Azure capability when no stored provider exists', async () => {
+    const result = await hydrateChatProvider(
+      request({
+        target: { type: 'browseros', providerId: 'custom-inline' },
+        provider: 'azure',
+        model: 'team-prod-deployment',
+        supportsReasoning: true,
+      }),
+      lookup([]),
+    )
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.usedStoredProvider).toBe(false)
+    expect(result.request.supportsReasoning).toBe(true)
+  })
+
   // The point of the change: a body carrying nothing but a message and a
   // conversation still resolves, because the server knows what is selected.
   it('falls back to the selected provider when none is named', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import modelsDevData from '../apps/app/lib/llm-providers/models-dev-data.json'
+import modelsDevData from '../packages/shared/src/llm-providers/models-dev-data.json'
 import {
   CHATGPT_SUBSCRIPTION_ID,
   deriveChatGptSubscription,
