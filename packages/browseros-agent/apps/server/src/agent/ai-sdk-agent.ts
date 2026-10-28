@@ -24,6 +24,7 @@ import { metrics } from '../lib/metrics'
 import { buildFilesystemToolSet } from '../tools/filesystem/build-toolset'
 import { createReadTool } from '../tools/filesystem/read'
 import { createCompactionPrepareStep, type StepWithUsage } from './compaction'
+import { excludeCredentialAccessTools } from './credential-tool-filter'
 import {
   buildInternalBrowserMcpSpec,
   buildMcpServerSpecs,
@@ -282,11 +283,19 @@ export class AiSdkAgent {
         !config.resolvedConfig.chatMode && 'filesystem_write' in filesystemTools
           ? config.resolvedConfig.workingDir
           : undefined
-      const tools = {
+      const candidateTools = {
         ...internalMcp.tools,
         ...externalMcpTools,
         ...filesystemTools,
         ...buildNudgeToolSet(),
+      }
+      const filtered = excludeCredentialAccessTools(candidateTools)
+      const tools = filtered.allowed
+      if (filtered.blocked.length > 0) {
+        logger.warn('Credential-access MCP tools excluded from agent', {
+          count: filtered.blocked.length,
+          toolNames: filtered.blocked,
+        })
       }
 
       if (
