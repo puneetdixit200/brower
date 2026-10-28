@@ -20,17 +20,10 @@ type DownloadRow = {
   totalBytes: number
 }
 
-function activeWebTab(tabs: readonly chrome.tabs.Tab[]): chrome.tabs.Tab | undefined {
-  return tabs.find(
-    (tab) =>
-      tab.active &&
-      tab.id !== undefined &&
-      /^https?:\/\//i.test(tab.url ?? ''),
-  )
-}
-
 export function BrowserQuickControls() {
   const [address, setAddress] = useState('')
+  const [webTabs, setWebTabs] = useState<{ id: number; title: string }[]>([])
+  const [selectedTabId, setSelectedTabId] = useState<number | null>(null)
   const [downloads, setDownloads] = useState<DownloadRow[]>([])
   const [history, setHistory] = useState<{ id: string; title: string; url: string }[]>([])
   const [showHistory, setShowHistory] = useState(false)
@@ -49,6 +42,24 @@ export function BrowserQuickControls() {
     return () => {
       active = false
     }
+  }, [])
+
+  const refreshWebTabs = async () => {
+    const allTabs = await chrome.tabs.query({ currentWindow: true })
+    const web = allTabs.flatMap((tab) =>
+      tab.id !== undefined && (tab.url?.startsWith('https://') || tab.url?.startsWith('http://'))
+        ? [{ id: tab.id, title: tab.title || tab.url || 'Webpage' }]
+        : [],
+    ).slice(0, 50)
+    setWebTabs(web)
+    setSelectedTabId((previous) =>
+      previous !== null && web.some((tab) => tab.id === previous)
+        ? previous : (web[0]?.id ?? null),
+    )
+  }
+
+  useEffect(() => {
+    void refreshWebTabs().catch(() => undefined)
   }, [])
 
   const action = async (operation: () => Promise<unknown>) => {
@@ -75,10 +86,23 @@ export function BrowserQuickControls() {
 
   const reload = () => {
     void action(async () => {
+      if (selectedTabId === null) throw new Error('Select a website first')
       const tabs = await chrome.tabs.query({ currentWindow: true })
-      const active = activeWebTab(tabs)
-      if (active?.id === undefined) throw new Error('No active website tab')
-      await chrome.tabs.reload(active.id)
+      const target = tabs.find((tab) =>
+        tab.id === selectedTabId && (tab.url?.startsWith('https://') || tab.url?.startsWith('http://')),
+      )
+      if (target?.id === undefined) throw new Error('Website tab moved or closed')
+      await chrome.tabs.reload(target.id)
+    })
+  }
+
+  const activateWebTab = () => {
+    void action(async () => {
+      if (selectedTabId === null) throw new Error('Select a website first')
+      const tabs = await chrome.tabs.query({ currentWindow: true })
+      const target = tabs.find((tab) => tab.id === selectedTabId && tab.url?.startsWith('http'))
+      if (target?.id === undefined) throw new Error('Tab no longer available')
+      await chrome.tabs.update(target.id, { active: true })
     })
   }
 
@@ -185,10 +209,32 @@ export function BrowserQuickControls() {
           Open
         </button>
       </form>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          aria-label="Choose a website tab for browser actions"
+          value={selectedTabId ?? ''}
+          onChange={(event) => setSelectedTabId(Number(event.currentTarget.value))}
+          className="h-9 min-w-0 flex-1 rounded-md border bg-background px-2 text-xs"
+        >
+          {webTabs.length === 0 && <option value="">No open websites</option>}
+          {webTabs.map((tab) => (
+            <option key={tab.id} value={tab.id}>{tab.title}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          disabled={busy}
+          className="rounded-md border px-2 py-2 text-xs disabled:opacity-50"
+          onClick={() => void action(refreshWebTabs)}
+        >
+          Refresh tabs
+        </button>
+      </div>
       <div className="flex flex-wrap gap-1">
         {[
           { name: 'New tab', Icon: SquarePlus, run: () => void action(() => chrome.tabs.create({})) },
-          { name: 'Reload active webpage', Icon: RotateCw, run: reload },
+          { name: 'Activate selected tab', Icon: Globe2, run: activateWebTab },
+          { name: 'Reload selected webpage', Icon: RotateCw, run: reload },
           { name: 'Reopen closed tab', Icon: History, run: restoreClosed },
           { name: 'Recent history', Icon: History, run: showRecentHistory },
           { name: 'Downloads', Icon: Download, run: listDownloads },
@@ -199,7 +245,11 @@ export function BrowserQuickControls() {
           <button
             key={name}
             type="button"
-            disabled={busy || (privateWindow && ['Downloads', 'Screenshot', 'Reopen closed tab', 'Recent history'].includes(name))}
+            disabled={
+              busy ||
+              ((name === 'Activate selected tab' || name === 'Reload selected webpage') && selectedTabId === null) ||
+              (privateWindow && ['Downloads', 'Screenshot', 'Reopen closed tab', 'Recent history'].includes(name))
+            }
             onClick={run}
             aria-label={name}
             title={name}
