@@ -23,7 +23,9 @@ function textBlock(value: string | undefined): string {
 /** Local user-initiated report. Never include raw tool input/output. */
 export function buildTaskReport(task: ExecutionTaskRecord): string {
   if (!isSafeTaskForDisplay(task)) {
-    throw new Error('This task cannot be exported because it contains credential-shaped text.')
+    throw new Error(
+      'This task cannot be exported because it contains credential-shaped text.',
+    )
   }
   const lines = [
     '# Aster task report',
