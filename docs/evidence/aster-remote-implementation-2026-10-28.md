@@ -44,3 +44,8 @@ At the beginning of this batch the canonical matrix had **2 PASS, 28 PARTIAL (in
 5. Retain strict release signing/update ownership and authenticated sidecar boundaries. Neither release nor full feature parity is verified.
 
 All changes in this batch were committed directly on the authenticated GitHub feature branch through file-SHA checked updates. No force-push or changes to `origin`.
+
+
+## Continued U09 source implementation
+
+Additional source commits created `lib/display/aster-display-settings.ts` and `screens/customization/AsterDisplaySettingsCard.tsx`, installed the setting applier in the app entrypoint, and added CSS restricted to `html[data-aster-reduced-motion='true']`. The UI now offers existing persisted light/dark/system theme, 90/100/110% rem-based interface scaling, and reduced decorative motion with explicit scope limited to extension UI. A normalization Bun test was added but **not run**. This is not a website zoom control, system battery manager, or proven performance improvement. U09 remains PARTIAL until WXT/GUI/runtime verification.
