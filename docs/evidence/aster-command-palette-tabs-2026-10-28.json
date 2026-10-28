@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-28",
+  "scope": "Development extension in headed BrowserOS v0.51.0 AppImage; not native Aster",
+  "checks": {
+    "two_current_window_tabs_listed": true,
+    "shortcut_opens_palette": true,
+    "search_receives_focus": true,
+    "repeat_open_idempotent": true,
+    "escape_closes": true,
+    "title_filter_matches_fixture": true,
+    "repeated_enter_single_activation": true,
+    "selected_tab_becomes_active": true,
+    "selected_tab_same_window": true,
+    "palette_closed_state": true,
+    "fixture_process_cleanup_verified": true
+  },
+  "validation": {
+    "helper_tests_passed": 5,
+    "app_typecheck_passed": true,
+    "biome_passed": true,
+    "fresh_wxt_build_passed": true,
+    "terra_review_blocking_findings": 0
+  },
+  "privacy": {
+    "disposable_profile": true,
+    "local_fixture_pages": true,
+    "provider_called": false,
+    "network_namespace_verified": false
+  },
+  "limits": [
+    "Membership query and update are separate browser API calls; atomic window confinement is not guaranteed.",
+    "Native Aster keyboard, OS shortcut conflicts and packaged integration remain unverified."
+  ],
+  "harness": "work/taskwork/palette-delayed-review.py",
+  "harness_correction": "A backgrounded extension document may retain a Radix dialog DOM node with data-state=closed; assert absent or closed, rather than requiring immediate removal."
+}
