@@ -143,7 +143,7 @@ export function BrowserQuickControls() {
         maxResults: 8,
       })
       setHistory(items.flatMap((item) =>
-        item.url && /^https?:\\/\\//i.test(item.url)
+        item.url && (item.url.startsWith('https://') || item.url.startsWith('http://'))
           ? [{ id: item.id, title: item.title || item.url, url: item.url }]
           : [],
       ))
