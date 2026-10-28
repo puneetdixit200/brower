@@ -14,6 +14,7 @@ import type {
   ScheduledJob,
   ScheduledJobRun,
 } from '@/lib/schedules/scheduleTypes'
+import { shouldFailStaleScheduledRun } from '@/lib/schedules/stale-run-policy'
 import {
   listScheduledJobRunsOrNull,
   listScheduledJobsOrNull,
@@ -38,10 +39,14 @@ export const scheduledJobRuns = async () => {
     if (current === null) return
     const now = Date.now()
 
-    const stale = current.filter(
-      (run) =>
-        run.status === 'running' &&
-        now - new Date(run.startedAt).getTime() > STALE_TIMEOUT_MS,
+    const stale = current.filter((run) =>
+      shouldFailStaleScheduledRun({
+        run,
+        nowMs: now,
+        timeoutMs: STALE_TIMEOUT_MS,
+        activeRunIds: new Set(runAbortControllers.keys()),
+        activeJobIds,
+      }),
     )
 
     for (const run of stale) {
