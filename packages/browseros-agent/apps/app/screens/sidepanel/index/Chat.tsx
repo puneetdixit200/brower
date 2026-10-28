@@ -204,6 +204,9 @@ export const Chat = () => {
 
   const handleStop = () => {
     track(SIDEPANEL_STOP_CLICKED_EVENT)
+    // Stop is definitive, not a signal to start the next queued action.
+    setQueuedPrompts([])
+    queueAwaitingRun.current = false
     stop()
   }
 
