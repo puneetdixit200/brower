@@ -131,10 +131,20 @@ export function BrowserQuickControls() {
     void action(async () => {
       if (privateWindow) throw new Error('Screenshot not available in private windows')
       const current = await chrome.windows.getCurrent()
-      if (current.id === undefined) throw new Error('Unknown window')
-      if (!window.confirm('Capture the visible browser tab? It may contain private information. The image will be saved to Downloads; nothing is sent to an AI model.')) {
+      if (current.id === undefined || selectedTabId === null) {
+        throw new Error('Select a website before capturing')
+      }
+      const tabs = await chrome.tabs.query({ currentWindow: true })
+      const target = tabs.find((tab) =>
+        tab.id === selectedTabId &&
+        tab.windowId === current.id &&
+        (tab.url?.startsWith('https://') || tab.url?.startsWith('http://')),
+      )
+      if (target?.id === undefined) throw new Error('Selected website not available')
+      if (!window.confirm('Capture the selected website tab? It may contain private information. The image will be saved to Downloads; nothing is sent to an AI model.')) {
         return
       }
+      await chrome.tabs.update(target.id, { active: true })
       const image = await chrome.tabs.captureVisibleTab(current.id, { format: 'png' })
       await chrome.downloads.download({
         url: image,
@@ -250,7 +260,7 @@ export function BrowserQuickControls() {
             type="button"
             disabled={
               busy ||
-              ((name === 'Activate selected tab' || name === 'Reload selected webpage') && selectedTabId === null) ||
+              ((name === 'Activate selected tab' || name === 'Reload selected webpage' || name === 'Screenshot') && selectedTabId === null) ||
               (privateWindow && ['Downloads', 'Screenshot', 'Reopen closed tab', 'Recent history'].includes(name))
             }
             onClick={run}
