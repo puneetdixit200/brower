@@ -14,16 +14,18 @@ const safeTask: ExecutionTaskRecord = {
   approvalCount: 0,
   deniedCount: 0,
   errorCount: 0,
-  steps: [{
-    id: 'step-1',
-    toolName: 'snapshot',
-    order: 0,
-    state: 'output-available',
-    startedAt: '2026-10-28T10:00:10Z',
-    previewText: 'Read the visible page',
-    input: { bearer: 'raw-input-never-exposed' },
-    output: { secret: 'raw-output-never-exposed' },
-  }],
+  steps: [
+    {
+      id: 'step-1',
+      toolName: 'snapshot',
+      order: 0,
+      state: 'output-available',
+      startedAt: '2026-10-28T10:00:10Z',
+      previewText: 'Read the visible page',
+      input: { bearer: 'raw-input-never-exposed' },
+      output: { secret: 'raw-output-never-exposed' },
+    },
+  ],
 }
 
 describe('local task report export', () => {
@@ -36,9 +38,11 @@ describe('local task report export', () => {
   })
 
   it('refuses credential-shaped records instead of exporting them', () => {
-    expect(() => buildTaskReport({
-      ...safeTask,
-      promptText: 'password: sensitive',
-    })).toThrow('cannot be exported')
+    expect(() =>
+      buildTaskReport({
+        ...safeTask,
+        promptText: 'password: sensitive',
+      }),
+    ).toThrow('cannot be exported')
   })
 })
