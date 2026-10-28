@@ -1,5 +1,10 @@
 import { Menu } from 'lucide-react'
-import type { FC } from 'react'
+import type {
+  CSSProperties,
+  FC,
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+} from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation } from 'react-router'
 import { AppSidebar } from '@/components/sidebar/AppSidebar'
@@ -47,6 +52,7 @@ const SidebarLayoutContent: FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [expandedWidth, setExpandedWidth] = useState(readSidebarWidth)
   const resizeSession = useRef<{ initialX: number; initialWidth: number } | null>(null)
+  const lastResizeWidth = useRef(expandedWidth)
   const [resizing, setResizing] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [shortcutsDialogOpen, setShortcutsDialogOpen] = useState(false)
@@ -86,7 +92,7 @@ const SidebarLayoutContent: FC = () => {
     }, COLLAPSE_DELAY)
   }, [])
 
-  const beginResize = (event: React.PointerEvent<HTMLDivElement>) => {
+  const beginResize = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
     event.preventDefault()
     if (collapseTimeoutRef.current) {
@@ -97,6 +103,7 @@ const SidebarLayoutContent: FC = () => {
       initialX: event.clientX,
       initialWidth: expandedWidth,
     }
+    lastResizeWidth.current = expandedWidth
     setSidebarOpen(true)
     setResizing(true)
   }
@@ -106,9 +113,11 @@ const SidebarLayoutContent: FC = () => {
     const onMove = (event: PointerEvent) => {
       const session = resizeSession.current
       if (!session) return
-      setExpandedWidth(
-        boundedSidebarWidth(session.initialWidth + event.clientX - session.initialX),
+      const next = boundedSidebarWidth(
+        session.initialWidth + event.clientX - session.initialX,
       )
+      lastResizeWidth.current = next
+      setExpandedWidth(next)
     }
     const onStop = (event: PointerEvent | Event) => {
       const session = resizeSession.current
@@ -116,7 +125,7 @@ const SidebarLayoutContent: FC = () => {
       const next =
         event instanceof PointerEvent
           ? boundedSidebarWidth(session.initialWidth + event.clientX - session.initialX)
-          : readSidebarWidth()
+          : lastResizeWidth.current
       resizeSession.current = null
       setResizing(false)
       setExpandedWidth(next)
@@ -134,7 +143,7 @@ const SidebarLayoutContent: FC = () => {
     }
   }, [resizing])
 
-  const resizeWithKeyboard = (event: React.KeyboardEvent<HTMLDivElement>) => {
+  const resizeWithKeyboard = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const delta =
       event.key === 'ArrowRight' ? 16 : event.key === 'ArrowLeft' ? -16 : 0
     if (!delta && event.key !== 'Home' && event.key !== 'End') return
@@ -145,6 +154,7 @@ const SidebarLayoutContent: FC = () => {
         : event.key === 'End'
           ? MAX_SIDEBAR_WIDTH
           : boundedSidebarWidth(expandedWidth + delta)
+    lastResizeWidth.current = next
     setExpandedWidth(next)
     saveSidebarWidth(next)
   }
@@ -255,7 +265,7 @@ const SidebarLayoutContent: FC = () => {
             style={
               {
                 '--aster-sidebar-extra': `${expandedWidth - 56}px`,
-              } as React.CSSProperties
+              } as CSSProperties
             }
           >
             <Outlet />
