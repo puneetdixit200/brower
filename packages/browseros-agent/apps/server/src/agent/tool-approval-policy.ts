@@ -104,15 +104,34 @@ export function decideToolApproval(
     }
   }
 
-  if (
-    lowerName === 'tabs' &&
-    isRecord(candidate.input) &&
-    candidate.input.action === 'close'
-  ) {
+  if (lowerName === 'tabs') {
+    const action = isRecord(candidate.input) ? candidate.input.action : 'list'
+    if (action === undefined || action === 'list' || action === 'active') {
+      return { required: false }
+    }
+    // The model is not trusted to describe a tool action as read-only.
+    // New, move, pin, duplicate, close and unknown tab actions all need review.
     return {
       required: true,
       reason:
-        'This closes a browser tab. Review the selected tab before it closes.',
+        action === 'close'
+          ? 'This closes a browser tab. Review the selected tab before it closes.'
+          : 'This changes browser tabs. Review the target and action before it runs.',
+    }
+  }
+
+  if (lowerName === 'history' && isRecord(candidate.input)) {
+    const action = candidate.input.action
+    if (
+      action !== undefined &&
+      action !== 'list' &&
+      action !== 'search' &&
+      action !== 'query'
+    ) {
+      return {
+        required: true,
+        reason: 'This could change browser history. Review before it runs.',
+      }
     }
   }
 
