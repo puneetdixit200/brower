@@ -99,12 +99,21 @@ interface ConversationRunsDeps {
   activity?: ConversationRunActivity
   /** Lower values heal clients faster at the cost of more loopback traffic. */
   panelAssignmentsHeartbeatMs?: number
+  /** Caps simultaneous model/browser runs, not retained finished histories. */
+  maxConcurrentRuns?: number
 }
 
 export class ConversationRunAlreadyActiveError extends Error {
   constructor() {
     super('A conversation run is already active')
     this.name = 'ConversationRunAlreadyActiveError'
+  }
+}
+
+export class ConversationCapacityError extends Error {
+  constructor() {
+    super('Aster is at its concurrent agent-task limit; finish or stop a task first')
+    this.name = 'ConversationCapacityError'
   }
 }
 
@@ -135,6 +144,14 @@ export class ConversationRuns {
     if (existing?.status === 'running' || existing?.deleting) {
       throw new ConversationRunAlreadyActiveError()
     }
+    // Separate conversations may run in parallel, but a burst cannot create
+    // unbounded browser tools or model connections in a 14 GiB Linux session.
+    const configuredCap = this.deps.maxConcurrentRuns ?? 4
+    const cap = Math.max(1, Math.min(32, Math.floor(configuredCap)))
+    const active = [...this.runs.values()].filter(
+      (run) => run.status === 'running' || run.deleting,
+    ).length
+    if (active >= cap) throw new ConversationCapacityError()
 
     let resolveFinished!: () => void
     let resolvePrepared!: () => void
