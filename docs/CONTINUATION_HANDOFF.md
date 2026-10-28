@@ -202,3 +202,9 @@ After the prior remote checkpoint, commits on `feat/aster-linux-ui` added bounde
 ## Most recent source-only checkpoint — 2026-10-28
 
 User asked to partially implement all 38 untouched feature rows and defer testing. The authenticated GitHub continuation added source-level foundations for 36 of those 38, with two remaining NOT_STARTED because an honest safe implementation is not available yet: R02 durable heartbeat continuation and P03 native origin-bound blind autofill. **Matrix is now 2 PASS, 67 PARTIAL, 1 PARTIAL/BLOCKED, 2 NOT_STARTED.** No tests, native builds, or GUI acceptance were run on the new source. See [foundation batch evidence](evidence/aster-source-foundations-38-2026-10-28.md). Earlier feature-table snapshots in this document are historical; use `FEATURE_MATRIX.md` for current values. Do not equate source partials with passing tests or full Aside parity.
+
+## Superseding model policy and latest stop — 2026-10-28
+
+Main model: Terra. Use at most five Luna medium subagents, and use Luna only for implementation and independent review; do not use Sol or Terra as subagents. Save tokens. The continuation fetched 125 commits through `8454a673d`; current HEAD includes this checkpoint. Account allowance was 3%, below the user's 5% stop threshold. Resume only when requested and allowance permits.
+
+The previous 72-row status snapshot in this document is historical: current matrix is 2 PASS, 67 PARTIAL, 1 PARTIAL/BLOCKED, and 2 NOT_STARTED. The broad latest source batch is unverified; R02 and P03 remain NOT_STARTED. Follow the latest NEXT_STEPS.md and evidence while continuing the full master specification, not just the two remaining NOT_STARTED rows.

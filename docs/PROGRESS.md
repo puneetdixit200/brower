@@ -392,3 +392,9 @@ Later source commits remain untested and may have additional compiler/runtime
 issues. This historical CI result must not be reported as a passing check for
 the new foundation batch. The existing earlier passing CI run covers only
 previous source revisions.
+
+### Fetched remote continuation and 3% stop — 2026-10-28
+
+Fetched 125 commits to `8454a673d` and fast-forwarded the local feature branch. Initial checkout was clean, but root-owned directories caused a partial fast-forward. Each partial file was verified identical to the fetched branch, archived in task work, and restored before a successful fast-forward; three original root-owned directories were preserved as locally excluded same-parent backups. No user changes were overwritten. No tests were run on the newly fetched source.
+
+User requests Terra as main model with at most five Luna medium subagents, Luna only for coding and review; no Sol or Terra subagent delegation. The account was already at 3% remaining, below the 5% stop rule, so this is a stop checkpoint. Matrix: 2 PASS, 67 PARTIAL, 1 PARTIAL/BLOCKED and 2 NOT_STARTED. R02 and P03 remain NOT_STARTED. The project is incomplete.

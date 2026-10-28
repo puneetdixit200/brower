@@ -97,3 +97,11 @@ Of the 38 formerly NOT_STARTED feature rows, 36 received source-level foundation
 
 
 **Testing-deferred note:** An automatic push workflow on an intermediate commit caught a server TypeScript description-type error; the source was fixed but no follow-up CI run was initiated. The Aster-focused workflow is now manual-dispatch only. Reenable focused CI deliberately before any new PASS claims. See the latest foundation evidence for exact details.
+
+## Latest model policy and 3% stop checkpoint — 2026-10-28
+
+The user selected Terra as the main model and requests **Luna medium subagents only** for implementation and review, with a maximum of five concurrent subagents. Do not delegate work to Sol or Terra subagents. Keep handoffs narrow and conserve tokens. This supersedes older model-policy entries.
+
+Account allowance was already at 3% remaining when this continuation began, below the user's 5% stop threshold. Fetched and fast-forwarded 125 remote commits through `8454a673d`, then stopped at the requested checkpoint. Current source contains a broad unverified foundation batch; the matrix records 2 PASS, 67 PARTIAL, 1 PARTIAL/BLOCKED and 2 NOT_STARTED. Source foundations are not equivalent to verified feature completion.
+
+Next: resume only when requested and allowance permits. Implement all remaining master-spec features, prioritizing R02 durable heartbeat continuation and P03 origin-bound blind autofill without exposing passwords, alongside completing native loader/crash-reporter compilation, full native browser build and security boundaries. Read CONTINUATION_HANDOFF.md, IMPLEMENTATION_PLAN.md and the latest source-foundation evidence. Run only tests authorized by the current user instruction; record all unverified behavior. Keep release signing/update ownership blocked until provisioned.
