@@ -50,9 +50,7 @@ export async function getServerConversationLiveness(input: {
     if (typeof body !== 'object' || body === null) return 'unknown'
     const result = body as Record<string, unknown>
     if (response.status === 404) {
-      return result.error === 'Conversation not found'
-        ? 'inactive'
-        : 'unknown'
+      return result.error === 'Conversation not found' ? 'inactive' : 'unknown'
     }
     if (result.conversationId !== conversationId) return 'unknown'
     if (result.status === 'running') return 'active'
