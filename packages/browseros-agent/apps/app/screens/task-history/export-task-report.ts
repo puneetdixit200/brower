@@ -89,3 +89,42 @@ export function downloadTaskReport(task: ExecutionTaskRecord): void {
     window.setTimeout(() => URL.revokeObjectURL(url), 30_000)
   }
 }
+
+interface AsterWritableHandle {
+  write(data: string): Promise<void>
+  close(): Promise<void>
+  abort(): Promise<void>
+}
+
+interface AsterDirectoryHandle {
+  getFileHandle(
+    name: string,
+    options: { create: boolean },
+  ): Promise<{ createWritable(): Promise<AsterWritableHandle> }>
+}
+
+/** Browser-native, user-picked directory. No arbitrary path or agent input. */
+export async function saveTaskReportToChosenDirectory(
+  task: ExecutionTaskRecord,
+): Promise<void> {
+  const picker = (
+    window as Window & { showDirectoryPicker?: () => Promise<AsterDirectoryHandle> }
+  ).showDirectoryPicker
+  if (!picker) {
+    throw new Error('Your browser does not support directory export')
+  }
+  const content = buildTaskReport(task)
+  // Pickers are invoked only from a direct user click. Never persist handles.
+  const dir = await picker.call(window)
+  const filename =
+    'aster-task-' + task.id.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 48) + '.md'
+  const handle = await dir.getFileHandle(filename, { create: true })
+  const writer = await handle.createWritable()
+  try {
+    await writer.write(content)
+    await writer.close()
+  } catch (error) {
+    await writer.abort().catch(() => undefined)
+    throw error
+  }
+}
