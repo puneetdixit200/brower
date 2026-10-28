@@ -19,12 +19,15 @@ describe('agent approval details', () => {
   })
 
   it('rejects embedded credentials in a destination URL', () => {
-    expect(formatApprovalInput({ url: 'https://user:password@example.org/' }))
-      .not.toContain('password@example')
+    expect(
+      formatApprovalInput({ url: 'https://user:password@example.org/' }),
+    ).not.toContain('password@example')
   })
 
   it('bounds nested, circular and large model input', () => {
-    const obj: { cyclic?: unknown; list: string[] } = { list: Array(1000).fill('x'.repeat(200)) }
+    const obj: { cyclic?: unknown; list: string[] } = {
+      list: Array(1000).fill('x'.repeat(200)),
+    }
     obj.cyclic = obj
     const preview = formatApprovalInput(obj)
     expect(preview.length).toBeLessThan(6500)
