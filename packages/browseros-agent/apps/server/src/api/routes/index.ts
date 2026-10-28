@@ -23,6 +23,7 @@ import type { Env, HttpServerConfig } from '../types'
 import { defaultCorsConfig } from '../utils/cors'
 import { requireTrustedAppOrigin } from '../utils/request-auth'
 import { createAcpxProbeRoutes } from './acpx-probe'
+import { createAsterCliRoutes } from './aster-cli'
 import { createAgentRoutes } from './agents'
 import { createChatRoutes } from './chat'
 import { createConversationRoutes } from './conversations'
@@ -112,6 +113,8 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
 
   // Register path guards before mounting routes; Hono middleware is
   // evaluated in registration order.
+  // Local CLI uses its own mandatory bearer token; it cannot impersonate
+  // an extension Origin header and gains no browser or shell tool access.
   app.use('/acpx/probe/*', requireTrustedAppOrigin())
   app.use('/agents/*', requireTrustedAppOrigin())
   app.use('/conversations/*', requireTrustedAppOrigin())
@@ -133,6 +136,10 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
 
   return (
     app
+      .route('/devcli', createAsterCliRoutes({
+        runs: conversationRuns,
+        token: config.mcpAccessToken ?? '',
+      }))
       .route('/system/health', createHealthRoute({ browser }))
       .route('/system/diagnostics', createDiagnosticsRoute(version))
       .route('/system/shutdown', createShutdownRoute({ onShutdown }))
