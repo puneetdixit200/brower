@@ -29,6 +29,7 @@ import { ChatError } from './ChatError'
 import { ChatFooter } from './ChatFooter'
 import { ChatMessages } from './ChatMessages'
 import { IncognitoNotice } from './IncognitoNotice'
+import { HumanLoginHandoff } from './HumanLoginHandoff'
 
 /**
  * @public
@@ -280,6 +281,12 @@ export const Chat = () => {
       </main>
 
       {isIncognito && <IncognitoNotice />}
+      {mode === 'agent' && (
+        <HumanLoginHandoff
+          onStop={handleStop}
+          attachedTabs={attachedTabs}
+        />
+      )}
 
       <ChatFooter
         mode={mode}
