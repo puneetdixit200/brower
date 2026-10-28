@@ -28,9 +28,9 @@ describe('heartbeat server liveness', () => {
   })
 
   it('rejects changed contracts and unrelated 404 responses', async () => {
-    expect(await probe({ conversationId: 'different', status: 'running' })).toBe(
-      'unknown',
-    )
+    expect(
+      await probe({ conversationId: 'different', status: 'running' }),
+    ).toBe('unknown')
     expect(await probe({ conversationId, status: 'paused' })).toBe('unknown')
     expect(await probe({ error: 'Unknown route' }, 404)).toBe('unknown')
     expect(
