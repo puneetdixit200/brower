@@ -57,7 +57,7 @@ def _paths() -> tuple[Path, Path, Path]:
     )
 
 
-def install(binary: Path, icon: Path, *, replace_managed: bool) -> None:
+def install(binary: Path, icon: Path, *, replace_managed: bool, ozone: str = "auto") -> None:
     if sys.platform != "linux":
         raise RuntimeError("Aster native debug launcher requires Linux")
     binary = binary.expanduser().resolve(strict=True)
@@ -66,6 +66,8 @@ def install(binary: Path, icon: Path, *, replace_managed: bool) -> None:
         raise ValueError(f"Aster native binary is not executable: {binary}")
     if not icon.is_file() or icon.suffix.lower() != ".svg":
         raise ValueError(f"Aster SVG icon is missing: {icon}")
+    if ozone not in ("auto", "wayland", "x11"):
+        raise ValueError("ozone must be auto, wayland or x11")
     desktop, icon_dest, profile = _paths()
     if desktop.exists() or desktop.is_symlink():
         if not replace_managed or MANAGED not in desktop.read_text(encoding="utf-8"):
@@ -75,8 +77,12 @@ def install(binary: Path, icon: Path, *, replace_managed: bool) -> None:
             )
     # Keep the compiled debug browser independent from all other Chromium
     # product profiles, including a future signed Aster installation.
+    ozone_option = (
+        "--ozone-platform-hint=auto" if ozone == "auto"
+        else f"--ozone-platform={ozone}"
+    )
     command = (
-        f"{_desktop_value(binary)} --ozone-platform-hint=auto "
+        f"{_desktop_value(binary)} {ozone_option} "
         f"--user-data-dir={_desktop_value(profile)} %U"
     )
     contents = (
@@ -101,6 +107,7 @@ def install(binary: Path, icon: Path, *, replace_managed: bool) -> None:
     _write_managed(desktop, contents.encode("utf-8"))
     print(f"Installed Aster launcher: {desktop}")
     print(f"Isolated profile location: {profile}")
+    print(f"Ozone display selection: {ozone}")
     print("No default application or Hyprland shortcuts were changed.")
     print("This is an UNSIGNED development launcher; sandbox flags were not relaxed.")
 
@@ -128,10 +135,17 @@ def main() -> None:
         default=Path(__file__).resolve().parents[1] / "resources/aster/icons/aster-mark.svg",
     )
     create.add_argument("--replace-managed", action="store_true")
+    create.add_argument(
+        "--ozone", choices=("auto", "wayland", "x11"), default="auto",
+        help="Choose Wayland, explicit X11 fallback, or Chromium auto detection",
+    )
     sub.add_parser("uninstall")
     args = parser.parse_args()
     if args.action == "install":
-        install(args.binary, args.icon, replace_managed=args.replace_managed)
+        install(
+            args.binary, args.icon,
+            replace_managed=args.replace_managed, ozone=args.ozone,
+        )
     else:
         uninstall()
 
