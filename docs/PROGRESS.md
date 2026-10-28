@@ -665,3 +665,17 @@ Task-history export screening rejects JWT-shaped values, Slack `xox*` and `xapp`
 # 2026-10-29 — T31.1 local CLI route contract
 
 Added focused source tests for the existing Aster task CLI server routes. The suite verifies that missing or incorrect bearer credentials cannot inspect or stop a run, the status response contains only the task identifiers/status/count fields, cancellation is reachable only through the explicit stop endpoint, and missing tasks/oversized IDs stay bounded. `bun test tests/api/routes/aster-cli.test.ts` passes 4/4 (18 assertions). This is route-level source evidence only: the CLI client and native Aster server have not been exercised together, and D01 remains PARTIAL pending a disposable packaged-runtime check with a provisioned token. No production route behavior was changed.
+
+
+## GitHub source continuation: scheduled recovery and research attribution — 2026-10-29
+
+Starting HEAD `9ee82a38f0410d2ca5cccbbf29fcf08b11890b4b` was confirmed current on `feat/aster-linux-ui`. A Git clone/ls-remote could not resolve `github.com` from this container, so source changes used SHA-checked authenticated GitHub writes. No host-local build tree, user worktree or native Aster package was inspected.
+
+Implemented (1) an owner-aware stale scheduled-run predicate that does not fail a long task still running in the local worker, (2) a bounded local-server conversation liveness check that retains heartbeat claims when a sidecar turn is still running or its state is uncertain, and (3) research quote attribution that refuses to ascribe a quoted passage to the nearest of two distinct same-paragraph citation URLs and exposes an ambiguous-quote count.
+
+**Verified focused source checks:**
+- [40787505020](https://github.com/puneetdixit200/brower/actions/runs/40787505020): Aster app TypeScript, 19 scheduler tests, pinned Biome and whitespace pass.
+- [40786688768](https://github.com/puneetdixit200/brower/actions/runs/40786688768): Aster app TypeScript, 22 research tests, pinned Biome and whitespace pass.
+- Earlier 14-test [scheduler batch](https://github.com/puneetdixit200/brower/actions/runs/40786302159) also passed before the server-liveness follow-up.
+
+**Unverified:** packaged Aster execution, service-worker restart while a live model/provider tool runs, server/tool liveness races, original source quote semantic support, native Wayland/Chromium UI and all release signing/update conditions. Aster remains **2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, 1 NOT_STARTED** in the 72-feature acceptance matrix. No full-project completion claim. See [source/evidence report](evidence/aster-github-continuation-2026-10-29.md).
