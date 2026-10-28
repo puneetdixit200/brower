@@ -241,6 +241,58 @@ describe('research source URL ledger', () => {
     })
   })
 
+  it('does not attribute a quote to the nearest of two distinct same-paragraph citations', () => {
+    const first = 'https://first.example/article'
+    const second = 'https://second.example/article'
+    const answer = `The finding “a verified quote” refers to ${first} and ${second}.`
+    const ledger = getResearchSourceLedger([
+      message('request', 'user', researchRequest),
+      message('tools', 'assistant', '', [
+        tool('read', 'output-available', readOutput(first, 'a verified quote')),
+        tool('read', 'output-available', readOutput(second, 'a verified quote')),
+      ]),
+      message('answer', 'assistant', answer),
+    ], false)
+
+    expect(ledger?.unattributedQuoteCount).toBe(1)
+    expect(ledger?.entries[0].quoteChecks).toEqual([])
+    expect(ledger?.entries[1].quoteChecks).toEqual([])
+    expect(ledger?.entries[0].status).toBe('visited')
+  })
+
+  it('allows repeated citations of the same normalized URL without ambiguity', () => {
+    const first = 'https://source.example/article#one'
+    const second = 'https://source.example/article#two'
+    const ledger = getResearchSourceLedger([
+      message('request', 'user', researchRequest),
+      message('tools', 'assistant', '', [
+        tool('read', 'output-available', readOutput(first, 'Quoted finding.')),
+      ]),
+      message('answer', 'assistant',
+        `“Quoted finding.” ${first} and ${second}`),
+    ], false)
+    expect(ledger?.unattributedQuoteCount).toBe(0)
+    expect(ledger?.entries[0].quoteChecks).toMatchObject([
+      { quote: 'Quoted finding.', found: true },
+    ])
+  })
+
+  it('caps attempted quote attribution on maliciously long answer text', () => {
+    const first = 'https://first.example/page'
+    const second = 'https://second.example/page'
+    const answer = Array.from({ length: 40 }, (_, index) =>
+      `“Quote ${index}” ${first} ${second}`,
+    ).join(' ')
+    const ledger = getResearchSourceLedger([
+      message('request', 'user', researchRequest),
+      message('answer', 'assistant', answer),
+    ], false)
+    expect(ledger?.unattributedQuoteCount).toBeLessThanOrEqual(24)
+    expect(ledger?.entries.every((entry) =>
+      entry.quoteChecks.length === 0,
+    )).toBe(true)
+  })
+
   it('uses explicit wording that URL matching does not prove factual support', () => {
     expect(RESEARCH_LEDGER_LIMITATION).toContain('exact string match')
     expect(RESEARCH_LEDGER_LIMITATION).toContain(
