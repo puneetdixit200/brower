@@ -1,0 +1,49 @@
+name: Aster scheduled recovery source checks
+
+on:
+  push:
+    branches:
+      - feat/aster-linux-ui
+    paths:
+      - ".github/workflows/aster-scheduled-recovery-checks.yml"
+      - "packages/browseros-agent/apps/app/lib/schedules/stale-run-policy.ts"
+      - "packages/browseros-agent/apps/app/lib/schedules/stale-run-policy.test.ts"
+      - "packages/browseros-agent/apps/app/entrypoints/background/scheduledJobRuns.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scheduled-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: packages/browseros-agent
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: packages/browseros-agent/package.json
+      - name: Install pinned deps
+        run: bun ci
+      - name: Prepare disposable dev config
+        run: cp .env.development.example .env.development
+      - name: Aster app typecheck
+        run: bun run --filter @browseros/app typecheck
+      - name: Scheduled recovery regressions
+        run: |
+          bun test apps/app/lib/schedules/stale-run-policy.test.ts \
+            apps/app/lib/schedules/heartbeat-continuation.test.ts \
+            apps/app/lib/schedules/scheduled-alarm-handler.test.ts
+      - name: Biome check changed files
+        run: |
+          bunx @biomejs/biome check \
+            apps/app/lib/schedules/stale-run-policy.ts \
+            apps/app/lib/schedules/stale-run-policy.test.ts \
+            apps/app/entrypoints/background/scheduledJobRuns.ts
+      - name: Diff whitespace check
+        run: git diff --check
