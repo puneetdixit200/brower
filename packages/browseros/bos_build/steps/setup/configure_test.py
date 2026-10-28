@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Tests for the GN configure module against a mock checkout."""
 
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,7 +11,7 @@ from . import configure
 from ...core.context import Context
 from ...core.step import ValidationError
 from ...lib.testing import MockBrowserOSRoot, MockChromium, make_context
-from ...lib.utils import get_platform
+from ...lib.utils import depot_tools_environment, get_platform
 
 
 class ConfigureValidateTest(unittest.TestCase):
@@ -154,6 +155,45 @@ class ConfigureExecuteTest(unittest.TestCase):
         args_gn = (chromium.src / ctx.out_dir / "args.gn").read_text()
         self.assertLess(
             args_gn.index("symbol_level = 1"), args_gn.index("symbol_level=2")
+        )
+
+    def test_gn_environment_prepends_adjacent_depot_tools_and_disables_updates(self):
+        chromium_tmp = tempfile.TemporaryDirectory()
+        root_tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(chromium_tmp.cleanup)
+        self.addCleanup(root_tmp.cleanup)
+        chromium = MockChromium(Path(chromium_tmp.name))
+        depot_tools = chromium.src.parent / "depot_tools"
+        depot_tools.mkdir()
+        root = MockBrowserOSRoot(Path(root_tmp.name))
+        root.write_gn_flags(get_platform(), "release", "is_official_build = true\n")
+        ctx = make_context(chromium, root, build_type="release")
+
+        environment = depot_tools_environment(ctx.chromium_src)
+
+        self.assertEqual(environment["PATH"].split(os.pathsep)[0], str(depot_tools))
+        self.assertEqual(environment["DEPOT_TOOLS_UPDATE"], "0")
+
+    def test_debug_resource_warning_is_product_scoped(self):
+        with (
+            tempfile.TemporaryDirectory() as chromium_tmp,
+            tempfile.TemporaryDirectory() as root_tmp,
+        ):
+            chromium = MockChromium(Path(chromium_tmp))
+            root = MockBrowserOSRoot(Path(root_tmp))
+            root.write_gn_flags(get_platform(), "debug", "is_debug = true\n")
+            ctx = make_context(chromium, root, build_type="debug", product="aster")
+            with mock.patch.object(configure, "log_warning") as log_warning:
+                configure.ConfigureModule()._warn_missing_server_resources(ctx)
+
+        messages = [call.args[0] for call in log_warning.call_args_list]
+        self.assertTrue(messages)
+        self.assertTrue(all("aster-server" in message for message in messages), messages)
+        self.assertFalse(
+            any(
+                "browseros-server:" in message or "browserclaw-server:" in message
+                for message in messages
+            )
         )
 
     def test_debug_warns_when_server_resources_not_staged(self):

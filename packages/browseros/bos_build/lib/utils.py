@@ -195,6 +195,18 @@ def IS_LINUX() -> bool:
     return sys.platform.startswith("linux")
 
 
+def depot_tools_environment(source_root: Path) -> Dict[str, str]:
+    """Return a child environment with adjacent depot_tools available and stable."""
+    environment = dict(os.environ)
+    depot_tools = source_root.parent / "depot_tools"
+    if depot_tools.is_dir():
+        environment["PATH"] = os.pathsep.join(
+            (str(depot_tools), environment.get("PATH", ""))
+        ).rstrip(os.pathsep)
+    environment["DEPOT_TOOLS_UPDATE"] = "0"
+    return environment
+
+
 def run_command(
     cmd: List[str],
     cwd: Optional[Path] = None,

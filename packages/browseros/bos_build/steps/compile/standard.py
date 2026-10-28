@@ -11,6 +11,7 @@ from ...core.step import Step, ValidationError, step
 from ...core.context import Context
 from ...lib.utils import (
     run_command,
+    depot_tools_environment,
     log_info,
     log_success,
     log_warning,
@@ -132,7 +133,11 @@ class CompileModule(Step):
             # verified runtime, so make the compile/package handoff explicit.
             targets.append("chrome_sandbox")
 
-        run_command(autoninja_command(ctx.out_dir, targets), cwd=ctx.chromium_src)
+        run_command(
+            autoninja_command(ctx.out_dir, targets),
+            cwd=ctx.chromium_src,
+            env=depot_tools_environment(ctx.chromium_src),
+        )
 
         app_path = ctx.get_chromium_app_path()
         built_app_path = app_path

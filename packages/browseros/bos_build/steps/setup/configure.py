@@ -5,9 +5,10 @@ import sys
 
 from ...core.step import Step, ValidationError, step
 from ...core.context import Context
-from ...products.server_binaries import all_server_bundles
+from ...products.server_binaries import server_bundles_for_product
 from ...lib.utils import (
     run_command,
+    depot_tools_environment,
     log_info,
     log_warning,
     log_success,
@@ -80,15 +81,28 @@ class ConfigureModule(Step):
         gn_args = [gn_cmd, "gen", ctx.out_dir]
         if ctx.build_type != "debug":
             gn_args.append("--fail-on-unused-args")
-        run_command(gn_args, cwd=ctx.chromium_src)
+        run_command(
+            gn_args,
+            cwd=ctx.chromium_src,
+            env=depot_tools_environment(ctx.chromium_src),
+        )
 
         log_success("Build configured")
 
     def _warn_missing_server_resources(self, ctx: Context) -> None:
-        # Debug sets browseros_package_all_server_resources, so ninja needs
-        # every product's server resources staged; a missing set otherwise
-        # surfaces much later as a cryptic missing-input error.
-        for bundle in all_server_bundles():
+        # BrowserOS and BrowserClaw debug builds share their server-resource
+        # runtime union. Aster packages only its own server resources.
+        product_ids = (
+            ("browseros", "browserclaw")
+            if ctx.product.id in ("browseros", "browserclaw")
+            else (ctx.product.id,)
+        )
+        bundles = tuple(
+            bundle
+            for product_id in product_ids
+            for bundle in server_bundles_for_product(product_id)
+        )
+        for bundle in bundles:
             resources_dir = ctx.chromium_src / bundle.chromium_resources_root
             if not resources_dir.exists():
                 log_warning(

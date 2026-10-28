@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Tests for memory-aware ninja parallelism in the compile module."""
 
+import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -150,6 +151,28 @@ class CompileModuleExecuteTest(unittest.TestCase):
                 "chrome_sandbox",
             ],
         )
+
+    def test_execute_passes_adjacent_depot_tools_to_autoninja(self):
+        with TemporaryDirectory() as tmp:
+            chromium_src = Path(tmp) / "src"
+            chromium_src.mkdir()
+            depot_tools = Path(tmp) / "depot_tools"
+            depot_tools.mkdir()
+            ctx = mock.Mock()
+            ctx.out_dir = "out/Default_x64"
+            ctx.chromium_src = chromium_src
+            with (
+                mock.patch.object(standard, "run_command") as run_cmd,
+                mock.patch.object(standard, "IS_LINUX", return_value=False),
+                mock.patch.object(standard, "IS_WINDOWS", return_value=False),
+                mock.patch.object(standard.CompileModule, "_create_version_file"),
+                mock.patch.dict("os.environ", {"PATH": "/usr/bin"}, clear=True),
+            ):
+                standard.CompileModule().execute(ctx)
+
+            environment = run_cmd.call_args.kwargs["env"]
+            self.assertEqual(environment["PATH"].split(os.pathsep)[0], str(depot_tools))
+            self.assertEqual(environment["DEPOT_TOOLS_UPDATE"], "0")
 
     def test_execute_builds_chrome_via_shared_argv_builder(self):
         ctx = mock.Mock()
