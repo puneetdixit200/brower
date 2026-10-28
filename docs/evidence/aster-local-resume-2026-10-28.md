@@ -54,3 +54,7 @@ Server configuration and manager object preflight is active with two jobs, follo
 ## Server object preflight completed
 
 The actual pinned compiler produced `browseros_server_config.o` and `browseros_server_manager.o`; the two-job preflight completed all 2,556 actions and exited 0. Product/config/manager translation units have compiled successfully. The next native checks are product-state, loader and crash-reporter objects, followed by the full linked browser and sandbox targets. No native browser runtime or package acceptance is claimed.
+
+## Product-state object passed
+
+The actual pinned compiler produced `obj/chrome/browser/browseros/core/product/browseros_product_state.o`; the two-job preflight exited 0 after its single required action. Four Aster-related translation units now compile. No runtime, complete link or package result is inferred.

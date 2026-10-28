@@ -36,7 +36,7 @@ PASS rows are U04 and U05. Native browser acceptance, package release, performan
 Pinned Chromium checkout: `/home/puneet/Projects/aster-browser/chromium-aster-dev/src`, tag `155.0.8059.26`, HEAD `16c3e55476d3564bea713314b2fff638749ce3e6`. Dependencies and Linux sysroot are provisioned. Source/resources staged into this checkout come from Aster baseline `3fb17c5c6`; the newer tab-palette frontend has **not** been copied there.
 
 - All 424 patches applied; full GN generation passed (35,759 targets / 5,077 files).
-- Actual pinned compiler produced `obj/chrome/browser/browseros/core/product/browseros_product.o`, exit 0. This is one translation unit, not a linked browser.
+- Actual pinned compiler produced `browseros_product.o` and `browseros_product_state.o`, both exit 0. Along with the server config/manager objects, four translation units compile; this is not a linked browser.
 - The full two-job graph (57,342 actions) and then a combined object preflight were intentionally interrupted to prioritize smaller checks. Completed outputs remain reusable.
 - Server configuration and manager object preflight finished successfully: exit 0, all 2,556 scheduled actions completed, including both requested C++ objects. No task-owned Ninja build is expected to remain live at this checkpoint. **Check actual process state before starting one; never run concurrent Ninja processes against the same output directory.** A locator or lockfile alone is not proof of a live process.
 - Host-local locator: `/home/puneet/Documents/Codex/2026-10-27/paste-this-into-the-new-codex/work/aster-native-build-state.json`. The last server session 73371 is terminal with exit 0; its log is `work/aster-native-server-objects.log` under that task directory. Another chat may not have access to the same tool-session handle; inspect the actual process and logfile in that case. A transient observation timeout is not proof that it stopped.
@@ -49,7 +49,7 @@ Pinned Chromium checkout: `/home/puneet/Projects/aster-browser/chromium-aster-de
 ### 1. Finish native bootstrap and actual browser integration
 
 1. Verify the recorded successful product/config/manager object outputs and check there is no live build. Preserve completed outputs. Continue with the remaining changed translation units; fix concrete compiler/API failures against pinned Chromium.
-2. Verify `browseros_product_state.o` if not already built. Then compile the exact loader and crash-reporter objects identified from generated Ninja rules:
+2. Product-state compilation also passed. Compile the remaining exact loader and crash-reporter objects identified from generated Ninja rules:
    - `obj/chrome/browser/extensions/extensions/browseros_extension_loader.o`
    - `obj/chrome/browser/core/chrome_crash_reporter_client.o`
 3. Resume the full `chrome chromedriver chrome_sandbox` build with **two total jobs**, then package the product. Do not run concurrent Ninja processes against the same output directory.
