@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   CircleDashed,
   Clock3,
+  Download,
   XCircle,
 } from 'lucide-react'
 import { type FC, useCallback, useEffect, useMemo, useState } from 'react'
@@ -21,6 +22,7 @@ import type {
   ExecutionTaskRecord,
 } from '@/lib/execution-history/types'
 import { resolveAgentServerUrl } from '@/modules/browseros/agent-server-url.helpers'
+import { downloadTaskReport } from './export-task-report'
 import { flattenExecutionHistory, getTaskResult } from './task-history'
 
 function formatDate(value?: string): string {
@@ -388,10 +390,28 @@ export const TaskHistoryPage: FC = () => {
                 </section>
 
                 <section className="space-y-2">
-                  <h3 className="font-medium">Artifacts</h3>
+                  <h3 className="font-medium">Local report</h3>
                   <p className="text-muted-foreground text-sm">
-                    No downloadable artifacts are attached to this task record.
+                    Download this task’s saved summary and visible timeline as Markdown.
+                    Raw tool inputs, outputs and stored credentials are not exported.
+                    This is not a full agent workspace artifact archive.
                   </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      try {
+                        downloadTaskReport(selectedTask)
+                        setError(null)
+                      } catch {
+                        setError('This task could not be exported safely.')
+                      }
+                    }}
+                  >
+                    <Download className="mr-2 size-4" />
+                    Download Markdown report
+                  </Button>
                 </section>
               </article>
             )}
