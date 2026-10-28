@@ -42,8 +42,18 @@ describe('tool approval policy', () => {
   })
 
   it('requires review for tab close and external side-effect connector tools', () => {
+    for (const action of ['close', 'new', 'pin', 'move', 'duplicate', 'unknown']) {
+      expect(
+        decideToolApproval({ toolName: 'tabs', input: { action } }).required,
+        `tabs/${action} should require approval`,
+      ).toBe(true)
+    }
     expect(
-      decideToolApproval({ toolName: 'tabs', input: { action: 'close' } })
+      decideToolApproval({ toolName: 'tabs', input: { action: 'active' } })
+        .required,
+    ).toBe(false)
+    expect(
+      decideToolApproval({ toolName: 'history', input: { action: 'delete' } })
         .required,
     ).toBe(true)
     expect(
