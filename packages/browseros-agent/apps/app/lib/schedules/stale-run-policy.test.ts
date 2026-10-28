@@ -12,14 +12,15 @@ const stale = {
 const empty = new Set<string>()
 const eligible = (
   overrides: Partial<Parameters<typeof shouldFailStaleScheduledRun>[0]> = {},
-) => shouldFailStaleScheduledRun({
-  run: stale,
-  nowMs: now,
-  timeoutMs,
-  activeRunIds: empty,
-  activeJobIds: empty,
-  ...overrides,
-})
+) =>
+  shouldFailStaleScheduledRun({
+    run: stale,
+    nowMs: now,
+    timeoutMs,
+    activeRunIds: empty,
+    activeJobIds: empty,
+    ...overrides,
+  })
 
 describe('stale scheduled job cleanup', () => {
   it('fails only an orphaned running record older than the configured window', () => {
@@ -35,13 +36,17 @@ describe('stale scheduled job cleanup', () => {
   })
   it('fails closed on missing, future, or malformed time evidence', () => {
     expect(eligible({ run: { ...stale, startedAt: 'not-a-date' } })).toBe(false)
-    expect(eligible({ run: { ...stale, startedAt: '2026-10-29T06:00:00Z' } })).toBe(false)
+    expect(
+      eligible({ run: { ...stale, startedAt: '2026-10-29T06:00:00Z' } }),
+    ).toBe(false)
     expect(eligible({ nowMs: Number.NaN })).toBe(false)
     expect(eligible({ timeoutMs: -1 })).toBe(false)
   })
   it('does not call a record stale at the exact cutoff', () => {
-    expect(eligible({
-      run: { ...stale, startedAt: '2026-10-29T04:50:00.000Z' },
-    })).toBe(false)
+    expect(
+      eligible({
+        run: { ...stale, startedAt: '2026-10-29T04:50:00.000Z' },
+      }),
+    ).toBe(false)
   })
 })
