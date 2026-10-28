@@ -2,6 +2,7 @@ import { ArrowRight, Search, Sparkles } from 'lucide-react'
 import { type FC, type FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { NoProviderNotice } from '@/components/chat/NoProviderNotice'
+import { ProcessingDisclosure } from '@/components/chat/ProcessingDisclosure'
 import { Feature } from '@/lib/browseros/capabilities'
 import { createBrowserOSAction } from '@/lib/chat-actions/types'
 import { openSidePanelWithSearch } from '@/lib/messaging/sidepanel/openSidepanelWithSearch'
@@ -198,6 +199,9 @@ export const AgentCommandHome: FC = () => {
                       : 'Loading providers...'
                 }
               />
+            )}
+            {mode === 'ask' && (
+              <ProcessingDisclosure provider={selectedProvider} compact />
             )}
             {mode === 'ask' && noTarget && (
               <NoProviderNotice
