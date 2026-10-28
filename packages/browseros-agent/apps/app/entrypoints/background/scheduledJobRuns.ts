@@ -1,5 +1,5 @@
-import { onScheduleMessage } from '@/lib/messaging/schedules/scheduleMessages'
 import { getAgentServerUrl } from '@/lib/browseros/helpers'
+import { onScheduleMessage } from '@/lib/messaging/schedules/scheduleMessages'
 import { createAlarmFromJob } from '@/lib/schedules/createAlarmFromJob'
 import { getChatServerResponse } from '@/lib/schedules/getChatServerResponse'
 import {
@@ -15,8 +15,8 @@ import type {
   ScheduledJob,
   ScheduledJobRun,
 } from '@/lib/schedules/scheduleTypes'
-import { shouldFailStaleScheduledRun } from '@/lib/schedules/stale-run-policy'
 import { getServerConversationLiveness } from '@/lib/schedules/server-conversation-liveness'
+import { shouldFailStaleScheduledRun } from '@/lib/schedules/stale-run-policy'
 import {
   listScheduledJobRunsOrNull,
   listScheduledJobsOrNull,
