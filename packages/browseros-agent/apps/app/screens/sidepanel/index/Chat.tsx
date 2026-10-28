@@ -70,6 +70,8 @@ export const Chat = () => {
   } = useJtbdPopup()
 
   const [input, setInput] = useState('')
+  const [queuedPrompts, setQueuedPrompts] = useState<string[]>([])
+  const queueAwaitingRun = useRef(false)
   const [attachedTabs, setAttachedTabs] = useState<chrome.tabs.Tab[]>([])
   const [draftOwnerTabId, setDraftOwnerTabId] = useState<number | undefined>()
   const [draftIncognito, setDraftIncognito] = useState(true)
@@ -148,6 +150,37 @@ export const Chat = () => {
     }
     void persistDraft().catch(() => undefined)
   }, [input, attachedTabs, draftLoaded, draftIncognito, draftOwnerTabId])
+
+  // An explicit user queue is ephemeral and bounded. No hidden browser
+  // context, credentials, or automatic tool replay is stored with a prompt.
+  useEffect(() => {
+    if (status === 'streaming' || status === 'submitted') {
+      queueAwaitingRun.current = false
+      return
+    }
+    if (
+      status !== 'ready' ||
+      !canSend ||
+      queuedPrompts.length === 0 ||
+      queueAwaitingRun.current
+    ) {
+      return
+    }
+    queueAwaitingRun.current = true
+    const sent = sendMessage({ text: queuedPrompts[0] })
+    if (sent) {
+      setQueuedPrompts((previous) => previous.slice(1))
+    } else {
+      queueAwaitingRun.current = false
+    }
+  }, [status, canSend, queuedPrompts, sendMessage])
+
+  const queueCurrentPrompt = () => {
+    const value = input.trim()
+    if (!value || queuedPrompts.length >= 5) return
+    setQueuedPrompts((previous) => [...previous, value])
+    setInput('')
+  }
 
   // Trigger JTBD popup when AI finishes responding
   const previousChatStatus = useRef(status)
@@ -280,6 +313,30 @@ export const Chat = () => {
         )}
       </main>
 
+      {(status === 'streaming' || status === 'submitted' || queuedPrompts.length > 0) && (
+        <section className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-xs" aria-label="Queued agent prompts">
+          <span>{queuedPrompts.length} queued prompts (maximum 5, this chat only)</span>
+          {(status === 'streaming' || status === 'submitted') && (
+            <button
+              type="button"
+              disabled={!input.trim() || queuedPrompts.length >= 5}
+              onClick={queueCurrentPrompt}
+              className="rounded-md border px-2 py-1 disabled:opacity-50"
+            >
+              Queue current prompt
+            </button>
+          )}
+          {queuedPrompts.length > 0 && (
+            <button
+              type="button"
+              className="rounded-md border px-2 py-1"
+              onClick={() => setQueuedPrompts([])}
+            >
+              Clear queue
+            </button>
+          )}
+        </section>
+      )}
       {isIncognito && <IncognitoNotice />}
       {mode === 'agent' && (
         <HumanLoginHandoff
