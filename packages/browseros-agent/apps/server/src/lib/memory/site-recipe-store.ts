@@ -21,6 +21,15 @@ export interface SiteRecipe {
 
 const MAX_RECIPES = 150
 const STALE_AFTER_MS = 30 * 86_400_000
+const CREDENTIAL_ASSIGNMENT =
+  /(?:password|passphrase|api[_ -]?key|secret|access[_ -]?token|bearer|otp|totp)\\s*[:=]\\s*\\S+/i
+
+/** Recipes are instructions, never a password vault or model prompt cache. */
+function assertNonsecretInstructions(value: string): void {
+  if (CREDENTIAL_ASSIGNMENT.test(value)) {
+    throw new Error('Site recipes may not contain credential assignments')
+  }
+}
 
 export function siteRecipeOrigin(input: string): string {
   const parsed = new URL(input)
@@ -70,6 +79,7 @@ export const siteRecipeStore = {
     }))
   },
   save(input: { id?: string; origin: string; title: string; instructions: string }): SiteRecipe {
+    assertNonsecretInstructions(input.instructions)
     const entries = read()
     const origin = siteRecipeOrigin(input.origin)
     const existing = input.id ? entries.find((item) => item.id === input.id) : undefined
