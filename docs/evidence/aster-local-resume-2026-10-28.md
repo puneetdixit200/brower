@@ -44,3 +44,9 @@ The following build applied all 424 patches and prepared the Linux sysroot. Conf
 ## Actual GN generation passed
 
 Terra ran full-project GN successfully with the pinned tool: exit 0, 35,759 targets from 5,077 files. In addition to split argument declarations, corrections select CRX sources only in signed mode (avoiding nonempty-list overwrite/unused variables) and define the required legacy updater identifier as empty, without provisioning an updater identity or feed. Exact managed checkout content was checked before refreshing files, and backups were saved. GN reports the existing unused `enable_js_type_check` argument. C++ compilation and native runtime remain the next acceptance gates.
+
+## Native object compilation started
+
+The full baseline `3fb17c5c6` build entered real C++ compilation with `-j 2` (57,342 scheduled actions). It was intentionally interrupted to prioritize changed translation units; completed outputs are reusable. The combined preflight exposed a large shared input closure, so object checks were separated. The actual pinned compiler successfully produced `obj/chrome/browser/browseros/core/product/browseros_product.o` with exit 0 after generating the Aster buildflags. This proves that translation unit compiles, not that the browser links or runs.
+
+Server configuration and manager object preflight is active with two jobs, followed by loader/crash-reporter checks and resumption of the full graph. No native browser binary or package is complete. The Chromium checkout remains on baseline `3fb17c5c6` source/resource content; the later command-palette frontend change is verified separately and has not been staged into that checkout.
