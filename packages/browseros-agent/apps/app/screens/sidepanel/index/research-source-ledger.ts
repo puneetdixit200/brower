@@ -75,9 +75,7 @@ function readText(output: unknown): string[] {
   return textParts
 }
 
-function quotedEvidence(
-  answerText: string,
-): {
+function quotedEvidence(answerText: string): {
   matches: Array<{ quote: string; url: string; sourceOffset: number }>
   unattributedQuoteCount: number
 } {
