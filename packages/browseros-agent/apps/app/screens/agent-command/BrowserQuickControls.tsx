@@ -115,7 +115,7 @@ export function BrowserQuickControls() {
       })
       setDownloads(recent.map((item) => ({
         id: item.id,
-        filename: item.filename.split(/[\\/]/).pop() || 'Download',
+        filename: item.filename.split(String.fromCharCode(92)).pop()?.split('/').pop() || 'Download',
         state: item.state,
         receivedBytes: item.bytesReceived,
         totalBytes: item.totalBytes,
