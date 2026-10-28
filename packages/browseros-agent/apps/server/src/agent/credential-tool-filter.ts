@@ -9,6 +9,10 @@ import type { ToolSet } from 'ai'
  */
 const SECRET_RESOURCE = /(?:passwords?|credentials?|passkeys?|authenticat(?:ion|or)|otp|totp|one.?time.?codes?)/i
 const EXPOSE_ACTION = /(?:read|list|retrieve|get|fetch|export|dump|copy|reveal|show|extract|decrypt|autofill|fill)/i
+// A generic browser tool may mention passwords only to warn that it never
+// exposes them. A description must claim actual vault export/retrieval,
+// not merely mention a security term elsewhere in a long paragraph.
+const EXPLICIT_SECRET_EXPORT = /(?:read|retrieve|list|export|reveal|dump|decrypt|autofill)\\b.{0,56}\\b(?:saved|stored|vault)\\s+(?:browser\\s+)?(?:passwords?|credentials?|passkeys?)/i
 
 export function isCredentialAccessTool(
   name: string,
@@ -17,7 +21,7 @@ export function isCredentialAccessTool(
   const normalized = name.replace(/[_-]+/g, ' ')
   return (
     (SECRET_RESOURCE.test(normalized) && EXPOSE_ACTION.test(normalized)) ||
-    (SECRET_RESOURCE.test(description) && EXPOSE_ACTION.test(description))
+    EXPLICIT_SECRET_EXPORT.test(description)
   )
 }
 
