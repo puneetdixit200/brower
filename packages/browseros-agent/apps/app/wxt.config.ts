@@ -72,6 +72,7 @@ export default defineConfig({
       'history',
       'browserOS',
       'alarms',
+      'idle',
       'webNavigation',
       'downloads',
       'sessions',
