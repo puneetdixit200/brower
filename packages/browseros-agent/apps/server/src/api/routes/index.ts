@@ -132,6 +132,7 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
   app.use('/scheduled-job-runs/*', requireTrustedAppOrigin())
   app.use('/memory', requireTrustedAppOrigin())
   app.use('/memory/*', requireTrustedAppOrigin())
+  app.use('/site-recipes', requireTrustedAppOrigin())
   app.use('/site-recipes/*', requireTrustedAppOrigin())
 
   return (
