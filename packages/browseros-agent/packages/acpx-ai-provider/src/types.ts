@@ -45,6 +45,10 @@ export interface AcpxProviderSettings {
   sessionMode?: AcpxSessionMode
   permissionMode?: AcpxPermissionMode
   nonInteractivePermissions?: AcpxNonInteractivePermissions
+  /** Disable ACPX's local TTY write confirmation path. */
+  fs?: boolean
+  /** Disable ACPX's local TTY command confirmation path. */
+  terminal?: boolean
   /**
    * Async callback invoked when the agent issues a per-call permission
    * request (e.g. write, shell, delete). Return a decision to gate the

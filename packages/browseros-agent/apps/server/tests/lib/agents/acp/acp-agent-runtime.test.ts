@@ -9,6 +9,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  type AcpPermissionRequest,
   type AcpxProviderSettings,
   createAcpxProvider,
 } from '@browseros/acpx-ai-provider'
@@ -24,6 +25,7 @@ import type {
 } from 'acpx/runtime'
 import { createFileSessionStore } from 'acpx/runtime'
 import type { UIMessage, UIMessageChunk } from 'ai'
+import { DbActionPolicyStore } from '../../../../src/agent/action-policy'
 import { ChatService } from '../../../../src/api/services/chat-service'
 import {
   AcpAgentPreparationError,
@@ -33,12 +35,14 @@ import {
 import { BROWSEROS_ACP_INSTRUCTIONS } from '../../../../src/lib/agents/acp/browseros-instructions'
 import type { AcpAgentDefinition } from '../../../../src/lib/agents/agent-types'
 import { DbConversationStore } from '../../../../src/lib/conversations/conversation-store'
+import { closeDb, initializeDb } from '../../../../src/lib/db'
 import { openBrowserOsDatabase } from '../../../../src/lib/db/client'
 
 const temporaryDirectories: string[] = []
 const BROWSER_TOOL_LEASE_TOKEN = 'runtime-test-lease'
 
 afterEach(async () => {
+  closeDb()
   await Promise.all(
     temporaryDirectories
       .splice(0)
@@ -133,8 +137,11 @@ describe('AcpAgentRuntime', () => {
       cwd: expect.any(String),
       sessionKey: 'acp:claude-agent-id:conversation-1',
       sessionMode: 'persistent',
-      permissionMode: 'approve-all',
+      permissionMode: 'approve-reads',
       nonInteractivePermissions: 'deny',
+      fs: false,
+      terminal: false,
+      onPermissionRequest: expect.any(Function),
       sessionOptions: {
         model: 'claude-opus-4-1',
         systemPrompt: { append: BROWSEROS_ACP_INSTRUCTIONS },
@@ -150,7 +157,7 @@ describe('AcpAgentRuntime', () => {
         },
       ],
     })
-    expect(acpRuntime.setModeCalls).toEqual(['bypassPermissions'])
+    expect(acpRuntime.setModeCalls).toEqual([])
     expect(acpRuntime.setConfigOptionCalls).toEqual([
       { key: 'effort', value: 'high' },
     ])
@@ -344,11 +351,10 @@ describe('AcpAgentRuntime', () => {
     const store = await saveAgentRecord(fixture, 'setup-failure', [
       { User: { id: 'old', content: [{ Text: 'old question' }] } },
     ])
-    fixture.acpRuntime.setModeHook = async () => {
-      if (fixture.acpRuntime.ensureSessionCalls.length === 1)
-        throw resumeError()
-    }
     fixture.acpRuntime.ensureSessionHook = async (input) => {
+      if (fixture.acpRuntime.ensureSessionCalls.length === 1) {
+        throw resumeError()
+      }
       if (fixture.acpRuntime.ensureSessionCalls.length === 2) {
         const record = await store.load(input.sessionKey)
         if (!record) throw new Error('Missing saved agent session')
@@ -604,10 +610,8 @@ describe('AcpAgentRuntime', () => {
     }
   })
 
-  it('uses Codex config and falls back across full-access mode ids', async () => {
-    const acpRuntime = new RecordingAcpRuntime({
-      rejectedModes: ['agent-full-access'],
-    })
+  it('uses Codex config without switching the ACP agent into full access', async () => {
+    const acpRuntime = new RecordingAcpRuntime()
     const fixture = await runtimeFixture({
       adapter: 'codex',
       runtime: acpRuntime,
@@ -624,10 +628,7 @@ describe('AcpAgentRuntime', () => {
       }),
     )
 
-    expect(acpRuntime.setModeCalls).toEqual([
-      'agent-full-access',
-      'full-access',
-    ])
+    expect(acpRuntime.setModeCalls).toEqual([])
     expect(acpRuntime.setConfigOptionCalls).toEqual([
       { key: 'reasoning_effort', value: 'xhigh' },
     ])
@@ -640,6 +641,152 @@ describe('AcpAgentRuntime', () => {
     expect(codexCommand).toContain('CODEX_CONFIG=')
     expect(codexCommand).toContain('"model":"gpt-5.4"')
     expect(codexCommand).toContain('"model_reasoning_effort":"xhigh"')
+  })
+
+  it('uses saved action decisions for mediated ACP write, edit, and execute requests', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'acp-action-policy-'))
+    temporaryDirectories.push(root)
+    const db = initializeDb({ dbPath: join(root, 'state.sqlite') })
+    const store = new DbActionPolicyStore(db.db)
+    const fixture = await runtimeFixture({})
+    await collect(
+      await fixture.runtime.stream({
+        agent: fixture.agent,
+        conversationId: 'conversation-action-policy',
+        browserToolLeaseToken: BROWSER_TOOL_LEASE_TOKEN,
+        readOnly: false,
+        messages: [
+          textMessage('user-policy', 'user', 'perform the requested task'),
+        ],
+      }),
+    )
+    const callback = fixture.providerSettings[0]?.onPermissionRequest
+    expect(callback).toBeDefined()
+    if (!callback) throw new Error('Expected ACP permission callback')
+
+    const mediated = [
+      { name: 'Write', kind: 'edit' as const, id: 'filesystem.write' as const },
+      { name: 'Edit', kind: 'edit' as const, id: 'filesystem.edit' as const },
+      {
+        name: 'Bash',
+        kind: 'execute' as const,
+        id: 'filesystem.bash' as const,
+      },
+    ]
+    for (const item of mediated) {
+      const request = {
+        sessionId: 'test-session',
+        inferredKind: item.kind,
+        raw: {
+          toolCall: {
+            toolCallId: item.id,
+            name: item.name,
+            title: 'untrusted display label',
+            rawInput: { path: '/workspace/file.txt', command: 'echo hi' },
+          },
+        },
+      } as AcpPermissionRequest
+      await store.put(item.id, { decision: 'allow', expiresAt: null })
+      expect(
+        await callback(request, { signal: new AbortController().signal }),
+      ).toEqual({ outcome: 'allow_once' })
+      await store.put(item.id, { decision: 'deny', expiresAt: null })
+      expect(
+        await callback(request, { signal: new AbortController().signal }),
+      ).toEqual({ outcome: 'reject_once' })
+      await store.put(item.id, { decision: 'ask', expiresAt: null })
+      expect(
+        await callback(request, { signal: new AbortController().signal }),
+      ).toEqual({ outcome: 'reject_once' })
+    }
+
+    const unknownRequest = {
+      sessionId: 'test-session',
+      inferredKind: 'edit',
+      raw: {
+        toolCall: {
+          toolCallId: 'unknown',
+          name: 'mystery_mutator',
+          title: 'Write',
+          rawInput: {},
+        },
+      },
+    } as AcpPermissionRequest
+    expect(
+      await callback(unknownRequest, { signal: new AbortController().signal }),
+    ).toEqual({ outcome: 'reject_once' })
+
+    const unknownKindRequest = {
+      sessionId: 'test-session',
+      inferredKind: 'other',
+      raw: {
+        toolCall: {
+          toolCallId: 'unknown-kind',
+          name: 'Write',
+          title: 'Write',
+          rawInput: {},
+        },
+      },
+    } as AcpPermissionRequest
+    await store.put('filesystem.write', { decision: 'allow', expiresAt: null })
+    expect(
+      await callback(unknownKindRequest, {
+        signal: new AbortController().signal,
+      }),
+    ).toEqual({ outcome: 'reject_once' })
+
+    const safeReadRequest = {
+      sessionId: 'test-session',
+      inferredKind: 'read',
+      raw: {
+        toolCall: {
+          toolCallId: 'read',
+          name: 'Read',
+          title: 'Read file',
+          rawInput: {},
+        },
+      },
+    } as AcpPermissionRequest
+    expect(
+      await callback(safeReadRequest, { signal: new AbortController().signal }),
+    ).toBeUndefined()
+
+    const unknownReadRequest = {
+      sessionId: 'test-session',
+      inferredKind: 'read',
+      raw: {
+        toolCall: {
+          toolCallId: 'unknown-read',
+          name: 'mystery_mutator',
+          title: 'Read',
+          rawInput: {},
+        },
+      },
+    } as AcpPermissionRequest
+    expect(
+      await callback(unknownReadRequest, {
+        signal: new AbortController().signal,
+      }),
+    ).toEqual({ outcome: 'reject_once' })
+
+    const mislabeledMutatorRequest = {
+      sessionId: 'test-session',
+      inferredKind: 'read',
+      raw: {
+        toolCall: {
+          toolCallId: 'mislabeled-write',
+          name: 'Write',
+          title: 'Read',
+          rawInput: {},
+        },
+      },
+    } as AcpPermissionRequest
+    expect(
+      await callback(mislabeledMutatorRequest, {
+        signal: new AbortController().signal,
+      }),
+    ).toEqual({ outcome: 'reject_once' })
+    await fixture.runtime.closeAllForAgent(fixture.agent.id)
   })
 
   it('inlines text files before the turn reaches ACP', async () => {

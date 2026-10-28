@@ -47,7 +47,7 @@ afterEach(() => {
 
 describe('AcpxProvider — onPermissionRequest', () => {
   test('forwards structured agent argv to the ACPX registry', () => {
-    const argv = ['env', 'INITIAL_AGENT_MODE=agent-full-access', 'codex-acp']
+    const argv = ['codex-acp']
     const provider = createAcpxProvider({
       agent: 'codex',
       agentRegistryOverrides: { codex: argv },
@@ -73,6 +73,19 @@ describe('AcpxProvider — onPermissionRequest', () => {
     expect(createAcpRuntimeMock).toHaveBeenCalledTimes(1)
     const opts = createAcpRuntimeMock.mock.calls[0]?.[0]
     expect(opts?.onPermissionRequest).toBe(cb)
+  })
+
+  test('forwards disabled TTY filesystem and terminal capabilities', () => {
+    const provider = createAcpxProvider({
+      agent: 'codex',
+      fs: false,
+      terminal: false,
+    })
+    void provider.runtime
+
+    const opts = createAcpRuntimeMock.mock.calls.at(-1)?.[0]
+    expect(opts?.fs).toBe(false)
+    expect(opts?.terminal).toBe(false)
   })
 
   test('omits the callback when not configured', () => {

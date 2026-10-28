@@ -1,4 +1,4 @@
-import { lazy, Suspense, type FC } from 'react'
+import { type FC, lazy, Suspense } from 'react'
 import { HashRouter, Navigate, Route, Routes, useParams } from 'react-router'
 import { AsterCommandPalette } from '@/components/layout/AsterCommandPalette'
 import { SettingsSidebarLayout } from '@/components/layout/SettingsSidebarLayout'
@@ -9,63 +9,99 @@ import { NewTabLayout } from '@/screens/newtab/layout/NewTabLayout'
 // Keep the main composer eager. Heavy secondary routes load only when visited.
 // This reduces initial new-tab JavaScript parsing and avoids idle settings work.
 const DiagnosticsPage = lazy(() =>
-  import('@browseros/diagnostics/view').then((module) => ({ default: module.DiagnosticsPage })),
+  import('@browseros/diagnostics/view').then((module) => ({
+    default: module.DiagnosticsPage,
+  })),
 )
 
 const AISettingsPage = lazy(() =>
-  import('@/screens/ai-settings/AISettingsPage').then((module) => ({ default: module.AISettingsPage })),
+  import('@/screens/ai-settings/AISettingsPage').then((module) => ({
+    default: module.AISettingsPage,
+  })),
 )
 
 const ConnectMCP = lazy(() =>
-  import('@/screens/connect-mcp/ConnectMCP').then((module) => ({ default: module.ConnectMCP })),
+  import('@/screens/connect-mcp/ConnectMCP').then((module) => ({
+    default: module.ConnectMCP,
+  })),
 )
 
 const CustomizationPage = lazy(() =>
-  import('@/screens/customization/CustomizationPage').then((module) => ({ default: module.CustomizationPage })),
+  import('@/screens/customization/CustomizationPage').then((module) => ({
+    default: module.CustomizationPage,
+  })),
 )
 
 const FeaturesPage = lazy(() =>
-  import('@/screens/features/Features').then((module) => ({ default: module.FeaturesPage })),
+  import('@/screens/features/Features').then((module) => ({
+    default: module.FeaturesPage,
+  })),
 )
 
 const SurveyPage = lazy(() =>
-  import('@/screens/jtbd-agent/SurveyPage').then((module) => ({ default: module.SurveyPage })),
+  import('@/screens/jtbd-agent/SurveyPage').then((module) => ({
+    default: module.SurveyPage,
+  })),
 )
 
 const LlmHubPage = lazy(() =>
-  import('@/screens/llm-hub/LlmHubPage').then((module) => ({ default: module.LlmHubPage })),
+  import('@/screens/llm-hub/LlmHubPage').then((module) => ({
+    default: module.LlmHubPage,
+  })),
 )
 
 const MCPSettingsPage = lazy(() =>
-  import('@/screens/mcp-settings/MCPSettingsPage').then((module) => ({ default: module.MCPSettingsPage })),
+  import('@/screens/mcp-settings/MCPSettingsPage').then((module) => ({
+    default: module.MCPSettingsPage,
+  })),
 )
 
 const MemoryPage = lazy(() =>
-  import('@/screens/memory/MemoryPage').then((module) => ({ default: module.MemoryPage })),
+  import('@/screens/memory/MemoryPage').then((module) => ({
+    default: module.MemoryPage,
+  })),
+)
+
+const ActionPolicyPage = lazy(() =>
+  import('@/screens/action-policy/ActionPolicyPage').then((module) => ({
+    default: module.ActionPolicyPage,
+  })),
 )
 
 const NewTabChat = lazy(() =>
-  import('@/screens/newtab/index/NewTabChat').then((module) => ({ default: module.NewTabChat })),
+  import('@/screens/newtab/index/NewTabChat').then((module) => ({
+    default: module.NewTabChat,
+  })),
 )
 
 const Personalize = lazy(() =>
-  import('@/screens/newtab/personalize/Personalize').then((module) => ({ default: module.Personalize })),
+  import('@/screens/newtab/personalize/Personalize').then((module) => ({
+    default: module.Personalize,
+  })),
 )
 
 const OnboardingAiPage = lazy(() =>
-  import('@/screens/onboarding-ai/OnboardingAiPage').then((module) => ({ default: module.OnboardingAiPage })),
+  import('@/screens/onboarding-ai/OnboardingAiPage').then((module) => ({
+    default: module.OnboardingAiPage,
+  })),
 )
 
 const PrivacySettingsPage = lazy(() =>
-  import('@/screens/privacy/PrivacySettingsPage').then((module) => ({ default: module.PrivacySettingsPage })),
+  import('@/screens/privacy/PrivacySettingsPage').then((module) => ({
+    default: module.PrivacySettingsPage,
+  })),
 )
 
 const ScheduledTasksPage = lazy(() =>
-  import('@/screens/scheduled-tasks/ScheduledTasksPage').then((module) => ({ default: module.ScheduledTasksPage })),
+  import('@/screens/scheduled-tasks/ScheduledTasksPage').then((module) => ({
+    default: module.ScheduledTasksPage,
+  })),
 )
 
 const TaskHistoryPage = lazy(() =>
-  import('@/screens/task-history/TaskHistoryPage').then((module) => ({ default: module.TaskHistoryPage })),
+  import('@/screens/task-history/TaskHistoryPage').then((module) => ({
+    default: module.TaskHistoryPage,
+  })),
 )
 
 function getSurveyParams(): { maxTurns?: number; experimentId?: string } {
@@ -103,7 +139,10 @@ export const App: FC = () => {
       <AsterCommandPalette />
       <Suspense
         fallback={
-          <div role="status" className="px-6 py-8 text-muted-foreground text-sm">
+          <div
+            role="status"
+            className="px-6 py-8 text-muted-foreground text-sm"
+          >
             Loading Aster page…
           </div>
         }
@@ -129,6 +168,7 @@ export const App: FC = () => {
               <Route path="chat" element={<LlmHubPage />} />
               <Route path="mcp" element={<MCPSettingsPage />} />
               <Route path="memory" element={<MemoryPage />} />
+              <Route path="permissions" element={<ActionPolicyPage />} />
               <Route path="privacy" element={<PrivacySettingsPage />} />
               <Route path="customization" element={<CustomizationPage />} />
               <Route path="diagnostics" element={<DiagnosticsPage />} />
@@ -137,7 +177,10 @@ export const App: FC = () => {
                 element={<Navigate to="/settings/ai" replace />}
               />
               <Route path="survey" element={<SurveyPage {...surveyParams} />} />
-              <Route path="*" element={<Navigate to="/settings/ai" replace />} />
+              <Route
+                path="*"
+                element={<Navigate to="/settings/ai" replace />}
+              />
             </Route>
           </Route>
 

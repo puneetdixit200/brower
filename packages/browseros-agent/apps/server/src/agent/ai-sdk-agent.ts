@@ -27,6 +27,7 @@ import {
   type PinnedWorkspaceRoot,
   pinWorkspaceRoot,
 } from '../tools/filesystem/safe-file'
+import { decideActionPolicy } from './action-policy'
 import { createCompactionPrepareStep, type StepWithUsage } from './compaction'
 import { excludeCredentialAccessTools } from './credential-tool-filter'
 import {
@@ -46,7 +47,6 @@ import {
   serializesReasoningContent,
 } from './provider-factory'
 import { buildAgentReasoningConfig } from './reasoning-config'
-import { decideToolApproval } from './tool-approval-policy'
 import type { ResolvedAgentConfig } from './types'
 
 // Approval signatures are process-scoped. A restart invalidates an unresolved
@@ -388,18 +388,28 @@ export class AiSdkAgent {
         model,
         instructions,
         tools,
-        toolApproval: ({ toolCall, tools: availableTools }) => {
+        toolApproval: async ({ toolCall, tools: availableTools }) => {
           const tool = availableTools?.[toolCall.toolName] as
             | { description?: string }
             | undefined
-          const decision = decideToolApproval({
+          const decision = await decideActionPolicy({
             toolName: toolCall.toolName,
             input: toolCall.input,
             description: tool?.description,
           })
-          return decision.required
-            ? { type: 'user-approval', reason: decision.reason }
-            : undefined
+          if (decision.decision === 'deny') {
+            return {
+              type: 'denied',
+              reason: 'Blocked by the saved action policy.',
+            }
+          }
+          if (decision.decision === 'ask') {
+            return {
+              type: 'user-approval',
+              reason: decision.reason ?? 'Review this action before it runs.',
+            }
+          }
+          return undefined
         },
         experimental_toolApprovalSecret: TOOL_APPROVAL_SECRET,
         stopWhen: [stepCountIs(AGENT_LIMITS.MAX_TURNS)],

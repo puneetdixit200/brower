@@ -123,9 +123,10 @@ function buildSpawnEnvironment(
 
   // acpx applies its snake_case record policy to SessionAgentOptions.env, so
   // uppercase process variables must stay at the process-launch boundary.
+  // Do not set INITIAL_AGENT_MODE: the provider's permission callback must
+  // remain active for filesystem writes and commands.
   return {
     CODEX_CONFIG: JSON.stringify(buildCodexConfig(agent, instructions)),
-    INITIAL_AGENT_MODE: 'agent-full-access',
   }
 }
 

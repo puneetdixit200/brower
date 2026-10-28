@@ -173,7 +173,7 @@ describe('buildAcpAgentPolicy', () => {
     const renderedArgv = codexArgv.join('\n')
     expect(renderedArgv).not.toContain('CODEX_HOME')
     expect(renderedArgv).toContain('CODEX_CONFIG=')
-    expect(renderedArgv).toContain('INITIAL_AGENT_MODE=agent-full-access')
+    expect(renderedArgv).not.toContain('INITIAL_AGENT_MODE')
     expect(renderedArgv).toContain('"developer_instructions":"# BrowserOS')
     expect(renderedArgv).toContain('browseros-neo')
     expect(renderedArgv).toContain('"model":"gpt-5.4"')

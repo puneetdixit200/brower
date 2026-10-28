@@ -6,6 +6,7 @@
 
 import { join } from 'node:path'
 import {
+  type AcpPermissionRequest,
   AcpxError,
   type AcpxProvider,
   type AcpxProviderSettings,
@@ -22,6 +23,7 @@ import {
   type UIMessage,
   type UIMessageChunk,
 } from 'ai'
+import { decideActionPolicy } from '../../../agent/action-policy'
 import { getBrowserosDir } from '../../browseros-dir'
 import { logger } from '../../logger'
 import type { AcpAgentDefinition } from '../agent-types'
@@ -142,7 +144,6 @@ export class AcpAgentRuntime {
         session = acquired.session
         createdSession ||= acquired.created
         input.abortSignal?.throwIfAborted()
-        await applyFullAccess(session.provider, policy)
         await applyReasoningEffort(session.provider, input.agent)
       }
       const canRecover = (error: unknown) =>
@@ -300,8 +301,32 @@ export class AcpAgentRuntime {
       sessionMode: 'persistent',
       stateDir: this.stateDir,
       agentRegistryOverrides: policy.agentRegistryOverrides,
-      permissionMode: 'approve-all',
+      permissionMode: 'approve-reads',
       nonInteractivePermissions: 'deny',
+      // These disable ACPX's own TTY confirmation handlers, which do not pass
+      // through onPermissionRequest. They do not sandbox the agent process;
+      // native filesystem/shell operations are enforced only when the agent
+      // emits an ACP permission request for them.
+      fs: false,
+      terminal: false,
+      onPermissionRequest: async (request) => {
+        try {
+          const action = classifyAcpPermissionRequest(request)
+          if (action === 'safe-read') return undefined
+          if (!action) return { outcome: 'reject_once' }
+          const decision = await decideActionPolicy({
+            toolName: action.toolName,
+            input: request.raw.toolCall.rawInput,
+          })
+          return decision.decision === 'allow'
+            ? { outcome: 'allow_once' }
+            : { outcome: 'reject_once' }
+        } catch {
+          // A missing DB or malformed provider request must fail closed. Never
+          // throw here: ACPX would fall back to its broader permission mode.
+          return { outcome: 'reject_once' }
+        }
+      },
       mcpServers: policy.mcpServers,
       sessionOptions: policy.sessionOptions,
     })
@@ -477,32 +502,45 @@ function releaseOnEnd<T>(
   })
 }
 
-async function applyFullAccess(
-  provider: AcpxProvider,
-  policy: AcpAgentPolicy,
-): Promise<void> {
-  if (policy.fullAccessModeCandidates.length === 0) {
-    // No bypass mode configured (common for custom agents). Run in the agent's
-    // own default permission mode rather than forcing one.
-    return
+function classifyAcpPermissionRequest(
+  request: AcpPermissionRequest,
+): { toolName: string } | 'safe-read' | null {
+  const rawName = request.raw.toolCall.name
+  if (typeof rawName !== 'string') return null
+  const name = rawName.toLowerCase()
+  const kind = request.inferredKind
+  if (
+    kind === 'read' &&
+    ['read', 'read_file', 'filesystem_read', 'cat'].includes(name)
+  ) {
+    return 'safe-read'
   }
-  if (!provider.runtime.setMode) {
-    throw new Error(`ACP adapter ${policy.adapter} has no full-access mode`)
-  }
-
-  let lastError: unknown
-  for (const mode of policy.fullAccessModeCandidates) {
-    try {
-      await provider.setMode(mode)
-      return
-    } catch (error) {
-      lastError = error
-    }
+  if (
+    kind === 'search' &&
+    ['glob', 'grep', 'search', 'find', 'filesystem_grep'].includes(name)
+  ) {
+    return 'safe-read'
   }
 
-  throw new Error(`Unable to enable full access for ${policy.adapter}`, {
-    cause: lastError,
-  })
+  if (
+    kind === 'edit' &&
+    ['write', 'write_file', 'create_file', 'filesystem_write'].includes(name)
+  ) {
+    return { toolName: 'filesystem_write' }
+  }
+  if (
+    kind === 'edit' &&
+    ['edit', 'edit_file', 'filesystem_edit'].includes(name)
+  ) {
+    return { toolName: 'filesystem_edit' }
+  }
+  if (
+    kind === 'execute' &&
+    ['bash', 'shell', 'exec', 'exec_command', 'filesystem_bash'].includes(name)
+  ) {
+    return { toolName: 'filesystem_bash' }
+  }
+  return null
 }
 
 function resolveReasoningEffortKey(agent: AcpAgentDefinition): string {

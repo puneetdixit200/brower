@@ -324,6 +324,11 @@ const currentMigrationHistory = [
     hash: '8457cf0c9efbc63f77bca3976e310f7286c712071eda86e7c03b2a237ef7d6d5',
     createdAt: 1793232000000,
   },
+  {
+    tag: '0021_add_action_policy_rules',
+    hash: '3e9373d40392c2ddb78577a8844911dfb81fde94a755197778079be45e7862db',
+    createdAt: 1793318400000,
+  },
 ]
 
 // TODO(nikhil): Remove this fallback once Windows/Linux packaging always includes Drizzle migrations.
@@ -456,6 +461,7 @@ const currentSchemaStatements = [
     )
   `,
   `CREATE INDEX IF NOT EXISTS conversation_run_state_status_idx ON conversation_run_state (status)`,
+  `CREATE TABLE IF NOT EXISTS action_policy_rules (action_id text PRIMARY KEY NOT NULL, decision text NOT NULL CHECK (decision IN ('allow', 'ask', 'deny')), expires_at integer, updated_at integer NOT NULL)`,
   `
     CREATE TABLE IF NOT EXISTS memories (
       id text PRIMARY KEY NOT NULL,

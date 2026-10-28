@@ -24,6 +24,7 @@ import type { Env, HttpServerConfig } from '../types'
 import { defaultCorsConfig } from '../utils/cors'
 import { requireTrustedAppOrigin } from '../utils/request-auth'
 import { createAcpxProbeRoutes } from './acpx-probe'
+import { createActionPolicyRoutes } from './action-policy'
 import { createAgentRoutes } from './agents'
 import { createAsterCliRoutes } from './aster-cli'
 import { createChatRoutes } from './chat'
@@ -129,6 +130,8 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
   // an extension Origin header and gains no browser or shell tool access.
   app.use('/acpx/probe/*', requireTrustedAppOrigin())
   app.use('/agents/*', requireTrustedAppOrigin())
+  app.use('/action-policy', requireTrustedAppOrigin({ requireOrigin: true }))
+  app.use('/action-policy/*', requireTrustedAppOrigin({ requireOrigin: true }))
   app.use('/conversations/*', requireTrustedAppOrigin())
   app.use('/mcp-manager/*', requireTrustedAppOrigin())
   app.use(
@@ -157,6 +160,7 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
         }),
       )
       .route('/system/health', createHealthRoute({ browser }))
+      .route('/action-policy', createActionPolicyRoutes())
       .route('/system/diagnostics', createDiagnosticsRoute(version))
       .route('/system/shutdown', createShutdownRoute({ onShutdown }))
       // Compatibility aliases for shipped browsers that still probe root paths

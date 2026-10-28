@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Palette,
   Server,
+  Shield,
   ShieldCheck,
 } from 'lucide-react'
 import type { FC } from 'react'
@@ -79,6 +80,7 @@ const primarySettingsSections: NavSection[] = [
       { name: 'Aster as MCP', to: '/settings/mcp', icon: Server },
       { name: 'Memory', to: '/settings/memory', icon: Brain },
       { name: 'Privacy', to: '/settings/privacy', icon: ShieldCheck },
+      { name: 'Permission rules', to: '/settings/permissions', icon: Shield },
     ],
   },
 ]

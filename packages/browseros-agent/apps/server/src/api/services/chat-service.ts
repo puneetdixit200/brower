@@ -16,6 +16,10 @@ import {
   type UIMessage,
   type UIMessageChunk,
 } from 'ai'
+import {
+  decideActionPolicy,
+  enforceCurrentActionPolicyOnApproval,
+} from '../../agent/action-policy'
 import { AiSdkAgent } from '../../agent/ai-sdk-agent'
 import { toChatErrorText } from '../../agent/chat-error'
 import { formatUserMessage } from '../../agent/format-message'
@@ -454,9 +458,14 @@ export class ChatService {
           ),
         )
       }
-      const pending = applyToolApprovalResponse(
+      const approvalResponse = await enforceCurrentActionPolicyOnApproval(
         session.agent.messages,
         request.approvalResponse,
+        decideActionPolicy,
+      )
+      const pending = applyToolApprovalResponse(
+        session.agent.messages,
+        approvalResponse,
       )
       if (!pending) {
         throw new ChatRequestError(
@@ -469,7 +478,7 @@ export class ChatService {
       logger.info('Tool approval response received', {
         conversationId: request.conversationId,
         toolName: pending.toolName,
-        approved: request.approvalResponse.approved,
+        approved: approvalResponse.approved,
       })
     } else {
       session.agent.appendUserMessage(request.message)

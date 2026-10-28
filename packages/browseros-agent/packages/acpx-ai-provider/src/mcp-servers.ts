@@ -1,8 +1,9 @@
 import type { AcpRuntimeOptions } from 'acpx/runtime'
 import type { AcpxMcpServerConfig } from './types'
 
-export type RuntimeMcpServer = NonNullable<
-  AcpRuntimeOptions['mcpServers']
+export type RuntimeMcpServer = Extract<
+  NonNullable<AcpRuntimeOptions['mcpServers']>,
+  readonly unknown[]
 >[number]
 
 export function toRuntimeMcpServers(

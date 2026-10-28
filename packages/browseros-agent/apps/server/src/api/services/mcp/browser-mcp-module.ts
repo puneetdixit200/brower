@@ -15,6 +15,7 @@ import type {
 import { tabs } from '@browseros/browser-mcp/tools/tabs'
 import type { BrowserContext } from '@browseros/shared/schemas/browser-context'
 import { z } from 'zod/v4'
+import { decideActionPolicy } from '../../../agent/action-policy'
 import { logger } from '../../../lib/logger'
 import { shouldLogToolRegistration } from '../../../tools/registration-log-sampling'
 import type { ConversationRuns } from '../conversation-runs'
@@ -195,6 +196,41 @@ export class BrowserMcpModule {
     args: Record<string, unknown>,
     context: ToolContext,
   ) {
+    // ACP has no interactive tool-approval round trip. Recheck persisted policy
+    // at this shared executor boundary so a caller cannot bypass Deny, and so
+    // Ask (including unknown actions) fails closed instead of running silently.
+    // Chat remains governed by its AI SDK approval hook and current-policy
+    // revalidation before approval responses are accepted.
+    if (source === 'acp') {
+      const policy = await decideActionPolicy({
+        toolName: tool.name,
+        input: args,
+        description: tool.description,
+      })
+      if (policy.decision === 'deny') {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: 'Blocked by the current saved action policy.',
+            },
+          ],
+          isError: true,
+        }
+      }
+      if (policy.decision === 'ask') {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: 'Approval required for this action; ACP cannot request interactive approval.',
+            },
+          ],
+          isError: true,
+        }
+      }
+    }
+
     // Resolve once and carry this exact handle through execution. If another
     // turn starts before effects run, its record-identity check rejects them.
     const run = lease

@@ -56,6 +56,27 @@ const localServer = {
 } as never
 
 describe('createApiRoutes', () => {
+  it('requires a trusted app origin for action policy reads and writes', async () => {
+    const app = createTestApp()
+    const blockedRead = await app.request(
+      '/action-policy',
+      { headers: { Host: 'localhost' } },
+      localServer,
+    )
+    expect(blockedRead.status).toBe(403)
+
+    const blockedWrite = await app.request(
+      '/action-policy/browser.tabs.new',
+      {
+        method: 'PUT',
+        headers: { Host: 'localhost', Origin: 'https://attacker.example' },
+        body: JSON.stringify({ decision: 'allow', expiresAt: null }),
+      },
+      localServer,
+    )
+    expect(blockedWrite.status).toBe(403)
+  })
+
   it('requires a trusted extension origin to activate remote integrations', async () => {
     const app = createTestApp()
     const blocked = await app.request(
