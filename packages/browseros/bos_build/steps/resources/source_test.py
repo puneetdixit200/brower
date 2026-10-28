@@ -106,6 +106,56 @@ class SourceResourcesStepTest(unittest.TestCase):
         )
         self.assertIsNotNone(ctx.prepared_resources)
 
+    @mock.patch("bos_build.steps.resources.source.prepare_common_resources")
+    @mock.patch("bos_build.steps.resources.source.read_component_version")
+    def test_aster_unpacked_uses_app_package_version_under_aster_identity(
+        self, read_version, prepare
+    ) -> None:
+        read_version.side_effect = lambda _root, component: {
+            "aster-server": "0.0.8",
+            "agent": "0.0.161.0",
+            "aster-onboard": "0.0.3",
+        }[component]
+        prepare.return_value = self.manifest
+        ctx = Context(
+            root_dir=self.root / "packages/browseros",
+            chromium_src=self.chromium,
+            architecture="x64",
+            build_type="debug",
+            product="aster",
+            resource_mode="source",
+            aster_unpacked_dev=True,
+            source_sha=SOURCE_SHA,
+            chromium_version="128.0.0.0",
+            browseros_build_offset="1",
+            browseros_version_parts=(128, 0, 0, 1),
+            browseros_chromium_version="128.0.0.1",
+            semantic_version="0.31.0",
+        )
+
+        with mock.patch("bos_build.steps.resources.source.LocalPreparationOperations"):
+            PrepareCommonResourcesModule().execute(ctx)
+
+        request = prepare.call_args.args[0]
+        self.assertEqual(
+            read_version.call_args_list,
+            [
+                mock.call(self.root, "aster-server"),
+                mock.call(self.root, "agent"),
+                mock.call(self.root, "aster-onboard"),
+            ],
+        )
+        self.assertEqual(
+            dict(request.component_versions),
+            {
+                "aster-server": "0.0.8",
+                "aster-app": "0.0.161.0",
+                "aster-onboard": "0.0.3",
+            },
+        )
+        self.assertEqual(request.product, "aster")
+        self.assertTrue(request.aster_unpacked_dev)
+
     @mock.patch("bos_build.steps.resources.source.load_prepared_resources")
     def test_supplied_directory_must_match_product_and_source(self, load) -> None:
         self.prepared.mkdir()

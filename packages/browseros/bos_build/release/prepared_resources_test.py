@@ -10,6 +10,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from bos_build.core.products import (
@@ -183,6 +184,59 @@ class PreparedResourcesTest(unittest.TestCase):
             ["bun", "scripts/build/aster-onboard.ts", "--no-upload"],
         )
         self.assertEqual(run.call_args.kwargs["cwd"], agent_root)
+
+    def test_aster_unpacked_builder_uses_product_owned_version_key(self) -> None:
+        agent_root = self.root / "packages/browseros-agent"
+        manifest = agent_root / "apps/app/package.json"
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text('{"version":"0.0.161"}')
+        lockfile = agent_root / "bun.lock"
+        lockfile.write_text("lock")
+        built = agent_root / "apps/app/dist/chrome-mv3-dev"
+        built.mkdir(parents=True)
+        (built / "manifest.json").write_text("{}")
+        request = PreparationRequest(
+            product="aster",
+            parent_sha=PARENT_SHA,
+            source_sha=SOURCE_SHA,
+            browser_version="0.51.2",
+            component_versions={
+                "aster-server": "0.0.8",
+                "aster-app": "0.0.161.0",
+                "aster-onboard": "0.0.3",
+            },
+            output_dir=self.output,
+            aster_unpacked_dev=True,
+            build_type="debug",
+            is_official_build=False,
+        )
+        destination = self.root / "prepared/extensions/aster.zip"
+
+        with (
+            patch("bos_build.release.prepared_resources.subprocess.run") as run,
+            patch(
+                "bos_build.release.prepared_resources.validate_aster_unpacked_debug",
+                return_value=SimpleNamespace(files=("manifest.json",)),
+            ) as validate,
+        ):
+            LocalPreparationOperations(self.root).build_product_unpacked(
+                request, destination
+            )
+
+        validate.assert_called_once_with(
+            built,
+            product="aster",
+            platform="linux",
+            build_type="debug",
+            is_official_build=False,
+            expected_version="0.0.161.0",
+        )
+        self.assertEqual(
+            run.call_args.args[0],
+            ["bun", "run", "--filter", "@browseros/app", "build:aster-unpacked"],
+        )
+        with zipfile.ZipFile(destination) as archive:
+            self.assertEqual(archive.namelist(), ["manifest.json"])
 
     def test_valid_reuse_performs_no_build_network_or_signing(self) -> None:
         first = FakeOperations()

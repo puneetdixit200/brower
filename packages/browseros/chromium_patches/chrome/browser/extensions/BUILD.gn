@@ -30,17 +30,18 @@ index 563383fc71d7bc73f0af0fd2130879d0844ba2af..3b9de592a320174b111fa945da03c66c
        "api/chrome_device_permissions_prompt.h",
        "api/enterprise_reporting_private/conversion_utils.cc",
        "api/enterprise_reporting_private/conversion_utils.h",
-@@ -1033,6 +1047,9 @@ source_set("extensions") {
+@@ -1033,6 +1047,10 @@ source_set("extensions") {
        "//components/language/core/common",
        "//components/language/core/language_model",
        "//components/live_caption:constants",
 +      "//chrome/browser/browseros/core",
++      "//chrome/browser/browseros:buildflags",
 +      "//chrome/browser/browseros/core:prefs",
 +      "//chrome/browser/browseros/metrics",
        "//components/media_device_salt",
        "//components/navigation_interception",
        "//components/net_log",
-@@ -1142,6 +1159,8 @@ source_set("extensions") {
+@@ -1142,6 +1160,8 @@ source_set("extensions") {
  
      if (is_mac) {
        sources += [

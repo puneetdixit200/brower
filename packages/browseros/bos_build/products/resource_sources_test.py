@@ -17,6 +17,7 @@ class SourceResourceCatalogTest(unittest.TestCase):
 
         self.assertEqual(source.server_component, "server")
         self.assertEqual(source.extension_component, "agent")
+        self.assertEqual(source.extension_version_component, "")
         self.assertEqual(source.extension_name, "agent")
         self.assertEqual(source.onboarding_component, "app-onboard")
         self.assertEqual(source.external_extension_names, ("bugreporter",))
@@ -26,6 +27,7 @@ class SourceResourceCatalogTest(unittest.TestCase):
 
         self.assertEqual(source.server_component, "claw-server-rust")
         self.assertEqual(source.extension_component, "browserclaw")
+        self.assertEqual(source.extension_version_component, "")
         self.assertEqual(source.extension_name, "browserclaw")
         self.assertEqual(source.onboarding_component, "claw-onboard")
         self.assertEqual(source.external_extension_names, ("bugreporter",))
@@ -36,6 +38,7 @@ class SourceResourceCatalogTest(unittest.TestCase):
         self.assertEqual(source.product_id, "aster")
         self.assertEqual(source.server_component, "aster-server")
         self.assertEqual(source.extension_component, "aster-app")
+        self.assertEqual(source.extension_version_component, "agent")
         self.assertEqual(source.extension_name, "aster")
         self.assertEqual(source.onboarding_component, "aster-onboard")
         self.assertEqual(source.external_extension_names, ())

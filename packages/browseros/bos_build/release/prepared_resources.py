@@ -603,11 +603,14 @@ class LocalPreparationOperations:
             raise FileNotFoundError(
                 f"Expected WXT development output missing: {source}"
             )
+        resources = source_resources_for_product(request.product)
         result = validate_aster_unpacked_debug(
             source,
             product="aster", platform="linux", build_type="debug",
             is_official_build=False,
-            expected_version=request.component_versions["aster-app"],
+            expected_version=request.component_versions[
+                resources.extension_component
+            ],
         )
         destination.parent.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as archive:

@@ -138,14 +138,21 @@ class PrepareCommonResourcesModule(Step):
             raise FileNotFoundError(f"Prepared-resource directory not found: {output}")
 
         source = source_resources_for_product(ctx.product.id)
-        versions = {
-            component: read_component_version(_repo_root(ctx), component)
-            for component in (
-                source.server_component,
-                source.extension_component,
-                source.onboarding_component,
+        versions = {}
+        for component in (
+            source.server_component,
+            source.extension_component,
+            source.onboarding_component,
+        ):
+            version_component = (
+                source.extension_version_component
+                if component == source.extension_component
+                and source.extension_version_component
+                else component
             )
-        }
+            versions[component] = read_component_version(
+                _repo_root(ctx), version_component
+            )
         request = PreparationRequest(
             product=ctx.product.id,
             parent_sha="",

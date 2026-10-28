@@ -14,6 +14,10 @@ class SourceResources:
     extension_name: str
     onboarding_component: str
     external_extension_names: tuple[str, ...] = ("bugreporter",)
+    # Source package supplying the extension's version. The prepared manifest
+    # keeps the product-owned extension_component key even when its source
+    # package is shared with another product.
+    extension_version_component: str = ""
 
 
 SOURCE_RESOURCES = {
@@ -42,6 +46,7 @@ SOURCE_RESOURCES = {
         extension_name="aster",
         onboarding_component="aster-onboard",
         external_extension_names=(),
+        extension_version_component="agent",
     ),
 }
 
