@@ -40,7 +40,12 @@ describe('createAsterCliRoutes', () => {
   it('requires the configured bearer token before reading or stopping tasks', async () => {
     const { getSnapshot, route, stop } = createRoute()
 
-    for (const headers of [undefined, {}, auth('wrong-token')]) {
+    for (const headers of [
+      undefined,
+      {},
+      auth('wrong-token'),
+      { Authorization: `Basic ${ACCESS_TOKEN}` },
+    ]) {
       const status = await route.request('/task/conversation_1', { headers })
       const cancellation = await route.request('/task/conversation_1/stop', {
         method: 'POST',
@@ -53,6 +58,24 @@ describe('createAsterCliRoutes', () => {
 
     expect(getSnapshot).not.toHaveBeenCalled()
     expect(stop).not.toHaveBeenCalled()
+  })
+
+  it('accepts case-insensitive bearer schemes on status and stop routes', async () => {
+    const { route, stop } = createRoute()
+
+    for (const scheme of ['bearer', 'bEaReR']) {
+      const headers = { Authorization: `${scheme} ${ACCESS_TOKEN}` }
+      const status = await route.request('/task/conversation_1', { headers })
+      const cancellation = await route.request('/task/conversation_1/stop', {
+        method: 'POST',
+        headers,
+      })
+
+      expect(status.status).toBe(200)
+      expect(cancellation.status).toBe(200)
+    }
+
+    expect(stop).toHaveBeenCalledTimes(2)
   })
 
   it('returns only task identity and status, not prompt or transcript content', async () => {

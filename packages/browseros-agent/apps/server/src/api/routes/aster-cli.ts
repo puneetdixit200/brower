@@ -1,10 +1,15 @@
 import { timingSafeEqual } from 'node:crypto'
 import { Hono } from 'hono'
-import type { Env } from '../types'
 import type { ConversationRuns } from '../services/conversation-runs'
+import type { Env } from '../types'
 
 function allowedToken(expected: string, received: string | undefined): boolean {
-  if (!expected || !received?.startsWith('Bearer ')) return false
+  if (
+    !expected ||
+    !received ||
+    received.slice(0, 7).toLowerCase() !== 'bearer '
+  )
+    return false
   const given = Buffer.from(received.slice('Bearer '.length), 'utf8')
   const actual = Buffer.from(expected, 'utf8')
   return given.length === actual.length && timingSafeEqual(given, actual)
