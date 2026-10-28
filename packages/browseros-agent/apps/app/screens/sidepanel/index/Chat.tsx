@@ -28,8 +28,8 @@ import { ChatEmptyState } from './ChatEmptyState'
 import { ChatError } from './ChatError'
 import { ChatFooter } from './ChatFooter'
 import { ChatMessages } from './ChatMessages'
-import { IncognitoNotice } from './IncognitoNotice'
 import { HumanLoginHandoff } from './HumanLoginHandoff'
+import { IncognitoNotice } from './IncognitoNotice'
 import { prepareSourceResearch } from './research-request'
 
 /**
@@ -39,6 +39,8 @@ export const Chat = () => {
   const {
     mode,
     setMode,
+    permissionMode,
+    setPermissionMode,
     messages,
     sendMessage,
     respondToToolApproval,
@@ -338,9 +340,16 @@ export const Chat = () => {
         )}
       </main>
 
-      {(status === 'streaming' || status === 'submitted' || queuedPrompts.length > 0) && (
-        <section className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-xs" aria-label="Queued agent prompts">
-          <span>{queuedPrompts.length} queued prompts (maximum 5, this chat only)</span>
+      {(status === 'streaming' ||
+        status === 'submitted' ||
+        queuedPrompts.length > 0) && (
+        <section
+          className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-xs"
+          aria-label="Queued agent prompts"
+        >
+          <span>
+            {queuedPrompts.length} queued prompts (maximum 5, this chat only)
+          </span>
           {(status === 'streaming' || status === 'submitted') && (
             <button
               type="button"
@@ -380,15 +389,14 @@ export const Chat = () => {
         </div>
       )}
       {mode === 'agent' && (
-        <HumanLoginHandoff
-          onStop={handleStop}
-          attachedTabs={attachedTabs}
-        />
+        <HumanLoginHandoff onStop={handleStop} attachedTabs={attachedTabs} />
       )}
 
       <ChatFooter
         mode={mode}
         onModeChange={handleModeChange}
+        permissionMode={permissionMode}
+        onPermissionModeChange={setPermissionMode}
         input={input}
         onInputChange={setInput}
         onSubmit={handleSubmit}

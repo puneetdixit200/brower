@@ -25,6 +25,7 @@ export interface AgentSession {
    * the stamp at every construction site.
    */
   chatMode: boolean
+  permissionMode?: 'guard' | 'read-only'
   /** Browser-generated output paths returned during this conversation. */
   outputFileAccess?: BrowserOutputFileAccess
 }

@@ -117,6 +117,9 @@ export function buildSidepanelPreparedSendMessagesRequest({
         conversationId: common.conversationId,
         message: message ?? '',
         mode: common.mode,
+        ...(common.permissionMode
+          ? { permissionMode: common.permissionMode }
+          : {}),
         browserContext: common.browserContext,
         userSystemPrompt: common.userSystemPrompt,
         userWorkingDir: common.userWorkingDir,

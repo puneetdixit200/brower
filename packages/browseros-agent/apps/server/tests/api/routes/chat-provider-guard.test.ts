@@ -69,6 +69,44 @@ function chatBody(extra: Record<string, unknown> = {}) {
  * caller-supplied provider configurations.
  */
 describe('chat provider credentials', () => {
+  it('rejects forged Full access requests explicitly', async () => {
+    const response = await routes().request(
+      '/',
+      {
+        method: 'POST',
+        headers: extensionHeaders,
+        body: chatBody({ permissionMode: 'full' }),
+      },
+      localServer,
+    )
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({
+      error: 'Full access is not available.',
+    })
+  })
+
+  it('fails closed for Read-only ACP requests with a capability explanation', async () => {
+    const response = await routes().request(
+      '/',
+      {
+        method: 'POST',
+        headers: extensionHeaders,
+        body: chatBody({
+          target: { type: 'codex', agentId: crypto.randomUUID() },
+          permissionMode: 'read-only',
+        }),
+      },
+      localServer,
+    )
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({
+      error:
+        'Read-only permission mode is unavailable for ACP agents because their workspace tools cannot be restricted by the server.',
+    })
+  })
+
   it('refuses an untrusted caller that names a stored provider', async () => {
     const response = await routes().request('/', {
       method: 'POST',

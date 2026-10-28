@@ -34,6 +34,8 @@ export const NewTabChat: FC = () => {
   const {
     mode,
     setMode,
+    permissionMode,
+    setPermissionMode,
     messages,
     sendMessage,
     respondToToolApproval,
@@ -94,7 +96,8 @@ export const NewTabChat: FC = () => {
     const query = pending?.text ?? searchParams.get('q') ?? ''
     const chatMode = searchParams.get('mode')
     const tabIdsParam = searchParams.get('tabs')
-    const tabIds = pending?.tabIds ??
+    const tabIds =
+      pending?.tabIds ??
       (tabIdsParam
         ? tabIdsParam
             .split(',')
@@ -118,32 +121,35 @@ export const NewTabChat: FC = () => {
     if (tabIds.length > 0) {
       // URL query strings must never be able to nominate tabs outside the
       // user's current window. This rechecks membership before dispatch.
-      chrome.tabs.query({ currentWindow: true }).then((allTabs) => {
-        const matchedTabs = allTabs.filter(
-          (t) => t.id !== undefined && tabIds.includes(t.id),
-        )
-        if (matchedTabs.length > 0) {
-          const action =
-            actionType === 'ai-tab' && tabName
-              ? createAITabAction({
-                  name: tabName,
-                  description: tabDescription ?? '',
-                  tabs: matchedTabs,
-                })
-              : createBrowserOSAction({
-                  mode: (chatMode as 'chat' | 'agent') ?? 'agent',
-                  message: query,
-                  tabs: matchedTabs,
-                })
-          sendMessage({ text: query, action, files: pending?.files })
-        } else {
+      chrome.tabs
+        .query({ currentWindow: true })
+        .then((allTabs) => {
+          const matchedTabs = allTabs.filter(
+            (t) => t.id !== undefined && tabIds.includes(t.id),
+          )
+          if (matchedTabs.length > 0) {
+            const action =
+              actionType === 'ai-tab' && tabName
+                ? createAITabAction({
+                    name: tabName,
+                    description: tabDescription ?? '',
+                    tabs: matchedTabs,
+                  })
+                : createBrowserOSAction({
+                    mode: (chatMode as 'chat' | 'agent') ?? 'agent',
+                    message: query,
+                    tabs: matchedTabs,
+                  })
+            sendMessage({ text: query, action, files: pending?.files })
+          } else {
+            sendMessage({ text: query, files: pending?.files })
+          }
+        })
+        .catch(() => {
+          // A denied/closed tab lookup must not silently discard the prompt.
+          // Continue without any ambient tab context.
           sendMessage({ text: query, files: pending?.files })
-        }
-      }).catch(() => {
-        // A denied/closed tab lookup must not silently discard the prompt.
-        // Continue without any ambient tab context.
-        sendMessage({ text: query, files: pending?.files })
-      })
+        })
     } else {
       sendMessage({ text: query, files: pending?.files })
     }
@@ -255,6 +261,8 @@ export const NewTabChat: FC = () => {
         <ChatFooter
           mode={mode}
           onModeChange={handleModeChange}
+          permissionMode={permissionMode}
+          onPermissionModeChange={setPermissionMode}
           input={input}
           onInputChange={setInput}
           onSubmit={handleSubmit}

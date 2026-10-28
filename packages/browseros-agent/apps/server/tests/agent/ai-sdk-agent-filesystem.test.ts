@@ -55,4 +55,20 @@ describe('buildAgentFilesystemToolSet', () => {
     )
     expect(Object.keys(tools)).toEqual(['filesystem_read'])
   })
+
+  it('allows workspace inspection but excludes mutation and command tools in read-only permission mode', () => {
+    const tools = buildAgentFilesystemToolSet(
+      agentConfig({
+        permissionMode: 'read-only',
+        workingDir: '/tmp/browseros-workspace',
+      }),
+    )
+
+    expect(Object.keys(tools).sort()).toEqual([
+      'filesystem_find',
+      'filesystem_grep',
+      'filesystem_ls',
+      'filesystem_read',
+    ])
+  })
 })

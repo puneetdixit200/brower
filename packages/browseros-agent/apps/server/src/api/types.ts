@@ -65,6 +65,9 @@ const ChatInputSchema = z.object({
   supportsImages: z.boolean().optional().default(true),
   supportsReasoning: z.boolean().optional().default(true),
   mode: z.enum(['chat', 'agent']).optional().default('agent'),
+  // `mode` is the legacy task mode. Permission is an independent capability
+  // choice; Full is parsed so the route can reject forged requests clearly.
+  permissionMode: z.enum(['guard', 'read-only', 'full']).optional(),
   origin: z.enum(['sidepanel', 'newtab']).optional().default('sidepanel'),
   declinedApps: z.array(z.string()).optional(),
   selectedText: z.string().optional(),

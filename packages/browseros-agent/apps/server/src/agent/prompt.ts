@@ -24,13 +24,16 @@ function getRoleAndMode(
   _exclude: Set<string>,
   options?: BuildSystemPromptOptions,
 ): string {
-  const hasWorkspace = !!options?.workspaceDir && !options?.chatMode
+  const readOnly = options?.chatMode || options?.permissionMode === 'read-only'
+  const hasWorkspace = !!options?.workspaceDir && !readOnly
 
   let role = hasWorkspace
     ? `You are BrowserOS, a browser agent with full control of a Chromium browser, a filesystem workspace, and integrations with external apps.
 
 You can browse the web, interact with pages, manage tabs, read and write files, and work with connected services like Gmail, Slack, and Linear through direct API access.`
-    : `You are BrowserOS, a browser agent with full control of a Chromium browser and integrations with external apps.
+    : readOnly
+      ? `You are BrowserOS, a read-only browser agent. You can inspect pages and read, list, and search files in the selected workspace. You cannot change browser state, modify files, execute commands, or use connected external services.`
+      : `You are BrowserOS, a browser agent with full control of a Chromium browser and integrations with external apps.
 
 You can browse the web, interact with pages, manage tabs, and work with connected services like Gmail, Slack, and Linear through direct API access.
 
@@ -135,7 +138,12 @@ function getWorkspace(
   _exclude: Set<string>,
   options?: BuildSystemPromptOptions,
 ): string {
-  if (!options?.workspaceDir || options.chatMode) return ''
+  if (
+    !options?.workspaceDir ||
+    options.chatMode ||
+    options.permissionMode === 'read-only'
+  )
+    return ''
   return `<workspace>
 Working directory: ${options.workspaceDir}. You can read, write, search, and execute files here with the \`filesystem_*\` tools; use it to save extracted data, run scripts, or process files.
 </workspace>`
@@ -161,7 +169,10 @@ function getStyle(
   _exclude: Set<string>,
   options?: BuildSystemPromptOptions,
 ): string {
-  const hasWorkspace = !!options?.workspaceDir && !options?.chatMode
+  const hasWorkspace =
+    !!options?.workspaceDir &&
+    !options?.chatMode &&
+    options?.permissionMode !== 'read-only'
   const hasGeneratedOutputRead = !!options?.generatedOutputReadAvailable
 
   let style = `<style>
@@ -246,6 +257,7 @@ export interface BuildSystemPromptOptions {
   scheduledTaskPageId?: number
   workspaceDir?: string
   chatMode?: boolean
+  permissionMode?: 'guard' | 'read-only'
   /** Apps the user has connected and authenticated via Strata (from enabledMcpServers). */
   connectedApps?: string[]
   /** Apps the user previously declined to connect (chose "do it manually"). */

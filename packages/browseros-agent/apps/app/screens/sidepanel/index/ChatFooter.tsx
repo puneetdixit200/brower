@@ -10,7 +10,7 @@ import {
   selectedTextStorage,
 } from '@/lib/selected-text/selectedTextStorage'
 import { cn } from '@/lib/utils'
-import type { ChatMode } from '@/modules/chat/chat-types'
+import type { ChatMode, PermissionMode } from '@/modules/chat/chat-types'
 import { useWorkspace } from '@/modules/workspace/workspace.hooks'
 import { ChatAttachedTabs } from './ChatAttachedTabs'
 import { ChatInput, type ChatInputHandle } from './ChatInput'
@@ -21,6 +21,8 @@ import { getSelectedTextActionPrompt } from './selected-text-actions'
 export interface ChatFooterProps {
   mode: ChatMode
   onModeChange: (mode: ChatMode) => void
+  permissionMode: PermissionMode
+  onPermissionModeChange: (mode: PermissionMode) => void
   input: string
   onInputChange: (value: string) => void
   onSubmit: (e: FormEvent) => void
@@ -35,6 +37,8 @@ export interface ChatFooterProps {
 export const ChatFooter: FC<ChatFooterProps> = ({
   mode,
   onModeChange,
+  permissionMode,
+  onPermissionModeChange,
   input,
   onInputChange,
   onSubmit,
@@ -132,6 +136,30 @@ export const ChatFooter: FC<ChatFooterProps> = ({
       <div className="p-3">
         <div className="flex items-center gap-2">
           <ChatModeToggle mode={mode} onModeChange={onModeChange} />
+
+          <label className="sr-only" htmlFor="permission-mode">
+            Permission mode
+          </label>
+          <select
+            id="permission-mode"
+            aria-label="Permission mode"
+            title={
+              mode === 'chat'
+                ? 'Chat task mode always uses Read-only permissions.'
+                : 'Choose what BrowserOS can do for this task.'
+            }
+            value={mode === 'chat' ? 'read-only' : permissionMode}
+            onChange={(event) =>
+              onPermissionModeChange(event.target.value as PermissionMode)
+            }
+            className="h-8 rounded-lg border border-border/50 bg-background px-2 text-muted-foreground text-xs"
+          >
+            <option value="guard">Guard</option>
+            <option value="read-only">Read-only</option>
+            <option value="full" disabled>
+              Full access (unavailable)
+            </option>
+          </select>
 
           <div className="h-4 w-px bg-border/50" />
 

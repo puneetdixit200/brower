@@ -44,6 +44,8 @@ export interface ResolvedAgentConfig {
   supportsReasoning?: boolean
   /** Chat mode - restricts to read-only tools (no browser automation). Defaults to false. */
   chatMode?: boolean
+  /** Capability mode chosen separately from legacy task mode. */
+  permissionMode?: 'guard' | 'read-only'
   /** Scheduled task mode - disables tab grouping. Defaults to false. */
   isScheduledTask?: boolean
   /** Apps the user previously declined to connect via MCP (chose "do it manually"). */

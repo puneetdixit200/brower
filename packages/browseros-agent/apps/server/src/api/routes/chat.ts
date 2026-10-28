@@ -3,6 +3,10 @@ import type { ConversationPanelAssignments } from '@browseros/shared/schemas/con
 import { zValidator } from '@hono/zod-validator'
 import { createUIMessageStreamResponse } from 'ai'
 import { Hono } from 'hono'
+import {
+  permissionModeTargetError,
+  resolvePermissionMode,
+} from '../../agent/permission-mode'
 import { SessionStore } from '../../agent/session-store'
 import type { AcpAgentRuntime } from '../../lib/agents/acp/acp-agent-runtime'
 import { SERVER_CREDENTIALED_PROVIDERS } from '../../lib/clients/llm/config'
@@ -94,6 +98,9 @@ export function createChatRoutes(deps: ChatRouteDeps): Hono<Env> {
   )
   app.post('/', zValidator('json', ChatRequestSchema), async (c) => {
     const parsed = c.req.valid('json')
+    if (parsed.permissionMode === 'full') {
+      return c.json({ error: 'Full access is not available.' }, 400)
+    }
     if (
       'approvalResponse' in parsed &&
       parsed.approvalResponse &&
@@ -102,6 +109,17 @@ export function createChatRoutes(deps: ChatRouteDeps): Hono<Env> {
       return c.json({ error: 'Forbidden' }, 403)
     }
     const parsedBrowserRequest = isBrowserOsChatRequest(parsed) ? parsed : null
+    const permissionMode = resolvePermissionMode(
+      parsed.mode,
+      parsed.permissionMode,
+    )
+    const permissionTargetError = permissionModeTargetError(
+      parsedBrowserRequest ? 'browseros' : 'acp',
+      permissionMode,
+    )
+    if (permissionTargetError) {
+      return c.json({ error: permissionTargetError }, 400)
+    }
     if (!parsedBrowserRequest && !isTrustedAppRequest(c)) {
       return c.json({ error: 'Forbidden' }, 403)
     }

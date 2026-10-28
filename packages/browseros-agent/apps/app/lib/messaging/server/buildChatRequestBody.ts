@@ -1,6 +1,6 @@
 import { getModelsDevModels } from '@/lib/llm-providers/models-dev'
 import type { LlmProviderConfig } from '@/lib/llm-providers/types'
-import type { ChatMode } from '@/modules/chat/chat-types'
+import type { ChatMode, PermissionMode } from '@/modules/chat/chat-types'
 
 /**
  * Resolves whether the selected model supports reasoning from the models.dev
@@ -52,6 +52,7 @@ export interface ChatRequestBodyParams {
   providerId?: string
   message?: string
   mode?: ChatMode
+  permissionMode?: PermissionMode
   browserContext?: ChatRequestBrowserContext
   userSystemPrompt?: string
   userWorkingDir?: string
@@ -77,6 +78,7 @@ export const buildChatRequestBody = ({
   providerId,
   message = '',
   mode,
+  permissionMode,
   browserContext,
   userSystemPrompt,
   userWorkingDir,
@@ -104,6 +106,7 @@ export const buildChatRequestBody = ({
   message,
   conversationId,
   mode,
+  permissionMode,
   browserContext,
   userSystemPrompt,
   userWorkingDir,

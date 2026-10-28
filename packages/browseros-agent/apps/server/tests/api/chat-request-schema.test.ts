@@ -8,6 +8,28 @@ import { describe, expect, it } from 'bun:test'
 import { ChatRequestSchema } from '../../src/api/types'
 
 describe('ChatRequestSchema agent targets', () => {
+  it('accepts an explicit permission mode independently of task mode', () => {
+    const parsed = ChatRequestSchema.parse({
+      conversationId: crypto.randomUUID(),
+      message: 'inspect',
+      mode: 'agent',
+      permissionMode: 'read-only',
+    })
+
+    expect(parsed.permissionMode).toBe('read-only')
+    expect(parsed.mode).toBe('agent')
+  })
+
+  it('retains Full as a known request value so the route can reject it explicitly', () => {
+    const parsed = ChatRequestSchema.parse({
+      conversationId: crypto.randomUUID(),
+      message: 'forged request',
+      permissionMode: 'full',
+    })
+
+    expect(parsed.permissionMode).toBe('full')
+  })
+
   it('normalizes a legacy BrowserOS request without a target', () => {
     const parsed = ChatRequestSchema.parse({
       conversationId: crypto.randomUUID(),

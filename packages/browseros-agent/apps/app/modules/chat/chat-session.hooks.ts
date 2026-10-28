@@ -62,7 +62,7 @@ import {
   resolveRestoredChatTarget,
   restoreServerConversation,
 } from './chat-session-restore'
-import type { ChatMode } from './chat-types'
+import type { ChatMode, PermissionMode } from './chat-types'
 import { addContentFilterNotice } from './content-filter-notice'
 import {
   conversationReconnectUrl,
@@ -281,6 +281,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   const providers: Provider[] = chatTargets.map(toProviderOption)
 
   const [mode, setMode] = useState<ChatMode>('agent')
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>('guard')
   const [textToAction, setTextToAction] = useState<Map<string, ChatAction>>(
     new Map(),
   )
@@ -331,6 +332,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   }
 
   const modeRef = useRef<ChatMode>(mode)
+  const permissionModeRef = useRef<PermissionMode>(permissionMode)
   const textToActionRef = useRef<Map<string, ChatAction>>(textToAction)
   const workingDirRef = useRef<string | undefined>(undefined)
   const selectionMapRef = useRef<
@@ -374,8 +376,9 @@ export const useChatSession = (options?: ChatSessionOptions) => {
 
   useDeepCompareEffect(() => {
     modeRef.current = mode
+    permissionModeRef.current = permissionMode
     textToActionRef.current = textToAction
-  }, [mode, textToAction])
+  }, [mode, permissionMode, textToAction])
 
   const selectedProvider = selectedChatTarget
     ? toProviderOption(selectedChatTarget)
@@ -423,6 +426,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
           selectionMapRef.current,
         )
         const currentMode = modeRef.current
+        const currentPermissionMode = permissionModeRef.current
         const enabledMcpServers = enabledMcpServersRef.current
         const customMcpServers = enabledCustomServersRef.current
         const lastUserMessage = getLastUserMessageText(messages)
@@ -457,6 +461,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
         const commonRequest = {
           conversationId: conversationIdRef.current,
           mode: currentMode,
+          permissionMode: currentPermissionMode,
           browserContext: requestBrowserContext,
           userSystemPrompt,
           userWorkingDir: workingDirRef.current,
@@ -1085,6 +1090,8 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   return {
     mode,
     setMode,
+    permissionMode,
+    setPermissionMode,
     messages,
     sendMessage,
     respondToToolApproval: addToolApprovalResponse,

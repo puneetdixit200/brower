@@ -106,7 +106,7 @@ Account allowance was already at 3% remaining when this continuation began, belo
 Next: resume only when requested and allowance permits. Implement all remaining master-spec features, prioritizing R02 durable heartbeat continuation and P03 origin-bound blind autofill without exposing passwords, alongside completing native loader/crash-reporter compilation, full native browser build and security boundaries. Read CONTINUATION_HANDOFF.md, IMPLEMENTATION_PLAN.md and the latest source-foundation evidence. Run only tests authorized by the current user instruction; record all unverified behavior. Keep release signing/update ownership blocked until provisioned.
 
 
-## Current uncommitted R02/P03 checkpoint — 2026-10-28
+## R02/P03 source checkpoint — 2026-10-28 (historical snapshot)
 
 At this earlier checkpoint, the local worktree had source changes for heartbeat task selection/continuation and an Aster-only Autofill deny guard; the R02/P03 changes had not yet been applied to the native checkout. The later superseding update below records that the exact guard/test hunks are now applied and GN regeneration succeeded. Native compilation and browser tests remain pending. The Autofill denial is a safety guard only; P03 remains NOT_STARTED until browser-owned consent and an origin-safe broker exist. Current matrix: **2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, 1 NOT_STARTED**. Details: [checkpoint evidence](evidence/aster-r02-p03-source-checkpoint-2026-10-28.md).
 
@@ -122,7 +122,7 @@ Fetched `aster/feat/aster-linux-ui`; GitHub had no commits newer than `70060058f
 
 ### T06 follow-up — 2026-10-28
 
-The Linux Bash pathname gap is closed in source: Bun inherits the session-pinned workspace descriptor as stdio fd 3 and Bubblewrap binds `/proc/self/fd/3`. A regression renames the workspace, replaces its former path, and confirms the original inode remains mounted. Focused filesystem/agent/ChatService-ACP/lifecycle tests pass 455/455; server typecheck, targeted Biome, `git diff --check`, and independent Luna review pass. GitHub fetch found no commits newer than `df9d2a270`.
+The Linux Bash pathname gap is closed in source: Bun inherits the session-pinned workspace descriptor as stdio fd 3 and Bubblewrap binds `/proc/self/fd/3`. A regression renames the workspace, replaces its former path, and confirms the original inode remains mounted. Focused filesystem/agent/ChatService-ACP/lifecycle tests pass 455/455; server typecheck, targeted Biome, `git diff --check`, and independent Luna review pass. The current remote branch contains `9152baa17` and `a341bd20f`; no fetched updates were ahead of local HEAD `a341bd20f`.
 
 **Next:** resolve non-Linux validation-to-use races and verify confinement in the packaged runtime. Then perform headed permission/browser acceptance for U09/U13/U14, continue all remaining MUST items in the 95-subtask plan, and keep native build, performance, signing, and release gates open until evidenced. S02 remains PARTIAL. Preserve the dirty Chromium checkout and checkpoint/push/stop when the account allowance reaches 5% remaining.
 
@@ -134,7 +134,7 @@ P03 remains NOT_STARTED. The exact Aster guard/test hunks have been applied to t
 
 ### A05 current source checkpoint — 2026-10-28
 
-The committed A05 lifecycle implementation persists conversation/run identifiers, status and timestamps; startup marks leftover `running` rows `interrupted`; the app fetches and displays the existing transcript without opening a stream; and deletion removes lifecycle plus conversation data. Focused evidence: 63 server tests, 5 app tests, app/server typechecks and targeted Biome, recorded in [A05 lifecycle evidence](evidence/aster-a05-lifecycle-2026-10-28.md). A05 remains PARTIAL: stream/tool state, replay, execution continuation and approval/ownership recovery are absent, and no headed or packaged-native restart acceptance was run. Next verify actual app/server process restart, transcript display, delete cleanup and no replay, then continue broader recovery and native gates.
+The committed A05 lifecycle implementation persists conversation/run identifiers, status and timestamps; startup marks leftover `running` rows `interrupted`; the app fetches and displays the existing transcript without opening a stream; and deletion removes lifecycle plus conversation data. Focused evidence: 63 server tests, 5 app tests, app/server typechecks and targeted Biome, recorded in [A05 lifecycle evidence](evidence/aster-a05-lifecycle-2026-10-28.md). A05 remains PARTIAL: stream/tool state, replay, execution continuation and approval/ownership recovery are absent. The lifecycle transcript flow has no headed or packaged-native restart acceptance; separate task-history visibility smokes verified interruption status only. Next verify actual app/server process restart, transcript display, delete cleanup and no replay, then continue broader recovery and native gates.
 
 ### Current batch: R03 reliability, U07 routing, and native build — 2026-10-28
 
@@ -143,3 +143,9 @@ R03 alarm reliability and U07 stored-provider routing have focused tests, typech
 The pinned native checkout has the Aster patch set and the focused Autofill handler and DevTools test translation units compile. The one-job `browser_tests` build stopped cleanly at 621/52,858 actions after slow progress; no linked browser-test binary, native browser launch, or focused browser test has been verified. The stop left the dirty native checkout and generated outputs intact; the final snapshot was 4.8 GiB available RAM, 9.1 GiB swap used, and 267 GiB disk free. Pick a narrower/reusable build plan before another attempt; never report object compilation as browser-test success.
 
 The completion figure is evidence-based: **2/72 matrix features PASS (2.8%)**; the remaining rows are PARTIAL, PARTIAL/BLOCKED, or NOT_STARTED. This is not an effort-weighted estimate because the features and 95 implementation subtasks have different sizes and no validated weighting scheme. Continue the full 95-subtask plan; source foundations do not equal completed features.
+
+### Current continuation — T05.1 permission modes — 2026-10-28
+
+Fetched GitHub remotes; `aster/feat/aster-linux-ui` remains at `a341bd20f` with no newer Aster commit. This checkpoint adds independent Read-only/Guard task permission selection and server enforcement. Focused verification passes 57 server tests and 5 app request tests; app/server typechecks, targeted Biome, diff check, and independent Luna review pass. Full access remains disabled and rejected; ACP Read-only fails closed. No headed or packaged-runtime check has run.
+
+**Next:** persist per-action allow/ask/deny policy (T05.2), exercise approval, denial, expiry, forgery and restart; add local send/post/payment fixtures through the server gate (T05.3), then repeat in a runnable Aster package when T20a is available. Do not enable Full until the platform enforces its claimed browser and filesystem scope. Continue all other MUST work in the 95-subtask plan, including cross-platform filesystem races and native build/runtime gates. Account usage was 68% primary and 26% weekly at the latest check, so continue and checkpoint when only 5% remains.

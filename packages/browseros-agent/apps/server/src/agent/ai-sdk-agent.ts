@@ -141,6 +141,7 @@ export function buildAgentFilesystemToolSet(
   return buildFilesystemToolSet(resolvedConfig.workingDir, {
     resourcesDir: options.resourcesDir,
     workspaceRoot: options.workspaceRoot,
+    readOnly: resolvedConfig.permissionMode === 'read-only',
   })
 }
 
@@ -202,15 +203,23 @@ export class AiSdkAgent {
       const internalSpec = buildInternalBrowserMcpSpec({
         serverPort: config.serverPort,
         leaseToken: config.browserToolLeaseToken,
-        readOnly: config.resolvedConfig.chatMode ?? false,
+        readOnly:
+          config.resolvedConfig.chatMode ||
+          config.resolvedConfig.permissionMode === 'read-only',
       })
       const internalMcp = await createMcpClients([internalSpec])
       connectedMcpClients.push(...internalMcp.clients)
       const reservedInternalToolNames = new Set(Object.keys(internalMcp.tools))
 
-      const customSpecs = await buildMcpServerSpecs({
-        browserContext: config.browserContext,
-      })
+      // Arbitrary custom MCP servers do not provide a server-enforced
+      // read-only capability, so omit them entirely in Read-only mode.
+      const customSpecs =
+        config.resolvedConfig.permissionMode === 'read-only' ||
+        config.resolvedConfig.chatMode
+          ? []
+          : await buildMcpServerSpecs({
+              browserContext: config.browserContext,
+            })
       const customMcp = await createMcpClients(customSpecs)
       connectedMcpClients.push(...customMcp.clients)
       const rawExternalMcpTools = withoutReservedInternalToolNames(
@@ -296,7 +305,9 @@ export class AiSdkAgent {
         },
       )
       const workspaceDirForPrompt =
-        !config.resolvedConfig.chatMode && 'filesystem_write' in filesystemTools
+        !config.resolvedConfig.chatMode &&
+        config.resolvedConfig.permissionMode !== 'read-only' &&
+        'filesystem_write' in filesystemTools
           ? (workspaceRoot?.path ?? config.resolvedConfig.workingDir)
           : undefined
       const candidateTools = {
@@ -330,6 +341,9 @@ export class AiSdkAgent {
       ) {
         excludeSections.push('nudges')
       }
+      if (config.resolvedConfig.permissionMode === 'read-only') {
+        excludeSections.push('external-integrations')
+      }
       const instructions = buildSystemPrompt({
         userSystemPrompt: config.resolvedConfig.userSystemPrompt,
         exclude: excludeSections,
@@ -337,6 +351,7 @@ export class AiSdkAgent {
         scheduledTaskPageId: config.browserContext?.activeTab?.pageId,
         workspaceDir: workspaceDirForPrompt,
         chatMode: config.resolvedConfig.chatMode,
+        permissionMode: config.resolvedConfig.permissionMode,
         connectedApps: config.browserContext?.enabledMcpServers,
         declinedApps: config.resolvedConfig.declinedApps,
         origin: config.resolvedConfig.origin,

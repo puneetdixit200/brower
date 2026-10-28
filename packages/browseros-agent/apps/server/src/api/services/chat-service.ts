@@ -24,6 +24,7 @@ import {
   sanitizeMessagesForToolset,
   stripReasoningParts,
 } from '../../agent/message-validation'
+import { resolvePermissionMode } from '../../agent/permission-mode'
 import type { AgentSession, SessionStore } from '../../agent/session-store'
 import { applyToolApprovalResponse } from '../../agent/tool-approval-response'
 import type { ResolvedAgentConfig } from '../../agent/types'
@@ -230,6 +231,10 @@ export class ChatService {
       supportsImages: request.supportsImages,
       supportsReasoning: request.supportsReasoning,
       chatMode: request.mode === 'chat',
+      permissionMode: resolvePermissionMode(
+        request.mode,
+        request.permissionMode,
+      ),
       isScheduledTask: request.isScheduledTask,
       origin: request.origin,
       declinedApps: request.declinedApps,
@@ -250,11 +255,14 @@ export class ChatService {
       mcpServerKey: session.mcpServerKey,
       workingDir: session.workingDir,
       chatMode: session.chatMode,
+      permissionMode: session.permissionMode ?? 'guard',
     }
 
     const mcpChanged = !!prior && prior.mcpServerKey !== mcpServerKey
     const workspaceChanged =
       !!prior && prior.workingDir !== request.userWorkingDir
+    const permissionModeChanged =
+      !!prior && prior.permissionMode !== agentConfig.permissionMode
     const modeChanged = !!prior && prior.chatMode !== requestChatMode
 
     // One rebuild reflects every change, because rebuildSession reads the
@@ -262,12 +270,16 @@ export class ChatService {
     // drops the agent's record of tool calls it already made
     // (sanitizeMessagesForToolset removes parts the narrower toolset lacks) and
     // switching back does not restore them.
-    if (session && (mcpChanged || workspaceChanged || modeChanged)) {
+    if (
+      session &&
+      (mcpChanged || workspaceChanged || modeChanged || permissionModeChanged)
+    ) {
       logger.info('Rebuilding session for mid-conversation input changes', {
         conversationId: request.conversationId,
         mcpChanged,
         workspaceChanged,
         modeChanged,
+        permissionModeChanged,
       })
       session = await this.rebuildSession(
         session,
@@ -666,7 +678,9 @@ export class ChatService {
       },
       conversationId: request.conversationId,
       browserToolLeaseToken: acpToolLease.token,
-      readOnly: request.mode === 'chat',
+      readOnly:
+        resolvePermissionMode(request.mode, request.permissionMode) ===
+        'read-only',
       messages: promptMessages,
       browserContext,
       abortSignal,
@@ -738,7 +752,9 @@ export class ChatService {
     request: AcpChatRequest,
     browserContext: BrowserContext | undefined,
   ): BrowserToolLease {
-    const readOnly = request.mode === 'chat'
+    const readOnly =
+      resolvePermissionMode(request.mode, request.permissionMode) ===
+      'read-only'
     // Only the agent identity and the read-only flag require a new capability.
     // The browser context is refreshed in place instead: re-minting the token
     // on every context change restarts the ACP agent process, and a custom
@@ -862,6 +878,7 @@ export class ChatService {
       mcpServerKey,
       workingDir: request.userWorkingDir,
       chatMode: agentConfig.chatMode ?? false,
+      permissionMode: agentConfig.permissionMode,
       outputFileAccess,
     }
     newSession.agent.messages = sanitizeMessagesForToolset(
@@ -880,7 +897,8 @@ export class ChatService {
   ): Promise<{ agent: AiSdkAgent; browserToolLease: BrowserToolLease }> {
     const browserToolLease = this.deps.browserMcp.createLease({
       conversationId: agentConfig.conversationId,
-      readOnly: agentConfig.chatMode ?? false,
+      readOnly:
+        agentConfig.chatMode || agentConfig.permissionMode === 'read-only',
       outputFileAccess,
       browserContext,
       source: 'chat',

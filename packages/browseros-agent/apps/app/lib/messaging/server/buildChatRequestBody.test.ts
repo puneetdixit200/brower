@@ -90,6 +90,18 @@ describe('buildChatRequestBody', () => {
     expect(body.declinedApps).toEqual(['gmail'])
   })
 
+  it('sends permission mode separately from the legacy task mode', () => {
+    const body = buildChatRequestBody({
+      conversationId: '6ff46e3b-e45a-40a4-9157-ca520e800f43',
+      provider,
+      mode: 'agent',
+      permissionMode: 'read-only',
+    })
+
+    expect(body.mode).toBe('agent')
+    expect(body.permissionMode).toBe('read-only')
+  })
+
   it('forwards staged image attachments on an explicitly submitted LLM message', () => {
     const attachment = {
       mediaType: 'image/png',
