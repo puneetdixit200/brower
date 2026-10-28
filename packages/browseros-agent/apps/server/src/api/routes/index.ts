@@ -38,6 +38,7 @@ import { createProvidersRoutes } from './providers'
 import { createRefinePromptRoutes } from './refine-prompt'
 import { createScheduledJobRunRoutes } from './scheduled-job-runs'
 import { createScheduledJobRoutes } from './scheduled-jobs'
+import { createSiteRecipeRoutes } from './site-recipes'
 import { createShutdownRoute } from './shutdown'
 import { createStatusRoute } from './status'
 
@@ -128,6 +129,7 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
   app.use('/scheduled-job-runs/*', requireTrustedAppOrigin())
   app.use('/memory', requireTrustedAppOrigin())
   app.use('/memory/*', requireTrustedAppOrigin())
+  app.use('/site-recipes/*', requireTrustedAppOrigin())
 
   return (
     app
@@ -180,6 +182,7 @@ export function createApiRoutes(deps: CreateApiRoutesDeps) {
       .route('/scheduled-jobs', createScheduledJobRoutes())
       .route('/scheduled-job-runs', createScheduledJobRunRoutes())
       .route('/memory', createMemoryRoutes())
+      .route('/site-recipes', createSiteRecipeRoutes())
   )
 }
 
