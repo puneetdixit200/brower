@@ -1,6 +1,6 @@
 # Aster continuation handoff and full implementation plan
 
-Updated 2026-10-28. The full project remains incomplete. This goal is paused at the user-requested 5% allowance threshold; resume only when requested. This file supplements, and does not reduce, the original master specification or the 95-subtask implementation plan.
+Updated 2026-10-28. The full project remains incomplete. The previous goal was paused at the user-requested 5% allowance threshold. The user explicitly resumed it on 2026-10-28; the project remains incomplete. This file supplements, and does not reduce, the original master specification or the 95-subtask implementation plan.
 
 ## Mandatory implementation scope
 
@@ -15,7 +15,7 @@ The user explicitly requests **building all features**, including when the next 
 
 ## Verified progress accounting
 
-Feature matrix snapshot: **72 total; 2 PASS (2.8%), 28 partial including one blocked, 42 NOT_STARTED**. Thirty features (41.7%) have implementation/evidence work recorded. This is status coverage; remaining effort is not uniform across features. No reliable weighted code/effort completion percentage has been measured.
+Feature matrix snapshot: **72 total; 2 PASS (2.8%), 31 partial including one blocked, 39 NOT_STARTED** as of the remote implementation batch. Thirty-three features (45.8%) have implementation/evidence work recorded. This is status coverage; remaining effort is not uniform across features. No reliable weighted code/effort completion percentage has been measured.
 
 PASS rows are U04 and U05. Native browser acceptance, package release, performance and broad security gates remain open.
 
@@ -125,9 +125,9 @@ The canonical descriptions, dependencies and evidence remain in FEATURE_MATRIX.m
 | B08 | Extensions and normal password-manager support | NOT_STARTED |
 | B09 | Media, WebRTC, permissions, devtools | NOT_STARTED |
 | B10 | Session restore without profile corruption | NOT_STARTED |
-| U01 | Collapsible/resizable original sidebar | NOT_STARTED |
-| U02 | Sidebar groups: bookmarks/chats/tabs | NOT_STARTED |
-| U03 | Recent task cards, real statuses | NOT_STARTED |
+| U01 | Collapsible/resizable original sidebar | PARTIAL (source-only) |
+| U02 | Sidebar groups: bookmarks/chats/tabs | PARTIAL (source-only) |
+| U03 | Recent task cards, real statuses | PARTIAL (source-only) |
 | U04 | Search/Ask input modes | PASS |
 | U05 | URL detection and search provider | PASS |
 | U06 | `@` tab/history/file/memory context selector | PARTIAL |
@@ -187,3 +187,8 @@ The canonical descriptions, dependencies and evidence remain in FEATURE_MATRIX.m
 | F03 | Efficient idle CPU and RSS overhead | NOT_STARTED |
 | F04 | No slower typical browsing than upstream beyond budget | NOT_STARTED |
 | F05 | Backpressure under many tabs/tasks | NOT_STARTED |
+
+
+## Subsequent remote implementation checkpoint — 2026-10-28
+
+User resumed the project. The cloud session could not clone through container Git because GitHub DNS resolution failed, but the authenticated GitHub connector committed a substantial, source-only batch: real resizable Aster UI sidebar (U01), current-window tab/HTTP(S)-bookmark/conversation sidebar (U02), real credential-filtered local task cards (U03), safer one-time private tab/prompt handoff (U06/S01), and persisted extension-only scaling, theme and reduced motion (additional U09 work). An isolated TypeScript helper strict check plus 3 Node assertions pass; no full WXT/native build ran remotely. See [remote batch evidence](evidence/aster-remote-implementation-2026-10-28.md). The feature matrix, progress and next steps are canonical; release signing, native binary and remaining subtasks are still open.
