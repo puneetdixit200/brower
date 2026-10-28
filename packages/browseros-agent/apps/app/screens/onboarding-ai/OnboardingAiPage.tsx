@@ -54,6 +54,23 @@ export const OnboardingAiPage: FC = () => {
           settings.
         </p>
 
+        <section
+          aria-label="Privacy and model-routing explanation"
+          className="mb-6 space-y-2 rounded-xl border border-border bg-muted/30 p-4 text-muted-foreground text-sm"
+        >
+          <h2 className="font-semibold text-foreground">Where your AI requests go</h2>
+          <p>
+            Aster runs the browser on your device. AI tasks use your selected model
+            provider or coding-agent runtime. Cloud providers may receive your
+            prompts and explicitly attached page content. Ollama and LM Studio
+            can run locally, but only if you configure a local endpoint.
+          </p>
+          <p>
+            Browser passwords, passkeys and one-time codes must stay in Chromium's
+            native login flow, not in an AI prompt. You can change or remove
+            providers in AI Settings. No model is connected automatically.
+          </p>
+        </section>
         <AddProviderSection
           onCreateAgent={addProvider.onCreateAgent}
           onCreateCustomAgent={addProvider.onCreateCustomAgent}
