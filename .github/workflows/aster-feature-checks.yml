@@ -1,0 +1,63 @@
+name: Aster focused development checks
+
+on:
+  push:
+    branches:
+      - feat/aster-linux-ui
+    paths:
+      - ".github/workflows/aster-feature-checks.yml"
+      - "packages/browseros-agent/apps/app/components/sidebar/**"
+      - "packages/browseros-agent/apps/app/components/layout/command-palette-tabs.ts"
+      - "packages/browseros-agent/apps/app/screens/sidepanel/index/ToolBatch.tsx"
+      - "packages/browseros-agent/apps/app/screens/sidepanel/index/approval-preview*"
+      - "packages/browseros-agent/apps/server/src/agent/tool-approval-policy.ts"
+      - "packages/browseros-agent/apps/server/tests/agent/tool-approval-policy.test.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aster-focused-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: packages/browseros-agent
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: packages/browseros-agent/package.json
+      - name: Install pinned dependencies
+        run: bun ci
+      - name: Set up disposable development environment
+        run: cp .env.development.example .env.development
+      - name: Extension typecheck
+        run: bun run --filter @browseros/app typecheck
+      - name: Server typecheck
+        run: bun run --filter @browseros/server typecheck
+      - name: Focused regression checks
+        run: |
+          bun test \
+            apps/app/components/sidebar/sidebar-browser-data.test.ts \
+            apps/app/screens/sidepanel/index/approval-preview.test.ts \
+            apps/server/tests/agent/tool-approval-policy.test.ts
+      - name: Focused Biome source check
+        run: |
+          bunx @biomejs/biome check \
+            apps/app/components/sidebar/SidebarBrowserGroups.tsx \
+            apps/app/components/sidebar/sidebar-browser-data.ts \
+            apps/app/components/sidebar/sidebar-browser-data.test.ts \
+            apps/app/components/layout/command-palette-tabs.ts \
+            apps/app/screens/sidepanel/index/ToolBatch.tsx \
+            apps/app/screens/sidepanel/index/approval-preview.ts \
+            apps/app/screens/sidepanel/index/approval-preview.test.ts \
+            apps/server/src/agent/tool-approval-policy.ts \
+            apps/server/tests/agent/tool-approval-policy.test.ts
