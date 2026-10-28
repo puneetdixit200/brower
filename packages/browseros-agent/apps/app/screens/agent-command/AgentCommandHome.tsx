@@ -1,5 +1,5 @@
 import { ArrowRight, Search, Sparkles } from 'lucide-react'
-import { type FC, type FormEvent, useState } from 'react'
+import { type FC, type FormEvent, useCallback, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { NoProviderNotice } from '@/components/chat/NoProviderNotice'
 import { ProcessingDisclosure } from '@/components/chat/ProcessingDisclosure'
@@ -14,11 +14,11 @@ import { useShowImportHint } from '@/screens/newtab/index/import-hint.hooks'
 import { RecentSites } from '@/screens/newtab/index/RecentSites'
 import { RecentTasks } from '@/screens/newtab/index/RecentTasks'
 import { ScheduleResults } from '@/screens/newtab/index/ScheduleResults'
+import { BrowserQuickControls } from './BrowserQuickControls'
 import {
   ConversationInput,
   type ConversationInputSendInput,
 } from './ConversationInput'
-import { BrowserQuickControls } from './BrowserQuickControls'
 import { withSelectedHistoryContext } from './history-context'
 import { resolveHomeLlmRoutingMode } from './home-compose.helpers'
 import { resolveHomeSearchUrl } from './home-search'
@@ -53,6 +53,13 @@ export const AgentCommandHome: FC = () => {
   const [sendAttemptBlocked, setSendAttemptBlocked] = useState(false)
   const [mode, setMode] = useState<'ask' | 'search'>('ask')
   const [searchQuery, setSearchQuery] = useState('')
+  const [screenshotContext, setScreenshotContext] = useState<string | null>(
+    null,
+  )
+  const clearScreenshotContext = useCallback(
+    () => setScreenshotContext(null),
+    [],
+  )
   const sendBlocked = sendAttemptBlocked && noTarget
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
@@ -80,7 +87,11 @@ export const AgentCommandHome: FC = () => {
       withSelectedHistoryContext(input.text, input.selectedHistory),
       input.selectedMemories,
     )
-    if (target.kind === 'llm' && llmRoutingMode === 'sidepanel') {
+    if (
+      target.kind === 'llm' &&
+      llmRoutingMode === 'sidepanel' &&
+      input.attachments.length === 0
+    ) {
       const action = createBrowserOSAction({
         mode: 'chat',
         message,
@@ -103,10 +114,12 @@ export const AgentCommandHome: FC = () => {
         .map((tab) => tab.id)
         .filter((id): id is number => id !== undefined),
     })
-    navigate(`/home/chat?${new URLSearchParams({
-      handoff,
-      mode: 'agent',
-    }).toString()}`)
+    navigate(
+      `/home/chat?${new URLSearchParams({
+        handoff,
+        mode: 'agent',
+      }).toString()}`,
+    )
   }
 
   return (
@@ -184,6 +197,8 @@ export const AgentCommandHome: FC = () => {
                 selectedProvider={selectedProvider}
                 onSelectProvider={selectProvider}
                 onSend={handleSend}
+                screenshotDataUrl={screenshotContext}
+                onScreenshotConsumed={clearScreenshotContext}
                 streaming={false}
                 // Stays usable with nothing connected so the task someone came to
                 // write survives the trip to provider setup. Only a genuinely
@@ -191,7 +206,7 @@ export const AgentCommandHome: FC = () => {
                 disabled={
                   waitingForLlmCapabilities || (!selectedProvider && !noTarget)
                 }
-                attachmentsEnabled={selectedProvider?.kind === 'acp'}
+                attachmentsEnabled={Boolean(selectedProvider)}
                 placeholder={
                   selectedProvider
                     ? `Ask ${selectedProvider.name} to handle a task...`
@@ -215,7 +230,10 @@ export const AgentCommandHome: FC = () => {
         </div>
 
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-10 pb-12">
-          <BrowserQuickControls />
+          <BrowserQuickControls
+            onScreenshotContext={setScreenshotContext}
+            screenshotContextEnabled={Boolean(selectedProvider)}
+          />
           <RecentTasks />
           <RecentSites />
           <ScheduleResults />

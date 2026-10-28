@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'bun:test'
 import type { UIMessage } from 'ai'
+import { resolvePanelTabId } from '@/lib/browseros/panelTab'
 import type { LlmProviderConfig } from '@/lib/llm-providers/types'
 import {
   buildSidepanelPreparedSendMessagesRequest,
+  getOwnerTabSelection,
   getToolApprovalResponse,
   prepareSidepanelSendMessagesRequest,
 } from './chat-session-request'
@@ -11,6 +13,111 @@ import type { SidepanelChatTarget } from './sidepanel-chat-targets'
 const conversationId = '00000000-0000-4000-8000-000000000001'
 
 describe('chat request preparation', () => {
+  it('submits only the owning tab selection and its captured URL metadata', async () => {
+    const ownerTabId = await resolvePanelTabId(
+      'chrome-extension://assistant/sidepanel.html?tabId=10#/chat',
+    )
+    expect(ownerTabId).toBe(10)
+    if (ownerTabId === undefined) throw new Error('Owner tab ID was not parsed')
+    const ownerTab = {
+      id: ownerTabId,
+      url: 'https://owner.example/page',
+      title: 'Owner page',
+    }
+    const ownerSelection = {
+      text: 'owner-only selected text',
+      url: 'https://owner.example/selected-source',
+      title: 'Owner selection source',
+    }
+    const otherSelection = {
+      text: 'other-tab secret text',
+      url: 'https://other.example/private',
+      title: 'Other tab title',
+    }
+    const selection = getOwnerTabSelection(ownerTab, {
+      '10': ownerSelection,
+      '20': otherSelection,
+    })
+
+    const request = buildSidepanelPreparedSendMessagesRequest({
+      agentServerUrl: 'http://127.0.0.1:5151',
+      target: llmTarget,
+      fallbackProvider,
+      message: 'Summarize the selected passage',
+      browserContext: {
+        activeTab: {
+          id: ownerTab.id,
+          url: ownerTab.url,
+          title: ownerTab.title,
+        },
+      },
+      selectedText: selection?.text,
+      selectedTextSource: selection
+        ? { url: selection.url, title: selection.title }
+        : undefined,
+      conversationId,
+      mode: 'agent',
+    })
+
+    expect(request.body).toMatchObject({
+      message: 'Summarize the selected passage',
+      browserContext: {
+        activeTab: {
+          id: 10,
+          url: 'https://owner.example/page',
+          title: 'Owner page',
+        },
+      },
+      selectedText: ownerSelection.text,
+      selectedTextSource: {
+        url: ownerSelection.url,
+        title: ownerSelection.title,
+      },
+    })
+    const serialized = JSON.stringify(request.body)
+    expect(serialized).not.toContain(otherSelection.text)
+    expect(serialized).not.toContain(otherSelection.url)
+    expect(serialized).not.toContain(otherSelection.title)
+  })
+
+  it('fails closed for missing or invalid owner URLs through the submitted request', async () => {
+    for (const url of [
+      'chrome-extension://assistant/sidepanel.html',
+      'chrome-extension://assistant/sidepanel.html?tabId=invalid',
+    ]) {
+      const ownerTabId = await resolvePanelTabId(url)
+      expect(ownerTabId).toBeUndefined()
+      const selection = getOwnerTabSelection(
+        ownerTabId === undefined ? undefined : { id: ownerTabId },
+        {
+          '20': {
+            text: 'other-tab selection',
+            url: 'https://other.example',
+            title: 'Other tab',
+          },
+        },
+      )
+      const request = buildSidepanelPreparedSendMessagesRequest({
+        agentServerUrl: 'http://127.0.0.1:5151',
+        target: llmTarget,
+        fallbackProvider,
+        message: 'Summarize this page',
+        browserContext: undefined,
+        selectedText: selection?.text,
+        selectedTextSource: selection
+          ? { url: selection.url, title: selection.title }
+          : undefined,
+        conversationId,
+        mode: 'agent',
+      })
+
+      expect(request.body.browserContext).toBeUndefined()
+      expect(request.body.selectedText).toBeUndefined()
+      expect(request.body.selectedTextSource).toBeUndefined()
+      expect(JSON.stringify(request.body)).not.toContain('other.example')
+    }
+  })
+
   it('sends BrowserOS providers to the unified chat endpoint', () => {
     const request = buildSidepanelPreparedSendMessagesRequest({
       agentServerUrl: 'http://127.0.0.1:5151',

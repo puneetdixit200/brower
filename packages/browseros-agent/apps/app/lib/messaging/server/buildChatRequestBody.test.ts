@@ -89,4 +89,20 @@ describe('buildChatRequestBody', () => {
     expect(body.userSystemPrompt).toBe('Stay in the current tab.')
     expect(body.declinedApps).toEqual(['gmail'])
   })
+
+  it('forwards staged image attachments on an explicitly submitted LLM message', () => {
+    const attachment = {
+      mediaType: 'image/png',
+      data: 'data:image/png;base64,c2VsZWN0ZWQ=',
+    }
+    const body = buildChatRequestBody({
+      conversationId: '6ff46e3b-e45a-40a4-9157-ca520e800f43',
+      provider,
+      message: 'What is in this selected area?',
+      attachments: [attachment],
+    })
+
+    expect(body.message).toBe('What is in this selected area?')
+    expect(body.attachments).toEqual([attachment])
+  })
 })

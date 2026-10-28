@@ -1,8 +1,14 @@
-import { readFile } from 'node:fs/promises'
+import { realpath } from 'node:fs/promises'
 import { extname } from 'node:path'
 import { wrapUntrusted } from '@browseros/browser-mcp/tools/trust-boundary'
 import { type Tool, tool } from 'ai'
 import { z } from 'zod/v4'
+import { getToolOutputDir } from '../../lib/browseros-dir'
+import {
+  openWorkspaceRoot,
+  type PinnedWorkspaceRoot,
+  readFileBeneath,
+} from './safe-file'
 import {
   executeWithMetrics,
   type FilesystemToolResult,
@@ -12,7 +18,8 @@ import {
   MAX_READ_CHARS,
   MAX_READ_LINES,
   resolveBrowserToolOutputPath,
-  resolveWorkspacePath,
+  resolveWorkspacePathFromRoot,
+  resolveWorkspaceRoot,
   toModelOutput,
 } from './utils'
 
@@ -21,12 +28,13 @@ const TOOL_NAME = 'filesystem_read'
 export interface ReadToolOptions {
   allowedOutputPaths?: ReadonlySet<string>
   requireAllowedOutputPath?: boolean
+  workspaceRoot?: PinnedWorkspaceRoot
 }
 
 function createImageResult(
   path: string,
   ext: string,
-  buffer: Buffer<ArrayBuffer>,
+  buffer: Buffer<ArrayBufferLike>,
 ) {
   const mimeType = IMAGE_MIME_TYPES[ext] || 'application/octet-stream'
   return {
@@ -135,18 +143,33 @@ async function resolveReadPath(
   inputPath: string,
   allowedOutputPaths: ReadonlySet<string>,
   requireAllowedOutputPath: boolean,
-): Promise<string> {
-  if (!cwd)
-    return await resolveGeneratedOutputPath(inputPath, allowedOutputPaths)
+  workspaceRoot?: string,
+  descriptorAnchored = false,
+): Promise<{ path: string; root: string }> {
+  if (!cwd) {
+    const path = await resolveGeneratedOutputPath(inputPath, allowedOutputPaths)
+    return { path, root: await realpath(await getToolOutputDir()) }
+  }
 
   try {
-    return await resolveWorkspacePath(cwd, inputPath)
+    const root = workspaceRoot ?? (await resolveWorkspaceRoot(cwd))
+    const path = await resolveWorkspacePathFromRoot(
+      root,
+      inputPath,
+      descriptorAnchored,
+    )
+    return { path, root }
   } catch (error) {
     if (error instanceof Error && (await isBrowserosStatePath(inputPath))) {
       if (requireAllowedOutputPath) {
-        return await resolveGeneratedOutputPath(inputPath, allowedOutputPaths)
+        const path = await resolveGeneratedOutputPath(
+          inputPath,
+          allowedOutputPaths,
+        )
+        return { path, root: await realpath(await getToolOutputDir()) }
       }
-      return await resolveBrowserToolOutputPath(inputPath)
+      const path = await resolveBrowserToolOutputPath(inputPath)
+      return { path, root: await realpath(await getToolOutputDir()) }
     }
     throw error
   }
@@ -184,47 +207,82 @@ export function createReadTool(
         .describe('Maximum number of lines to read'),
     }),
     execute: (params) =>
-      executeWithMetrics(TOOL_NAME, async () => {
-        const resolved = await resolveReadPath(
-          cwd,
-          params.path,
-          allowedOutputPaths,
-          options.requireAllowedOutputPath ?? false,
-        )
-        const ext = extname(resolved).toLowerCase()
+      executeWithMetrics(
+        TOOL_NAME,
+        async () => {
+          const workspaceRoot = cwd
+            ? (options.workspaceRoot?.path ?? (await resolveWorkspaceRoot(cwd)))
+            : undefined
+          const workspaceRootHandle = workspaceRoot
+            ? (options.workspaceRoot?.handle ??
+              (await openWorkspaceRoot(workspaceRoot)))
+            : undefined
+          try {
+            const { path: resolved, root } = await resolveReadPath(
+              cwd,
+              params.path,
+              allowedOutputPaths,
+              options.requireAllowedOutputPath ?? false,
+              workspaceRoot,
+              Boolean(options.workspaceRoot),
+            )
+            const ext = extname(resolved).toLowerCase()
+            const rootHandle =
+              workspaceRootHandle && root === workspaceRoot
+                ? workspaceRootHandle
+                : await openWorkspaceRoot(root)
+            try {
+              if (IMAGE_EXTENSIONS.has(ext)) {
+                const buffer = await readFileBeneath(
+                  root,
+                  resolved,
+                  undefined,
+                  rootHandle,
+                )
+                return createImageResult(params.path, ext, buffer)
+              }
 
-        if (IMAGE_EXTENSIONS.has(ext)) {
-          const buffer = await readFile(resolved)
-          return createImageResult(params.path, ext, buffer)
-        }
+              const content = (
+                await readFileBeneath(root, resolved, undefined, rootHandle)
+              ).toString('utf-8')
+              const allLines = content.split('\n')
+              const totalLines = allLines.length
 
-        const content = await readFile(resolved, 'utf-8')
-        const allLines = content.split('\n')
-        const totalLines = allLines.length
+              const startIdx = getStartIndex(params.offset)
+              if (startIdx >= totalLines) {
+                return {
+                  text: `File has ${totalLines} lines. Offset ${params.offset} is beyond end of file.`,
+                }
+              }
 
-        const startIdx = getStartIndex(params.offset)
-        if (startIdx >= totalLines) {
-          return {
-            text: `File has ${totalLines} lines. Offset ${params.offset} is beyond end of file.`,
+              const selected = getSelectedLines(
+                allLines,
+                startIdx,
+                params.limit,
+              )
+              validateSelectedRange(selected, startIdx)
+              const result = formatReadResult({
+                selected,
+                startIdx,
+                totalLines,
+                limit: params.limit,
+              })
+              if (!cwd) {
+                return {
+                  ...result,
+                  text: wrapUntrusted(result.text, params.path),
+                }
+              }
+              return result
+            } finally {
+              if (rootHandle !== workspaceRootHandle) await rootHandle.close()
+            }
+          } finally {
+            if (!options.workspaceRoot) await workspaceRootHandle?.close()
           }
-        }
-
-        const selected = getSelectedLines(allLines, startIdx, params.limit)
-        validateSelectedRange(selected, startIdx)
-        const result = formatReadResult({
-          selected,
-          startIdx,
-          totalLines,
-          limit: params.limit,
-        })
-        if (!cwd) {
-          return {
-            ...result,
-            text: wrapUntrusted(result.text, params.path),
-          }
-        }
-        return result
-      }),
+        },
+        options.workspaceRoot,
+      ),
     toModelOutput,
   })
 }

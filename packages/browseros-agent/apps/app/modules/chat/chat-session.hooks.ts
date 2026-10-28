@@ -16,7 +16,10 @@ import {
   conversationPanelViewsStorage,
 } from '@/lib/browseros/conversationPanelStorage'
 import { isIncognitoWindow } from '@/lib/browseros/incognito'
-import { resolvePanelTabId } from '@/lib/browseros/panelTab'
+import {
+  resolvePanelTabId,
+  resolvePanelTabIdForConversation,
+} from '@/lib/browseros/panelTab'
 import type { ChatAction } from '@/lib/chat-actions/types'
 import {
   CONVERSATION_RESET_EVENT,
@@ -50,6 +53,7 @@ import {
   shouldPersistHistory,
 } from './chat-session-persistence'
 import {
+  getOwnerTabSelection,
   getToolApprovalResponse,
   prepareSidepanelSendMessagesRequest,
   toProviderOption,
@@ -89,6 +93,17 @@ const getLastUserMessageText = (messages: UIMessage[]) => {
     }
   }
   return ''
+}
+
+async function getRequestActiveTab(
+  isNewTab: boolean,
+  ownerTabId: number | undefined,
+) {
+  if (isNewTab) {
+    return (await chrome.tabs.query({ active: true, currentWindow: true }))[0]
+  }
+  if (ownerTabId === undefined) return undefined
+  return chrome.tabs.get(ownerTabId).catch(() => undefined)
 }
 
 const getLastUserMessageFiles = (messages: UIMessage[]) => {
@@ -282,10 +297,6 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   const localStreamRunRef = useRef<string | undefined>(undefined)
   const streamRequestRef = useRef<Promise<void> | undefined>(undefined)
   const viewTransitionRef = useRef<Promise<void>>(Promise.resolve())
-  const owningTab = () => {
-    panelTabRef.current ??= resolvePanelTabId()
-    return panelTabRef.current
-  }
 
   useEffect(() => {
     optionsRef.current = options
@@ -399,19 +410,18 @@ export const useChatSession = (options?: ChatSessionOptions) => {
           ) ?? undefined
         // A contextual panel sends from its owning tab even if another tab
         // becomes active while provider/server preparation is awaiting I/O.
-        const tabId =
-          optionsRef.current?.origin === 'newtab'
-            ? undefined
-            : await owningTab()
-        const activeTab =
-          tabId !== undefined
-            ? await chrome.tabs.get(tabId)
-            : (
-                await chrome.tabs.query({ active: true, currentWindow: true })
-              )[0]
-        const activeTabSelection = activeTab?.id
-          ? (selectionMapRef.current[String(activeTab.id)] ?? null)
-          : null
+        const isNewTab = optionsRef.current?.origin === 'newtab'
+        const tabId = isNewTab ? undefined : await resolvePanelTabId()
+        // A contextual panel must never fall back to whichever tab happens to
+        // be active if its owner cannot be resolved. That could disclose a
+        // different tab's URL or selected text after a tab switch.
+        const activeTab = await getRequestActiveTab(isNewTab, tabId)
+        const selectionTab =
+          isNewTab || activeTab?.id === tabId ? activeTab : undefined
+        const activeTabSelection = getOwnerTabSelection(
+          selectionTab,
+          selectionMapRef.current,
+        )
         const currentMode = modeRef.current
         const enabledMcpServers = enabledMcpServersRef.current
         const customMcpServers = enabledCustomServersRef.current
@@ -641,7 +651,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
         attachment.update(conversationForTab(views, tabId))
     })
     void (async () => {
-      panelTabRef.current ??= resolvePanelTabId()
+      panelTabRef.current ??= resolvePanelTabIdForConversation()
       tabId = await panelTabRef.current
       const views = await conversationPanelViewsStorage.getValue()
       if (!cancelled)

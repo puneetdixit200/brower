@@ -91,10 +91,16 @@ export async function resolveWorkspacePath(
 export async function resolveWorkspacePathFromRoot(
   root: string,
   inputPath: string,
+  descriptorAnchored = false,
+  platform = process.platform,
 ): Promise<string> {
   assertRelativeWorkspaceInput(inputPath)
   const candidate = resolve(root, inputPath)
   assertInsideWorkspace(root, candidate)
+  // With a pinned root, openat2 performs the authoritative existence and
+  // symlink checks relative to that inode. Pathname realpath could inspect a
+  // replacement directory after the selected root has been renamed.
+  if (descriptorAnchored && platform === 'linux') return candidate
   const canonical = await realpath(candidate)
   assertInsideWorkspace(root, canonical)
   return canonical
@@ -105,10 +111,20 @@ export async function resolveWorkspaceWritePath(
   cwd: string,
   inputPath: string,
 ): Promise<string> {
-  assertRelativeWorkspaceInput(inputPath)
   const root = await resolveWorkspaceRoot(cwd)
+  return await resolveWorkspaceWritePathFromRoot(root, inputPath)
+}
+
+export async function resolveWorkspaceWritePathFromRoot(
+  root: string,
+  inputPath: string,
+  descriptorAnchored = false,
+  platform = process.platform,
+): Promise<string> {
+  assertRelativeWorkspaceInput(inputPath)
   const candidate = resolve(root, inputPath)
   assertInsideWorkspace(root, candidate)
+  if (descriptorAnchored && platform === 'linux') return candidate
 
   try {
     const canonical = await realpath(candidate)

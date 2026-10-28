@@ -5,6 +5,12 @@ import { TOOL_LIMITS } from '@browseros/shared/constants/limits'
 import { logger } from '../../lib/logger'
 import { metrics } from '../../lib/metrics'
 import { isPathInside } from './path-boundary'
+import {
+  listDirectoryBeneath,
+  type PinnedWorkspaceRoot,
+  type SafeFileHandle,
+  type WorkspaceDirectoryEntry,
+} from './safe-file'
 
 const MAX_LINES = 2000
 const MAX_BYTES = 50 * 1024
@@ -24,6 +30,7 @@ export {
   resolveWorkspacePathFromRoot,
   resolveWorkspaceRoot,
   resolveWorkspaceWritePath,
+  resolveWorkspaceWritePathFromRoot,
 } from './path-boundary'
 
 export interface FilesystemToolResult {
@@ -224,8 +231,14 @@ export async function* walkFiles(
   dir: string,
   baseDir: string,
   boundaryRoot?: string,
+  pinnedRoot?: SafeFileHandle,
 ): AsyncGenerator<WalkFileEntry> {
   const root = boundaryRoot ?? (await realpath(baseDir))
+  if (process.platform === 'linux') {
+    yield* walkFilesBeneath(root, dir, baseDir, pinnedRoot)
+    return
+  }
+
   let entries: Dirent[]
   try {
     entries = (await readdir(dir, { withFileTypes: true })) as Dirent[]
@@ -237,7 +250,7 @@ export async function* walkFiles(
     const fullPath = join(dir, entry.name as string)
     if (entry.isDirectory()) {
       if (IGNORED_DIRS.has(entry.name as string)) continue
-      yield* walkFiles(fullPath, baseDir, root)
+      yield* walkFiles(fullPath, baseDir, root, pinnedRoot)
     } else if (entry.isFile() || entry.isSymbolicLink()) {
       const canonical = await realpath(fullPath).catch(() => null)
       if (!canonical || !isPathInside(root, canonical)) continue
@@ -245,6 +258,37 @@ export async function* walkFiles(
         path: relative(baseDir, fullPath),
         realPath: canonical,
       }
+    }
+  }
+}
+
+async function* walkFilesBeneath(
+  root: string,
+  dir: string,
+  baseDir: string,
+  pinnedRoot?: SafeFileHandle,
+): AsyncGenerator<WalkFileEntry> {
+  let entries: WorkspaceDirectoryEntry[]
+  try {
+    entries = await listDirectoryBeneath(root, dir, pinnedRoot)
+  } catch {
+    return
+  }
+
+  for (const entry of entries) {
+    if (entry.isDirectory && !entry.isSymbolicLink) {
+      if (IGNORED_DIRS.has(entry.name)) continue
+      yield* walkFilesBeneath(root, join(dir, entry.name), baseDir, pinnedRoot)
+      continue
+    }
+
+    if (!entry.isDirectory || entry.isSymbolicLink) {
+      const path = join(dir, entry.name)
+      const canonical = entry.isSymbolicLink
+        ? await realpath(path).catch(() => null)
+        : path
+      if (!canonical || !isPathInside(root, canonical)) continue
+      yield { path: relative(baseDir, path), realPath: canonical }
     }
   }
 }
@@ -279,9 +323,10 @@ export function toModelOutput({
 export function executeWithMetrics(
   toolName: string,
   fn: () => Promise<FilesystemToolResult>,
+  workspaceRoot?: PinnedWorkspaceRoot,
 ): Promise<FilesystemToolResult> {
   const startTime = performance.now()
-  return fn().then(
+  return (workspaceRoot ? workspaceRoot.run(fn) : fn()).then(
     (result) => {
       metrics.log('tool_executed', {
         tool_name: toolName,

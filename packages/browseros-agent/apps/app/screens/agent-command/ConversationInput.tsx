@@ -74,6 +74,8 @@ export interface ConversationInputProps {
    * composer omits this callback and has no Stop button.
    */
   onStop?: () => void
+  screenshotDataUrl?: string | null
+  onScreenshotConsumed?: () => void
 }
 
 function InputActionButton({
@@ -321,6 +323,8 @@ export const ConversationInput: FC<ConversationInputProps> = ({
   attachmentsEnabled = true,
   variant = 'conversation',
   onStop,
+  screenshotDataUrl,
+  onScreenshotConsumed,
 }) => {
   const [input, setInput] = useState('')
   const [selectedTabs, setSelectedTabs] = useState<chrome.tabs.Tab[]>([])
@@ -338,6 +342,7 @@ export const ConversationInput: FC<ConversationInputProps> = ({
   const [isDragOver, setIsDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const stagedScreenshotDataUrl = useRef<string | null>(null)
   const isConversation = variant === 'conversation'
 
   const stageFiles = async (files: File[]) => {
@@ -385,6 +390,53 @@ export const ConversationInput: FC<ConversationInputProps> = ({
     setAttachments([])
     setAttachmentError(null)
   }, [attachmentsEnabled])
+
+  useEffect(() => {
+    if (!screenshotDataUrl) {
+      stagedScreenshotDataUrl.current = null
+      return
+    }
+    if (stagedScreenshotDataUrl.current === screenshotDataUrl) return
+    stagedScreenshotDataUrl.current = screenshotDataUrl
+    if (!attachmentsEnabled) {
+      setAttachmentError('This agent does not accept image attachments.')
+      onScreenshotConsumed?.()
+      return
+    }
+    let active = true
+    void fetch(screenshotDataUrl)
+      .then((response) => response.blob())
+      .then((blob) => {
+        const file = new File([blob], 'selected-page-area.png', {
+          type: 'image/png',
+        })
+        return stageAttachments([file], attachments.length)
+      })
+      .then((result) => {
+        if (!active) return
+        if (result.staged.length)
+          setAttachments((prev) => [...prev, ...result.staged])
+        if (result.errors.length)
+          setAttachmentError(
+            result.errors.map((item) => item.message).join(' • '),
+          )
+      })
+      .catch(() => {
+        if (active)
+          setAttachmentError('Could not stage the selected screenshot area.')
+      })
+      .finally(() => {
+        if (active) onScreenshotConsumed?.()
+      })
+    return () => {
+      active = false
+    }
+  }, [
+    screenshotDataUrl,
+    attachmentsEnabled,
+    onScreenshotConsumed,
+    attachments.length,
+  ])
 
   const toggleTab = (tab: chrome.tabs.Tab) => {
     setSelectedTabs((prev) => {

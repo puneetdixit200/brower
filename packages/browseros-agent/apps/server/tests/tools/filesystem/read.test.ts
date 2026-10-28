@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import { mkdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import {
@@ -13,6 +13,7 @@ import {
   createReadTool,
   type ReadToolOptions,
 } from '../../../src/tools/filesystem/read'
+import { pinWorkspaceRoot } from '../../../src/tools/filesystem/safe-file'
 import type { FilesystemToolResult } from '../../../src/tools/filesystem/utils'
 import {
   MAX_READ_CHARS,
@@ -66,6 +67,29 @@ describe('filesystem_read', () => {
     expect(result.text).toContain('1 | line one')
     expect(result.text).toContain('2 | line two')
     expect(result.text).toContain('3 | line three')
+  })
+
+  it('reuses the session-pinned directory after its selected path is replaced', async () => {
+    if (process.platform !== 'linux') return
+    await writeFile(join(tmpDir, 'pinned.txt'), 'selected directory')
+    const moved = `${tmpDir}-moved`
+    const pinned = await pinWorkspaceRoot(tmpDir)
+    try {
+      await rm(moved, { recursive: true, force: true })
+      await rename(tmpDir, moved)
+      await mkdir(tmpDir, { recursive: true })
+      await writeFile(join(tmpDir, 'pinned.txt'), 'replacement directory')
+
+      const readPinned = createReadExec(tmpDir, { workspaceRoot: pinned })
+      const first = await readPinned({ path: 'pinned.txt' })
+      const second = await readPinned({ path: 'pinned.txt' })
+      expect(first.text).toContain('selected directory')
+      expect(second.text).toContain('selected directory')
+      expect(first.text).not.toContain('replacement directory')
+    } finally {
+      await pinned.close()
+      await rm(moved, { recursive: true, force: true })
+    }
   })
 
   it('reads with offset', async () => {

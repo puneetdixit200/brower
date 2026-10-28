@@ -1,8 +1,10 @@
-import type { Dirent } from 'node:fs'
-import { readdir, stat } from 'node:fs/promises'
-import { join } from 'node:path'
 import { type Tool, tool } from 'ai'
 import { z } from 'zod/v4'
+import {
+  listDirectoryBeneath,
+  openWorkspaceRoot,
+  type PinnedWorkspaceRoot,
+} from './safe-file'
 import {
   DEFAULT_LS_LIMIT,
   executeWithMetrics,
@@ -19,34 +21,18 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
 }
 
-async function collectVisibleEntries(
-  root: string,
-  inputPath: string,
-  resolved: string,
-  entries: Dirent[],
-): Promise<{ dirs: string[]; files: Array<{ name: string; size: number }> }> {
+function collectVisibleEntries(
+  entries: Awaited<ReturnType<typeof listDirectoryBeneath>>,
+): { dirs: string[]; files: Array<{ name: string; size: number }> } {
   const dirs: string[] = []
   const files: Array<{ name: string; size: number }> = []
 
   for (const entry of entries) {
-    const childPath = join(inputPath, entry.name as string)
-    try {
-      await resolveWorkspacePathFromRoot(root, childPath)
-    } catch {
-      continue
-    }
-
-    if (entry.isDirectory()) {
+    if (entry.isDirectory && !entry.isSymbolicLink) {
       dirs.push(entry.name)
       continue
     }
-
-    try {
-      const info = await stat(join(resolved, entry.name))
-      files.push({ name: entry.name, size: info.size })
-    } catch {
-      files.push({ name: entry.name, size: 0 })
-    }
+    files.push({ name: entry.name, size: entry.size })
   }
 
   return { dirs, files }
@@ -82,7 +68,10 @@ function formatEntries(
   return result
 }
 
-export function createLsTool(cwd: string): Tool {
+export function createLsTool(
+  cwd: string,
+  workspaceRoot?: PinnedWorkspaceRoot,
+): Tool {
   return tool({
     description:
       'List directory contents. Shows directories (with trailing /) first, then files with sizes. Entries are sorted alphabetically.',
@@ -97,20 +86,33 @@ export function createLsTool(cwd: string): Tool {
         .describe(`Maximum entries to return (default: ${DEFAULT_LS_LIMIT})`),
     }),
     execute: (params) =>
-      executeWithMetrics(TOOL_NAME, async () => {
-        const inputPath = params.path || '.'
-        const root = await resolveWorkspaceRoot(cwd)
-        const resolved = await resolveWorkspacePathFromRoot(root, inputPath)
-        const limit = params.limit || DEFAULT_LS_LIMIT
-        const entries = await readdir(resolved, { withFileTypes: true })
-        const { dirs, files } = await collectVisibleEntries(
-          root,
-          inputPath,
-          resolved,
-          entries,
-        )
-        return { text: formatEntries(dirs, files, limit) }
-      }),
+      executeWithMetrics(
+        TOOL_NAME,
+        async () => {
+          const inputPath = params.path || '.'
+          const root = workspaceRoot?.path ?? (await resolveWorkspaceRoot(cwd))
+          const rootHandle =
+            workspaceRoot?.handle ?? (await openWorkspaceRoot(root))
+          try {
+            const resolved = await resolveWorkspacePathFromRoot(
+              root,
+              inputPath,
+              Boolean(workspaceRoot),
+            )
+            const limit = params.limit || DEFAULT_LS_LIMIT
+            const entries = await listDirectoryBeneath(
+              root,
+              resolved,
+              rootHandle,
+            )
+            const { dirs, files } = collectVisibleEntries(entries)
+            return { text: formatEntries(dirs, files, limit) }
+          } finally {
+            if (!workspaceRoot) await rootHandle.close()
+          }
+        },
+        workspaceRoot,
+      ),
     toModelOutput,
   })
 }

@@ -9,6 +9,7 @@ import { basename, dirname, resolve, sep } from 'node:path'
 import { type Tool, tool } from 'ai'
 import { z } from 'zod/v4'
 import { resolveBundledBun } from '../../lib/agents/host-acp/bundled-bun'
+import type { PinnedWorkspaceRoot } from './safe-file'
 import {
   DEFAULT_BASH_TIMEOUT,
   executeWithMetrics,
@@ -160,6 +161,8 @@ function getLinuxSandboxArgs(
       continue
     args.push('--dir', parent)
   }
+  // Bash remains pathname-bound: the tested Bubblewrap configuration denied
+  // access to /proc/<server-pid>/fd as a bind source.
   args.push('--dir', root, '--bind', root, root, '--chdir', root)
 
   // Expose only a verified Bun executable, never the compiled server ELF,
@@ -256,7 +259,10 @@ function formatBashResult(
 
 export function createBashTool(
   cwd: string,
-  options: { resourcesDir?: string | null } = {},
+  options: {
+    resourcesDir?: string | null
+    workspaceRoot?: PinnedWorkspaceRoot
+  } = {},
 ): Tool {
   return tool({
     description:
@@ -269,52 +275,56 @@ export function createBashTool(
         .describe(`Timeout in seconds (default: ${DEFAULT_BASH_TIMEOUT})`),
     }),
     execute: (params) =>
-      executeWithMetrics(TOOL_NAME, async () => {
-        const timeoutMs = (params.timeout || DEFAULT_BASH_TIMEOUT) * 1000
-        const resolvedCwd = resolve(cwd)
-        let invocation: ReturnType<typeof getShellInvocation>
-        try {
-          invocation = getShellInvocation(
-            resolvedCwd,
-            params.command,
-            options.resourcesDir,
-          )
-        } catch (error) {
-          return {
-            text: error instanceof Error ? error.message : String(error),
-            isError: true,
+      executeWithMetrics(
+        TOOL_NAME,
+        async () => {
+          const timeoutMs = (params.timeout || DEFAULT_BASH_TIMEOUT) * 1000
+          const resolvedCwd = options.workspaceRoot?.path ?? resolve(cwd)
+          let invocation: ReturnType<typeof getShellInvocation>
+          try {
+            invocation = getShellInvocation(
+              resolvedCwd,
+              params.command,
+              options.resourcesDir,
+            )
+          } catch (error) {
+            return {
+              text: error instanceof Error ? error.message : String(error),
+              isError: true,
+            }
           }
-        }
 
-        const proc = Bun.spawn(invocation.command, {
-          cwd: invocation.cwd,
-          stdout: 'pipe',
-          stderr: 'pipe',
-          env: invocation.env,
-        })
+          const proc = Bun.spawn(invocation.command, {
+            cwd: invocation.cwd,
+            stdout: 'pipe',
+            stderr: 'pipe',
+            env: invocation.env,
+          })
 
-        let timedOut = false
-        const timer = setTimeout(() => {
-          timedOut = true
-          proc.kill()
-        }, timeoutMs)
+          let timedOut = false
+          const timer = setTimeout(() => {
+            timedOut = true
+            proc.kill()
+          }, timeoutMs)
 
-        const [stdoutText, stderrText] = await Promise.all([
-          new Response(proc.stdout).text(),
-          new Response(proc.stderr).text(),
-        ])
+          const [stdoutText, stderrText] = await Promise.all([
+            new Response(proc.stdout).text(),
+            new Response(proc.stderr).text(),
+          ])
 
-        const exitCode = await proc.exited
-        clearTimeout(timer)
+          const exitCode = await proc.exited
+          clearTimeout(timer)
 
-        return formatBashResult(
-          stdoutText,
-          stderrText,
-          exitCode,
-          timedOut,
-          params.timeout || DEFAULT_BASH_TIMEOUT,
-        )
-      }),
+          return formatBashResult(
+            stdoutText,
+            stderrText,
+            exitCode,
+            timedOut,
+            params.timeout || DEFAULT_BASH_TIMEOUT,
+          )
+        },
+        options.workspaceRoot,
+      ),
     toModelOutput,
   })
 }

@@ -143,6 +143,23 @@ describe('filesystem_grep', () => {
     expect(result.text).not.toContain('alpha')
   })
 
+  it('searches in-workspace symlink targets outside the selected subdirectory', async () => {
+    await mkdir(join(tmpDir, 'scope'), { recursive: true })
+    await mkdir(join(tmpDir, 'sibling'), { recursive: true })
+    await writeFile(
+      join(tmpDir, 'sibling', 'target.ts'),
+      'needle inside workspace',
+    )
+    await symlink(
+      join(tmpDir, 'sibling', 'target.ts'),
+      join(tmpDir, 'scope', 'alias.ts'),
+    )
+
+    const result = await exec({ pattern: 'needle', path: 'scope' })
+    expect(result.text).toContain('alias.ts')
+    expect(result.text).toContain('needle inside workspace')
+  })
+
   it('does not read oversized single-file targets', async () => {
     await writeFile(
       join(tmpDir, 'large.log'),

@@ -6,11 +6,21 @@ export function panelTabIdFromUrl(url: string): number | undefined {
   return Number.isSafeInteger(tabId) ? tabId : undefined
 }
 
-export async function resolvePanelTabId(): Promise<number | undefined> {
+/** Request-time owner resolution must never infer ownership from activeTab. */
+export async function resolvePanelTabId(
+  url = location.href,
+): Promise<number | undefined> {
+  return panelTabIdFromUrl(url)
+}
+
+/** Legacy UI state may follow an existing panel without an owner in its URL. */
+export async function resolvePanelTabIdForConversation(): Promise<
+  number | undefined
+> {
   const tabId = panelTabIdFromUrl(location.href)
   if (tabId !== undefined) return tabId
-  // Compatibility for an already-registered native panel from before the
-  // extension update. Capture once on mount, never subscribe to tab activation.
+  // Compatibility for conversation restoration in an already-open legacy
+  // panel. Request context uses resolvePanelTabId and remains fail-closed.
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
   return tab?.id
 }

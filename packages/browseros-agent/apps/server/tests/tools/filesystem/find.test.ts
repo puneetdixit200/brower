@@ -93,6 +93,19 @@ describe('filesystem_find', () => {
     expect(result.text).toContain('modal.tsx')
   })
 
+  it('keeps the workspace as the boundary for in-workspace symlinks in a subdirectory', async () => {
+    await mkdir(join(tmpDir, 'scope'), { recursive: true })
+    await mkdir(join(tmpDir, 'sibling'), { recursive: true })
+    await writeFile(join(tmpDir, 'sibling', 'target.ts'), '')
+    await symlink(
+      join(tmpDir, 'sibling', 'target.ts'),
+      join(tmpDir, 'scope', 'alias.ts'),
+    )
+
+    const result = await exec({ pattern: '*.ts', path: 'scope' })
+    expect(result.text).toContain('alias.ts')
+  })
+
   it('skips node_modules', async () => {
     await mkdir(join(tmpDir, 'node_modules', 'pkg'), { recursive: true })
     await writeFile(join(tmpDir, 'node_modules', 'pkg', 'index.js'), '')

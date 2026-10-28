@@ -1,14 +1,20 @@
-import { constants } from 'node:fs'
-import { open, stat } from 'node:fs/promises'
 import { type Tool, tool } from 'ai'
 import { z } from 'zod/v4'
+import {
+  openWorkspaceRoot,
+  type PinnedWorkspaceRoot,
+  readFileBeneath,
+  type SafeFileHandle,
+  statBeneath,
+} from './safe-file'
 import {
   DEFAULT_GREP_LIMIT,
   executeWithMetrics,
   GREP_MAX_LINE_LENGTH,
   isBinaryPath,
   MAX_GREP_FILE_SIZE,
-  resolveWorkspacePath,
+  resolveWorkspacePathFromRoot,
+  resolveWorkspaceRoot,
   toModelOutput,
   truncateLine,
   walkFiles,
@@ -23,31 +29,18 @@ interface GrepMatch {
   isMatch: boolean
 }
 
-const GREP_FILE_OPEN_FLAGS =
-  constants.O_RDONLY |
-  (typeof constants.O_NOFOLLOW === 'number' ? constants.O_NOFOLLOW : 0)
-
-/** Reads grep input from a descriptor so final-component symlinks are rejected. */
 async function readGrepFileContent(
+  root: string,
   filePath: string,
   maxBytes?: number,
+  pinnedRoot?: SafeFileHandle,
 ): Promise<string | null> {
-  let handle: Awaited<ReturnType<typeof open>>
   try {
-    handle = await open(filePath, GREP_FILE_OPEN_FLAGS)
+    return (
+      await readFileBeneath(root, filePath, maxBytes, pinnedRoot)
+    ).toString('utf-8')
   } catch {
     return null
-  }
-
-  try {
-    const fileStat = await handle.stat()
-    if (!fileStat.isFile()) return null
-    if (maxBytes !== undefined && fileStat.size > maxBytes) return null
-    return await handle.readFile({ encoding: 'utf-8' })
-  } catch {
-    return null
-  } finally {
-    await handle.close()
   }
 }
 
@@ -114,7 +107,10 @@ function formatMatches(matches: GrepMatch[], context: number): string {
   return lines.join('\n')
 }
 
-export function createGrepTool(cwd: string): Tool {
+export function createGrepTool(
+  cwd: string,
+  pinnedRoot?: PinnedWorkspaceRoot,
+): Tool {
   return tool({
     description:
       'Search file contents using a regular expression. Returns matching lines with file paths and line numbers. Searches recursively, skipping binary files and common build directories (node_modules, .git, dist, etc.).',
@@ -149,111 +145,138 @@ export function createGrepTool(cwd: string): Tool {
         .describe(`Maximum matches to return (default: ${DEFAULT_GREP_LIMIT})`),
     }),
     execute: (params) =>
-      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: grep tool has many output mode and filtering branches
-      executeWithMetrics(TOOL_NAME, async () => {
-        const searchPath = await resolveWorkspacePath(cwd, params.path || '.')
-        const limit = params.limit || DEFAULT_GREP_LIMIT
-        const context = params.context || 0
+      executeWithMetrics(
+        TOOL_NAME,
+        // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: grep tool has many output mode and filtering branches
+        async () => {
+          const workspaceRoot =
+            pinnedRoot?.path ?? (await resolveWorkspaceRoot(cwd))
+          const limit = params.limit || DEFAULT_GREP_LIMIT
+          const context = params.context || 0
 
-        const escapedPattern = params.literal
-          ? params.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-          : params.pattern
+          const escapedPattern = params.literal
+            ? params.pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            : params.pattern
 
-        let regex: RegExp
-        try {
-          regex = new RegExp(escapedPattern, params.ignore_case ? 'i' : '')
-        } catch (_e) {
-          return {
-            text: `Invalid regex pattern: ${params.pattern}`,
-            isError: true,
-          }
-        }
-
-        let globMatcher: InstanceType<typeof Bun.Glob> | null = null
-        if (params.glob) {
-          let effectiveGlob = params.glob
-          if (!effectiveGlob.includes('/') && !effectiveGlob.includes('**')) {
-            effectiveGlob = `**/${effectiveGlob}`
-          }
-          globMatcher = new Bun.Glob(effectiveGlob)
-        }
-
-        let pathStat: Awaited<ReturnType<typeof stat>>
-        try {
-          pathStat = await stat(searchPath)
-        } catch {
-          return {
-            text: `Path not found: ${params.path || '.'}`,
-            isError: true,
-          }
-        }
-        const allMatches: GrepMatch[] = []
-        let totalMatchCount = 0
-
-        if (pathStat.isFile()) {
-          const content = await readGrepFileContent(
-            searchPath,
-            MAX_GREP_FILE_SIZE,
-          )
-          if (content === null) {
+          let regex: RegExp
+          try {
+            regex = new RegExp(escapedPattern, params.ignore_case ? 'i' : '')
+          } catch (_e) {
             return {
-              text: `Unable to read file: ${params.path || searchPath}`,
+              text: `Invalid regex pattern: ${params.pattern}`,
               isError: true,
             }
           }
-          const lines = content.split('\n')
-          const relPath = params.path || searchPath
-          const fileMatches = searchFileLines(
-            relPath,
-            lines,
-            regex,
-            context,
-            limit,
-          )
-          allMatches.push(...fileMatches)
-          totalMatchCount = fileMatches.filter((m) => m.isMatch).length
-        } else {
-          for await (const file of walkFiles(searchPath, searchPath)) {
-            const relPath = file.path
-            if (isBinaryPath(relPath)) continue
-            if (globMatcher && !globMatcher.match(relPath)) continue
 
-            const content = await readGrepFileContent(
-              file.realPath,
-              MAX_GREP_FILE_SIZE,
-            )
-            if (content === null) continue
-
-            const lines = content.split('\n')
-            const remaining = limit - totalMatchCount
-            if (remaining <= 0) break
-
-            const fileMatches = searchFileLines(
-              relPath,
-              lines,
-              regex,
-              context,
-              remaining,
-            )
-            const matchCount = fileMatches.filter((m) => m.isMatch).length
-            totalMatchCount += matchCount
-            allMatches.push(...fileMatches)
-
-            if (totalMatchCount >= limit) break
+          let globMatcher: InstanceType<typeof Bun.Glob> | null = null
+          if (params.glob) {
+            let effectiveGlob = params.glob
+            if (!effectiveGlob.includes('/') && !effectiveGlob.includes('**')) {
+              effectiveGlob = `**/${effectiveGlob}`
+            }
+            globMatcher = new Bun.Glob(effectiveGlob)
           }
-        }
 
-        if (allMatches.length === 0) {
-          return { text: 'No matches found.' }
-        }
+          const rootHandle =
+            pinnedRoot?.handle ?? (await openWorkspaceRoot(workspaceRoot))
+          try {
+            const searchPath = await resolveWorkspacePathFromRoot(
+              workspaceRoot,
+              params.path || '.',
+              Boolean(pinnedRoot),
+            )
+            const pathStat = await statBeneath(
+              workspaceRoot,
+              searchPath,
+              rootHandle,
+            )
+            if (!pathStat) {
+              return {
+                text: `Path not found: ${params.path || '.'}`,
+                isError: true,
+              }
+            }
+            const allMatches: GrepMatch[] = []
+            let totalMatchCount = 0
 
-        let result = formatMatches(allMatches, context)
-        if (totalMatchCount >= limit) {
-          result += `\n\n(Showing first ${limit} matches. Use limit=${limit * 2} to see more.)`
-        }
+            if (pathStat.isFile()) {
+              const content = await readGrepFileContent(
+                workspaceRoot,
+                searchPath,
+                MAX_GREP_FILE_SIZE,
+                rootHandle,
+              )
+              if (content === null) {
+                return {
+                  text: `Unable to read file: ${params.path || searchPath}`,
+                  isError: true,
+                }
+              }
+              const lines = content.split('\n')
+              const relPath = params.path || searchPath
+              const fileMatches = searchFileLines(
+                relPath,
+                lines,
+                regex,
+                context,
+                limit,
+              )
+              allMatches.push(...fileMatches)
+              totalMatchCount = fileMatches.filter((m) => m.isMatch).length
+            } else {
+              for await (const file of walkFiles(
+                searchPath,
+                searchPath,
+                workspaceRoot,
+                rootHandle,
+              )) {
+                const relPath = file.path
+                if (isBinaryPath(relPath)) continue
+                if (globMatcher && !globMatcher.match(relPath)) continue
 
-        return { text: result }
-      }),
+                const content = await readGrepFileContent(
+                  workspaceRoot,
+                  file.realPath,
+                  MAX_GREP_FILE_SIZE,
+                  rootHandle,
+                )
+                if (content === null) continue
+
+                const lines = content.split('\n')
+                const remaining = limit - totalMatchCount
+                if (remaining <= 0) break
+
+                const fileMatches = searchFileLines(
+                  relPath,
+                  lines,
+                  regex,
+                  context,
+                  remaining,
+                )
+                const matchCount = fileMatches.filter((m) => m.isMatch).length
+                totalMatchCount += matchCount
+                allMatches.push(...fileMatches)
+
+                if (totalMatchCount >= limit) break
+              }
+            }
+
+            if (allMatches.length === 0) {
+              return { text: 'No matches found.' }
+            }
+
+            let result = formatMatches(allMatches, context)
+            if (totalMatchCount >= limit) {
+              result += `\n\n(Showing first ${limit} matches. Use limit=${limit * 2} to see more.)`
+            }
+
+            return { text: result }
+          } finally {
+            if (!pinnedRoot) await rootHandle.close()
+          }
+        },
+        pinnedRoot,
+      ),
     toModelOutput,
   })
 }

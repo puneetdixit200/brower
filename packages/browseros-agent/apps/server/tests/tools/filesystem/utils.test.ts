@@ -4,6 +4,10 @@ import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { getToolOutputDir } from '../../../src/lib/browseros-dir'
 import {
+  resolveWorkspacePathFromRoot,
+  resolveWorkspaceWritePathFromRoot,
+} from '../../../src/tools/filesystem/path-boundary'
+import {
   detectLineEnding,
   isBinaryPath,
   normalizeToLF,
@@ -335,6 +339,24 @@ describe('filesystem path boundaries', () => {
     await expect(resolveWorkspacePath(tmpDir, 'secret-link')).rejects.toThrow(
       'outside the selected workspace',
     )
+  })
+
+  it('keeps symlink containment for pinned roots on non-Linux platforms', async () => {
+    await writeFile(join(outsideDir, 'secret.txt'), 'secret')
+    await symlink(join(outsideDir, 'secret.txt'), join(tmpDir, 'secret-link'))
+    await symlink(outsideDir, join(tmpDir, 'outside-link'))
+
+    await expect(
+      resolveWorkspacePathFromRoot(tmpDir, 'secret-link', true, 'darwin'),
+    ).rejects.toThrow('outside the selected workspace')
+    await expect(
+      resolveWorkspaceWritePathFromRoot(
+        tmpDir,
+        'outside-link/new.txt',
+        true,
+        'darwin',
+      ),
+    ).rejects.toThrow('outside the selected workspace')
   })
 
   it('allows write targets under an existing workspace parent', async () => {

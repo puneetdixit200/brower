@@ -23,6 +23,10 @@ import { logger } from '../lib/logger'
 import { metrics } from '../lib/metrics'
 import { buildFilesystemToolSet } from '../tools/filesystem/build-toolset'
 import { createReadTool } from '../tools/filesystem/read'
+import {
+  type PinnedWorkspaceRoot,
+  pinWorkspaceRoot,
+} from '../tools/filesystem/safe-file'
 import { createCompactionPrepareStep, type StepWithUsage } from './compaction'
 import { excludeCredentialAccessTools } from './credential-tool-filter'
 import {
@@ -122,6 +126,7 @@ export function buildAgentFilesystemToolSet(
   options: {
     outputFileAccess?: BrowserOutputFileAccess
     resourcesDir?: string | null
+    workspaceRoot?: PinnedWorkspaceRoot
   } = {},
 ): ToolSet {
   if (resolvedConfig.chatMode || !resolvedConfig.workingDir) {
@@ -133,6 +138,7 @@ export function buildAgentFilesystemToolSet(
   }
   return buildFilesystemToolSet(resolvedConfig.workingDir, {
     resourcesDir: options.resourcesDir,
+    workspaceRoot: options.workspaceRoot,
   })
 }
 
@@ -143,6 +149,7 @@ export class AiSdkAgent {
     private _mcpClients: Array<{ close(): Promise<void> }>,
     private conversationId: string,
     private _toolNames: Set<string>,
+    private workspaceRoot?: PinnedWorkspaceRoot,
   ) {}
 
   /** Tool names registered on this agent — used to sanitize messages during session rebuilds. */
@@ -180,7 +187,11 @@ export class AiSdkAgent {
 
     const connectedMcpClients: Array<{ close(): Promise<void> }> = []
     let clientsTransferred = false
+    let workspaceRoot: PinnedWorkspaceRoot | undefined
     try {
+      if (!config.resolvedConfig.chatMode && config.resolvedConfig.workingDir) {
+        workspaceRoot = await pinWorkspaceRoot(config.resolvedConfig.workingDir)
+      }
       // BrowserOS tools and managed connectors use the same required loopback
       // MCP path as ACP/external clients. This keeps guards, effects, metrics,
       // and generated-output grants behind one server-owned seam.
@@ -277,11 +288,12 @@ export class AiSdkAgent {
         {
           outputFileAccess,
           resourcesDir: config.resourcesDir,
+          workspaceRoot,
         },
       )
       const workspaceDirForPrompt =
         !config.resolvedConfig.chatMode && 'filesystem_write' in filesystemTools
-          ? config.resolvedConfig.workingDir
+          ? (workspaceRoot?.path ?? config.resolvedConfig.workingDir)
           : undefined
       const candidateTools = {
         ...internalMcp.tools,
@@ -389,6 +401,7 @@ export class AiSdkAgent {
         connectedMcpClients,
         config.resolvedConfig.conversationId,
         new Set(Object.keys(tools)),
+        workspaceRoot,
       )
       clientsTransferred = true
       return result
@@ -399,6 +412,7 @@ export class AiSdkAgent {
         await Promise.allSettled(
           connectedMcpClients.map((client) => client.close()),
         )
+        await workspaceRoot?.close()
       }
     }
   }
@@ -427,6 +441,7 @@ export class AiSdkAgent {
     for (const client of this._mcpClients) {
       await client.close().catch(() => {})
     }
+    await this.workspaceRoot?.close()
     logger.info('Agent disposed', { conversationId: this.conversationId })
   }
 }

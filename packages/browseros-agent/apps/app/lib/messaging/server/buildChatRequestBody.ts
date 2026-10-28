@@ -68,6 +68,7 @@ export interface ChatRequestBodyParams {
   isScheduledTask?: boolean
   persistScheduledTask?: boolean
   approvalResponse?: { id: string; approved: boolean; reason?: string }
+  attachments?: Array<{ mediaType: string; data: string }>
 }
 
 export const buildChatRequestBody = ({
@@ -88,6 +89,7 @@ export const buildChatRequestBody = ({
   isScheduledTask,
   persistScheduledTask,
   approvalResponse,
+  attachments,
 }: ChatRequestBodyParams) => ({
   // The provider is named, not described. The server holds the list and which
   // one is selected, so it resolves the model, endpoint and credentials from
@@ -110,6 +112,7 @@ export const buildChatRequestBody = ({
   supportsImages: supportsImages ?? provider?.supportsImages,
   supportsReasoning: provider ? resolvesSupportsReasoning(provider) : undefined,
   previousConversation,
+  attachments: attachments?.length ? attachments : undefined,
   persist,
   declinedApps: declinedApps?.length ? declinedApps : undefined,
   selectedText,

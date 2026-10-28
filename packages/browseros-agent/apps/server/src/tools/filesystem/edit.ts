@@ -1,11 +1,18 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
 import { type Tool, tool } from 'ai'
 import { z } from 'zod/v4'
+import {
+  openExistingFileBeneath,
+  openWorkspaceRoot,
+  type PinnedWorkspaceRoot,
+  writeAtStart,
+} from './safe-file'
 import {
   detectLineEnding,
   executeWithMetrics,
   normalizeToLF,
-  resolveWorkspacePath,
+  resolveWorkspacePathFromRoot,
+  resolveWorkspaceRoot,
   restoreLineEndings,
   stripBom,
   toModelOutput,
@@ -72,7 +79,10 @@ function generateDiff(oldStr: string, newStr: string): string {
   return lines.join('\n')
 }
 
-export function createEditTool(cwd: string): Tool {
+export function createEditTool(
+  cwd: string,
+  workspaceRoot?: PinnedWorkspaceRoot,
+): Tool {
   return tool({
     description:
       'Make a targeted edit to a file by replacing an exact string match. The old_string must match exactly one location in the file. If exact match fails, a whitespace-tolerant match is attempted.',
@@ -82,51 +92,78 @@ export function createEditTool(cwd: string): Tool {
       new_string: z.string().describe('Replacement text'),
     }),
     execute: (params) =>
-      executeWithMetrics(TOOL_NAME, async () => {
-        const resolved = await resolveWorkspacePath(cwd, params.path)
-        const raw = await readFile(resolved, 'utf-8')
+      executeWithMetrics(
+        TOOL_NAME,
+        async () => {
+          const root = workspaceRoot?.path ?? (await resolveWorkspaceRoot(cwd))
+          const rootHandle =
+            workspaceRoot?.handle ?? (await openWorkspaceRoot(root))
+          try {
+            const resolved = await resolveWorkspacePathFromRoot(
+              root,
+              params.path,
+              Boolean(workspaceRoot),
+            )
+            const file = await openExistingFileBeneath(
+              root,
+              resolved,
+              constants.O_RDWR | constants.O_NONBLOCK,
+              undefined,
+              rootHandle,
+            )
+            try {
+              const raw = (await file.readFile()).toString('utf-8')
 
-        const { content: noBom, hasBom } = stripBom(raw)
-        const lineEnding = detectLineEnding(noBom)
-        const content = normalizeToLF(noBom)
-        const oldNorm = normalizeToLF(params.old_string)
-        const newNorm = normalizeToLF(params.new_string)
+              const { content: noBom, hasBom } = stripBom(raw)
+              const lineEnding = detectLineEnding(noBom)
+              const content = normalizeToLF(noBom)
+              const oldNorm = normalizeToLF(params.old_string)
+              const newNorm = normalizeToLF(params.new_string)
 
-        if (oldNorm === newNorm) {
-          return {
-            text: 'old_string and new_string are identical — no change needed.',
-            isError: true,
-          }
-        }
+              if (oldNorm === newNorm) {
+                return {
+                  text: 'old_string and new_string are identical — no change needed.',
+                  isError: true,
+                }
+              }
 
-        let updated: string
-        const exactCount = countOccurrences(content, oldNorm)
+              let updated: string
+              const exactCount = countOccurrences(content, oldNorm)
 
-        if (exactCount === 1) {
-          updated = content.replace(oldNorm, newNorm)
-        } else if (exactCount > 1) {
-          return {
-            text: `Found ${exactCount} exact occurrences of old_string. Add more surrounding context to make the match unique.`,
-            isError: true,
-          }
-        } else {
-          const fuzzyResult = fuzzyReplace(content, oldNorm, newNorm)
-          if (fuzzyResult === null) {
-            return {
-              text: 'old_string not found in file (exact and whitespace-tolerant match both failed).',
-              isError: true,
+              if (exactCount === 1) {
+                updated = content.replace(oldNorm, newNorm)
+              } else if (exactCount > 1) {
+                return {
+                  text: `Found ${exactCount} exact occurrences of old_string. Add more surrounding context to make the match unique.`,
+                  isError: true,
+                }
+              } else {
+                const fuzzyResult = fuzzyReplace(content, oldNorm, newNorm)
+                if (fuzzyResult === null) {
+                  return {
+                    text: 'old_string not found in file (exact and whitespace-tolerant match both failed).',
+                    isError: true,
+                  }
+                }
+                updated = fuzzyResult
+              }
+
+              let finalContent = restoreLineEndings(updated, lineEnding)
+              if (hasBom) finalContent = `\uFEFF${finalContent}`
+              await file.truncate(0)
+              await writeAtStart(file, finalContent)
+
+              const diff = generateDiff(params.old_string, params.new_string)
+              return { text: `Applied edit to ${params.path}\n\n${diff}` }
+            } finally {
+              await file.close()
             }
+          } finally {
+            if (!workspaceRoot) await rootHandle.close()
           }
-          updated = fuzzyResult
-        }
-
-        let finalContent = restoreLineEndings(updated, lineEnding)
-        if (hasBom) finalContent = `\uFEFF${finalContent}`
-        await writeFile(resolved, finalContent, 'utf-8')
-
-        const diff = generateDiff(params.old_string, params.new_string)
-        return { text: `Applied edit to ${params.path}\n\n${diff}` }
-      }),
+        },
+        workspaceRoot,
+      ),
     toModelOutput,
   })
 }

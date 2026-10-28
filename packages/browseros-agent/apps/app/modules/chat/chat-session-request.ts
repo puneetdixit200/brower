@@ -9,6 +9,28 @@ import {
 
 export type LlmChatRequestBodyInput = Parameters<typeof buildChatRequestBody>[0]
 
+export interface OwnerTabSelection {
+  text: string
+  url: string
+  title: string
+}
+
+/** Resolve selected text only from the tab that owns the contextual panel. */
+export function getOwnerTabSelection(
+  ownerTab: Pick<chrome.tabs.Tab, 'id' | 'url' | 'title'> | undefined,
+  selections: Record<string, OwnerTabSelection>,
+): OwnerTabSelection | undefined {
+  if (ownerTab?.id === undefined) return undefined
+  const selection = selections[String(ownerTab.id)]
+  if (!selection) return undefined
+
+  return {
+    text: selection.text,
+    url: selection.url,
+    title: selection.title,
+  }
+}
+
 export function getToolApprovalResponse(messages: UIMessage[]) {
   for (
     let messageIndex = messages.length - 1;
