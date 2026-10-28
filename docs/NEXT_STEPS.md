@@ -70,3 +70,10 @@ Fetched 66 remote commits and fast-forwarded cleanly from `fd3e59910` to `179ef1
 ## Latest stop checkpoint — 2026-10-28
 
 The user-requested 5% remaining allowance threshold was reached. All current work and this full next-step plan are committed/pushed; agents are complete and owned native/test processes are stopped. This goal is paused pending a resume request. Four native objects compile (product, product-state, server config, server manager). Next: loader and crash-reporter object checks, full linked browser/sandbox build, native runtime verification, and continued implementation of all remaining features per CONTINUATION_HANDOFF.md and the 95-task plan.
+
+
+## Remote continuation checkpoint — 2026-10-28
+
+Source work committed on `feat/aster-linux-ui` since `3f701328`: U01 bounded/persistent resizable sidebar; U02 live current-window tabs, real bookmarks and existing conversation history grouped in the Aster rail; U03 local recent task cards with real statuses, safe filtering and recovery markers; and U06/S01 private one-time message/tab handoff with a current-window API boundary. All remain partial until full app and native validation. See [source implementation evidence](evidence/aster-remote-implementation-2026-10-28.md).
+
+**Next implementable batch:** extend sidebar into nested bookmarks and native pane controls; complete task transcript/recovery, approvals, permissions and provider routing. In a source checkout with dependencies, first run focused WXT/React builds and the new sidebar, homepage and handoff tests. Continue compiler work on loader/crash reporter and the linked native binary only on a host with the pinned Chromium checkout. Do not infer those host-local artifacts or processes from GitHub docs. No release signing/update ownership is provisioned. The broader 95-subtask plan remains open.
