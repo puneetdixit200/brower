@@ -73,6 +73,7 @@ export default defineConfig({
       'alarms',
       'webNavigation',
       'downloads',
+      'sessions',
     ],
     host_permissions: ['http://127.0.0.1/*'],
   },
