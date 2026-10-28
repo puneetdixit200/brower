@@ -17,6 +17,8 @@ export interface ResearchSourceLedgerEntry {
 export interface ResearchSourceLedger {
   answerMessageId: string
   entries: ResearchSourceLedgerEntry[]
+  /** Quotes near multiple distinct citations are never assigned by proximity. */
+  unattributedQuoteCount: number
 }
 
 export const RESEARCH_LEDGER_LIMITATION =
@@ -75,7 +77,10 @@ function readText(output: unknown): string[] {
 
 function quotedEvidence(
   answerText: string,
-): Array<{ quote: string; url: string; sourceOffset: number }> {
+): {
+  matches: Array<{ quote: string; url: string; sourceOffset: number }>
+  unattributedQuoteCount: number
+} {
   const text = answerText.slice(0, MAX_ANSWER_SCAN_CHARS)
   const urls = [...text.matchAll(URL_PATTERN)].map((match) => {
     const rawUrl = match[0]
@@ -83,12 +88,17 @@ function quotedEvidence(
     return { url, index: match.index ?? 0 }
   })
   const quotes: Array<{ quote: string; url: string; sourceOffset: number }> = []
+  let unattributedQuoteCount = 0
+  let scannedQuotes = 0
   for (const match of text.matchAll(QUOTED_TEXT_PATTERN)) {
+    // A maliciously long answer must not run quote × URL proximity scans
+    // without an upper bound.
+    if (++scannedQuotes > MAX_QUOTE_CHECKS * 2) break
     const quote = match[1] ?? match[2] ?? ''
     if (!quote.trim() || quote.length > MAX_QUOTE_LENGTH) continue
     const start = match.index ?? 0
     const end = start + match[0].length
-    const nearby = urls
+    const nearbyCandidates = urls
       .map((candidate) => {
         const distance =
           candidate.index >= end
@@ -109,11 +119,23 @@ function quotedEvidence(
       .filter(
         (candidate) => candidate.distance <= 320 && candidate.sameParagraph,
       )
-      .sort((left, right) => left.distance - right.distance)[0]
+      .sort((left, right) => left.distance - right.distance)
+    // Nearest-URL attribution is unsafe when the same paragraph cites two
+    // distinct pages. Do not quietly label a quote as verified at either URL.
+    const distinctUrls = new Set(
+      nearbyCandidates.map((candidate) =>
+        normalizeResearchEvidenceUrl(candidate.url),
+      ),
+    )
+    if (distinctUrls.size > 1) {
+      unattributedQuoteCount++
+      continue
+    }
+    const nearby = nearbyCandidates[0]
     if (nearby) quotes.push({ quote, url: nearby.url, sourceOffset: start })
     if (quotes.length >= MAX_QUOTE_CHECKS) break
   }
-  return quotes
+  return { matches: quotes, unattributedQuoteCount }
 }
 
 function isResearchRequest(message: UIMessage): boolean {
@@ -265,10 +287,11 @@ export function getResearchSourceLedger(
       ...parts,
     ])
   }
-  const quotes = quotedEvidence(answerText)
+  const quoteEvidence = quotedEvidence(answerText)
 
   return {
     answerMessageId: answer.id,
+    unattributedQuoteCount: quoteEvidence.unattributedQuoteCount,
     entries: candidates.map((url) => {
       const normalizedUrl = normalizeResearchEvidenceUrl(url)
       const observedBy = normalizedUrl
@@ -284,7 +307,7 @@ export function getResearchSourceLedger(
           ]
         : []
       const quoteChecks = normalizedUrl
-        ? quotes
+        ? quoteEvidence.matches
             .filter(
               (item) =>
                 normalizeResearchEvidenceUrl(item.url) === normalizedUrl,
