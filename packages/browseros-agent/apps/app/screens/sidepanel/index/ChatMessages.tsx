@@ -154,7 +154,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
                           {RESEARCH_LEDGER_LIMITATION}
                         </p>
                         {researchLedger.unattributedQuoteCount > 0 && (
-                          <p role="status" className="mt-2 text-muted-foreground">
+                          <p
+                            role="status"
+                            className="mt-2 text-muted-foreground"
+                          >
                             {researchLedger.unattributedQuoteCount} quote(s) had
                             multiple nearby source URLs and were not attributed
                             to any page. Review those citations manually.
