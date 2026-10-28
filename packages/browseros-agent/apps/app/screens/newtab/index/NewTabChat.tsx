@@ -94,6 +94,12 @@ export const NewTabChat: FC = () => {
     const query = pending?.text ?? searchParams.get('q') ?? ''
     const chatMode = searchParams.get('mode')
     const tabIdsParam = searchParams.get('tabs')
+    const tabIds = pending?.tabIds ??
+      (tabIdsParam ?? '')
+        .split(',')
+        .map(Number)
+        .filter((id) => Number.isSafeInteger(id) && id >= 0)
+        .slice(0, 32)
     if (!query && !pending?.files.length) return
 
     hasSentInitialRef.current = true
@@ -106,9 +112,10 @@ export const NewTabChat: FC = () => {
     const tabName = searchParams.get('tabName')
     const tabDescription = searchParams.get('tabDescription')
 
-    if (tabIdsParam) {
-      const tabIds = tabIdsParam.split(',').map(Number).filter(Boolean)
-      chrome.tabs.query({}).then((allTabs) => {
+    if (tabIds.length > 0) {
+      // URL query strings must never be able to nominate tabs outside the
+      // user's current window. This rechecks membership before dispatch.
+      chrome.tabs.query({ currentWindow: true }).then((allTabs) => {
         const matchedTabs = allTabs.filter(
           (t) => t.id !== undefined && tabIds.includes(t.id),
         )
@@ -129,6 +136,10 @@ export const NewTabChat: FC = () => {
         } else {
           sendMessage({ text: query, files: pending?.files })
         }
+      }).catch(() => {
+        // A denied/closed tab lookup must not silently discard the prompt.
+        // Continue without any ambient tab context.
+        sendMessage({ text: query, files: pending?.files })
       })
     } else {
       sendMessage({ text: query, files: pending?.files })
