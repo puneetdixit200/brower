@@ -1,4 +1,5 @@
 import { onScheduleMessage } from '@/lib/messaging/schedules/scheduleMessages'
+import { getAgentServerUrl } from '@/lib/browseros/helpers'
 import { createAlarmFromJob } from '@/lib/schedules/createAlarmFromJob'
 import { getChatServerResponse } from '@/lib/schedules/getChatServerResponse'
 import {
@@ -15,6 +16,7 @@ import type {
   ScheduledJobRun,
 } from '@/lib/schedules/scheduleTypes'
 import { shouldFailStaleScheduledRun } from '@/lib/schedules/stale-run-policy'
+import { getServerConversationLiveness } from '@/lib/schedules/server-conversation-liveness'
 import {
   listScheduledJobRunsOrNull,
   listScheduledJobsOrNull,
@@ -49,7 +51,19 @@ export const scheduledJobRuns = async () => {
       }),
     )
 
-    for (const run of stale) {
+    // A restarted service worker can lose its in-memory controller while the
+    // sidecar is still actively streaming. Check the authoritative conversation
+    // state before retiring a heartbeat run. Unknown state retains the claim.
+    const serverUrl = await getAgentServerUrl().catch(() => null)
+    for (const run of stale.slice(0, 10)) {
+      if (run.conversationId) {
+        if (!serverUrl) continue
+        const status = await getServerConversationLiveness({
+          conversationId: run.conversationId,
+          agentServerUrl: serverUrl,
+        })
+        if (status !== 'inactive') continue
+      }
       await putScheduledJobRun({
         ...run,
         status: 'failed',
