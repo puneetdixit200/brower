@@ -5,8 +5,10 @@
  * Do not serialize arbitrary tool input to the DOM. It may contain credentials,
  * large binary blobs, nested API outputs, or attacker-controlled page text.
  */
-const SENSITIVE_KEY = /(pass(word|phrase)?|secret|token|api.?key|authorization|cookie|credential|private.?key|session.?id|otp|one.?time.?code|2fa|mfa|csrf)/i
-const SENSITIVE_VALUE = /(?:\bBearer\s+[A-Za-z0-9._~+/-]{16,}|\b(?:AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{30,})\b|(?:password|secret|token|api[_-]?key)\s*[:=]\s*\S+)/i
+const SENSITIVE_KEY =
+  /(pass(word|phrase)?|secret|token|api.?key|authorization|cookie|credential|private.?key|session.?id|otp|one.?time.?code|2fa|mfa|csrf)/i
+const SENSITIVE_VALUE =
+  /(?:\bBearer\s+[A-Za-z0-9._~+/-]{16,}|\b(?:AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{30,})\b|(?:password|secret|token|api[_-]?key)\s*[:=]\s*\S+)/i
 const MAX_DEPTH = 5
 const MAX_FIELDS = 24
 const MAX_ITEMS = 24
@@ -19,9 +21,11 @@ function cleanText(value: string): string {
   if (/^https?:\/\//i.test(value)) {
     try {
       const address = new URL(value)
-      if (address.username || address.password) return '[redacted URL credentials]'
+      if (address.username || address.password)
+        return '[redacted URL credentials]'
       // Query and fragment frequently carry reset tokens or session state.
-      if (SENSITIVE_VALUE.test(address.pathname)) return `${address.origin}/[sensitive path omitted]`
+      if (SENSITIVE_VALUE.test(address.pathname))
+        return `${address.origin}/[sensitive path omitted]`
       if (address.search || address.hash) {
         return `${address.origin}${address.pathname} [query/fragment omitted]`
       }
@@ -30,14 +34,24 @@ function cleanText(value: string): string {
       return '[invalid URL]'
     }
   }
-  if (SENSITIVE_VALUE.test(value)) return '[redacted: credential-shaped content]'
-  if (value.length > MAX_STRING) return `${value.slice(0, MAX_STRING)}… [truncated]`
+  if (SENSITIVE_VALUE.test(value))
+    return '[redacted: credential-shaped content]'
+  if (value.length > MAX_STRING)
+    return `${value.slice(0, MAX_STRING)}… [truncated]`
   return value
 }
 
-function sanitizedPreview(value: unknown, depth: number, seen: WeakSet<object>): unknown {
+function sanitizedPreview(
+  value: unknown,
+  depth: number,
+  seen: WeakSet<object>,
+): unknown {
   if (typeof value === 'string') return cleanText(value)
-  if (value === null || typeof value === 'boolean' || typeof value === 'number') {
+  if (
+    value === null ||
+    typeof value === 'boolean' ||
+    typeof value === 'number'
+  ) {
     return value
   }
   if (typeof value === 'bigint') return '[numeric value]'
@@ -47,9 +61,9 @@ function sanitizedPreview(value: unknown, depth: number, seen: WeakSet<object>):
   seen.add(value)
   try {
     if (Array.isArray(value)) {
-      const items = value.slice(0, MAX_ITEMS).map((item) =>
-        sanitizedPreview(item, depth + 1, seen),
-      )
+      const items = value
+        .slice(0, MAX_ITEMS)
+        .map((item) => sanitizedPreview(item, depth + 1, seen))
       if (value.length > MAX_ITEMS) items.push('[additional items omitted]')
       return items
     }
@@ -60,7 +74,8 @@ function sanitizedPreview(value: unknown, depth: number, seen: WeakSet<object>):
         ? '[redacted]'
         : sanitizedPreview(child, depth + 1, seen)
     }
-    if (Object.keys(value).length > MAX_FIELDS) result['…'] = '[additional fields omitted]'
+    if (Object.keys(value).length > MAX_FIELDS)
+      result['…'] = '[additional fields omitted]'
     return result
   } finally {
     seen.delete(value)
@@ -69,7 +84,11 @@ function sanitizedPreview(value: unknown, depth: number, seen: WeakSet<object>):
 
 export function formatApprovalInput(input: unknown): string {
   try {
-    const summary = JSON.stringify(sanitizedPreview(input, 0, new WeakSet()), null, 2)
+    const summary = JSON.stringify(
+      sanitizedPreview(input, 0, new WeakSet()),
+      null,
+      2,
+    )
     if (!summary) return 'No action details were provided.'
     if (summary.length > MAX_OUTPUT) {
       return `${summary.slice(0, MAX_OUTPUT)}\n… [additional action details omitted]`
