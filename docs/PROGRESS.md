@@ -376,3 +376,19 @@ Committed a second feature batch: real bookmark tree folder paths, scoped tab pi
 Following the user's request to defer testing and implement as much of every NOT_STARTED feature as possible, this session committed actual Chromium API quick controls (selected-tab navigation/reload, recent downloads/history, session restore, private-window restrictions and explicit screenshots), model processing disclosure and first-run privacy guidance, human-owned MFA takeover, bounded queued agent prompts, source-aware research seeding, credential-tool catalog exclusions, local site recipes with staleness/CRUD, token-authenticated status/stop CLI, external read-only MCP scoping, a restricted disposable-profile developer REPL, idle-to-active schedule reconciliation, agent-run admission limits/429 responses, user-picked directory task export, Omarchy Ozone options, and numerical startup/CPU/RSS/tab-API benchmark tools.
 
 **No tests, typechecks, native builds, GUI sessions, actual benchmark runs or security-release acceptance were performed on these source changes, at the user's explicit request.** The historical passing GitHub Actions run 40682050699 covers only the previous feature batch, not the new code. The matrix now has **2 PASS, 67 PARTIAL, 1 PARTIAL/BLOCKED and 2 NOT_STARTED** (72 total). These PARTIAL updates are source-only and not proof of working or secure native features. The two remaining NOT_STARTED rows are R02 durable heartbeat continuation and P03 blind autofill. See [the detailed evidence boundary](evidence/aster-source-foundations-38-2026-10-28.md). The project remains incomplete and not releasable.
+
+
+### Push-triggered CI and deferred-test boundary correction
+
+The existing branch-scoped GitHub Actions workflow triggered automatically on an
+intermediate source commit despite the user's instruction to leave testing until
+later. [Run 40695175449](https://github.com/puneetdixit200/brower/actions/runs/40695175449)
+reported extension typecheck PASS, server typecheck FAIL with one specific
+TypeScript error in `credential-tool-filter.ts` (tool description may be a
+function). That source error was subsequently fixed by narrowing descriptions
+to strings, but **was not rechecked**. The workflow was then changed to
+`workflow_dispatch` only to honor the requested deferred-testing policy.
+Later source commits remain untested and may have additional compiler/runtime
+issues. This historical CI result must not be reported as a passing check for
+the new foundation batch. The existing earlier passing CI run covers only
+previous source revisions.
