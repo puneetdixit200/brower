@@ -14,6 +14,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { SidebarBrowserGroups } from './SidebarBrowserGroups'
 import { SidebarHistory } from './SidebarHistory'
 
 export interface SidebarNavigationProps {
@@ -99,7 +100,15 @@ export const SidebarNavigation: FC<SidebarNavigationProps> = ({
                   )}
                 </Tooltip>
                 {item.to === '/home' && (
-                  <SidebarHistory expanded={expanded} onNavigate={onNavigate} />
+                  <>
+                    <SidebarHistory expanded={expanded} onNavigate={onNavigate} />
+                    {expanded && (
+                      <SidebarBrowserGroups
+                        expanded={expanded}
+                        onNavigate={onNavigate}
+                      />
+                    )}
+                  </>
                 )}
               </div>
             )
