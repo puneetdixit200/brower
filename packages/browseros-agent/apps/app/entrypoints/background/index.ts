@@ -25,6 +25,7 @@ import { searchActionsStorage } from '@/lib/search-actions/searchActionsStorage'
 import { selectedTextStorage } from '@/lib/selected-text/selectedTextStorage'
 import { createSerializedMutationQueue } from '@/lib/selected-text/serializedMutationQueue'
 import { stopAgentStorage } from '@/lib/stop-agent/stop-agent-storage'
+import { registerAddressBarSearchListener } from './address-bar-search'
 import { scheduledJobRuns } from './scheduledJobRuns'
 
 declare const __ASTER_REPORTER_EXTENSION_ID__: string
@@ -45,6 +46,20 @@ const cleanupRetiredStorage = async () => {
 }
 
 export default defineBackground(() => {
+  registerAddressBarSearchListener(
+    {
+      onInputEntered: {
+        addListener: (listener) =>
+          chrome.omnibox.onInputEntered.addListener((text, disposition) =>
+            listener(text, disposition),
+          ),
+      },
+    },
+    {
+      create: (properties) => chrome.tabs.create(properties),
+      update: (properties) => chrome.tabs.update(properties),
+    },
+  )
   registerDiagnostics(
     'browseros',
     getAgentServerUrl,

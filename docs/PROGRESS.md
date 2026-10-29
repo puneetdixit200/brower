@@ -1,5 +1,9 @@
 # Progress
 
+### B02 Aster keyword address-bar entry source slice — 2026-10-29
+
+The extension manifest now registers the Chromium keyword `aster`. One background `omnibox.onInputEntered` listener uses the same pure URL/search resolver as `BrowserQuickControls` and honors Chromium's current-tab, foreground-tab and background-tab dispositions; no suggestion path or default-search setting is changed. Focused tests cover URL/search routing, unsafe schemes falling back to search, blank input and all three Enter dispositions. App typecheck, targeted Biome and `git diff --check` pass. The production WXT build passes and emits the keyword and background listener. Headed Aster keyword and omnibox acceptance remain open. Keep B02 PARTIAL.
+
 ### B10 recently closed tab restore source slice — 2026-10-29
 
 The recently-closed-tab selector now restores only a tab with a session ID whose window matches a known current-window ID, excludes incognito entries, and preserves Chromium's newest-first ordering. An independent Luna review identified the missing-window-ID ambiguity; the selector now fails closed and has a regression test. Focused tests pass 9/9; app typecheck and targeted Biome pass. This verifies selector behavior only, not native crash restore, session lifecycle or profile-corruption handling. Keep B10 PARTIAL. Next run headed disposable-profile checks for close/reopen, restart restore, regular/private separation and profile integrity when a runnable Aster binary is available.

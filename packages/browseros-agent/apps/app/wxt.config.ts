@@ -44,6 +44,9 @@ export default defineConfig({
     chrome_url_overrides: {
       newtab: 'app.html',
     },
+    omnibox: {
+      keyword: 'aster',
+    },
     options_ui: {
       page: 'app.html#/settings',
       open_in_tab: true,
