@@ -105,6 +105,139 @@ describe('conversation run lifecycle trace persistence', () => {
     expect(store.delete('conversation-a')).toBe(false)
   })
 
+  it('completes a human wait once for the exact active run and request', () => {
+    const store = createStore()
+    store.start('conversation-a', RUN_A, 100)
+    const wait = store.beginHumanWait('conversation-a', RUN_A, 'request-a', 110)
+    expect(wait).toMatchObject({ phase: 'waiting', version: 1 })
+    store.beginHumanWait('conversation-a', RUN_A, 'replacement-request', 115)
+
+    expect(
+      store.completeHumanWait('conversation-a', RUN_A, 'request-a', 120),
+    ).toBe(false)
+    expect(
+      store.completeHumanWait('conversation-a', RUN_B, 'request-a', 120),
+    ).toBe(false)
+    expect(
+      store.completeHumanWait(
+        'conversation-a',
+        RUN_A,
+        'replacement-request',
+        120,
+      ),
+    ).toBe(true)
+    expect(
+      store.completeHumanWait(
+        'conversation-a',
+        RUN_A,
+        'replacement-request',
+        130,
+      ),
+    ).toBe(false)
+    expect(store.getHumanWait('conversation-a', RUN_A)).toMatchObject({
+      requestId: 'replacement-request',
+      phase: 'human_completed',
+      createdAt: 115,
+      updatedAt: 120,
+      completedAt: 120,
+      version: 3,
+    })
+  })
+
+  it('invalidates pending waits on stop and startup recovery and persists opaque identity', () => {
+    const store = createStore()
+    store.start('conversation-a', RUN_A, 100)
+    store.beginHumanWait('conversation-a', RUN_A, 'opaque-request', 110)
+    store.finish('conversation-a', RUN_A, 'interrupted', 120)
+    expect(store.getHumanWait('conversation-a', RUN_A)?.phase).toBe(
+      'interrupted',
+    )
+
+    store.start('conversation-a', RUN_B, 200)
+    store.beginHumanWait('conversation-a', RUN_B, 'recovered-request', 210)
+    const dbPath = getDbHandle().path
+    closeDb()
+    initializeDb({ dbPath })
+    const recovered = new DbConversationRunLifecycleStore()
+    expect(recovered.getHumanWait('conversation-a', RUN_B)).toMatchObject({
+      requestId: 'recovered-request',
+      phase: 'interrupted',
+      version: 2,
+    })
+    const columns = getDbHandle()
+      .sqlite.query<{ name: string }, []>(
+        'PRAGMA table_info(conversation_human_waits)',
+      )
+      .all()
+      .map((column) => column.name)
+    expect(columns).toEqual([
+      'conversation_id',
+      'run_id',
+      'request_id',
+      'phase',
+      'created_at',
+      'updated_at',
+      'completed_at',
+      'version',
+      'fresh_conversation_id',
+    ])
+  })
+
+  it('exposes the current wait and consumes fresh conversation authorization once', () => {
+    const store = createStore()
+    store.start('conversation-a', RUN_A, 100)
+    store.beginHumanWait('conversation-a', RUN_A, 'opaque-request', 110)
+    expect(store.getCurrentHumanWait('conversation-a')).toMatchObject({
+      runId: RUN_A,
+      requestId: 'opaque-request',
+      phase: 'waiting',
+    })
+    store.finish('conversation-a', RUN_A, 'interrupted', 120)
+    expect(store.getCurrentHumanWait('conversation-a')).toMatchObject({
+      runId: RUN_A,
+      requestId: 'opaque-request',
+      phase: 'interrupted',
+    })
+
+    const freshConversationId = '33333333-3333-4333-8333-333333333333'
+    expect(
+      store.authorizeFreshConversation(
+        'conversation-a',
+        RUN_B,
+        'opaque-request',
+        freshConversationId,
+      ),
+    ).toBeUndefined()
+    expect(
+      store.authorizeFreshConversation(
+        'conversation-a',
+        RUN_A,
+        'stale-request',
+        freshConversationId,
+      ),
+    ).toBeUndefined()
+    expect(
+      store.authorizeFreshConversation(
+        'conversation-a',
+        RUN_A,
+        'opaque-request',
+        freshConversationId,
+      ),
+    ).toBe(freshConversationId)
+    expect(
+      store.authorizeFreshConversation(
+        'conversation-a',
+        RUN_A,
+        'opaque-request',
+        '44444444-4444-4444-8444-444444444444',
+      ),
+    ).toBe(freshConversationId)
+    expect(store.getCurrentHumanWait('conversation-a')).toMatchObject({
+      runId: RUN_A,
+      phase: 'interrupted',
+    })
+  })
+
   function createStore(): DbConversationRunLifecycleStore {
     tempDir = mkdtempSync(join(tmpdir(), 'conversation-trace-store-'))
     initializeDb({ dbPath: join(tempDir, 'browseros.sqlite') })

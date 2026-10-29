@@ -31,6 +31,8 @@ interface StubState {
   childNodes?: AXNode[]
   failAxTree?: boolean
   onFrameTreeRead?: () => void
+  challengeValue?: unknown
+  challengeExpression?: string
 }
 
 function stubObserverHarness(state: StubState): Observer {
@@ -88,7 +90,10 @@ function stubObserverHarness(state: StubState): Observer {
       },
     },
     Runtime: {
-      evaluate: async () => ({ result: { value: [] } }),
+      evaluate: async ({ expression }: { expression: string }) => {
+        state.challengeExpression = expression
+        return { result: { value: state.challengeValue ?? [] } }
+      },
     },
   } as unknown as ProtocolApi
 
@@ -108,6 +113,82 @@ function stubObserverHarness(state: StubState): Observer {
 }
 
 describe('Observer stable refs', () => {
+  test('projects exactly bounded safe challenge signal fields and caches a copy', async () => {
+    const state: StubState = {
+      loaderId: 'loader-1',
+      url: 'https://example.com/login?token=private#fragment',
+      nodes: [],
+      challengeValue: {
+        visiblePasswordInputCount: 1000,
+        visibleOtpInputCount: 2,
+        captchaIframeCount: 1,
+        captchaProviderMarkerCount: 1,
+        explicitChallengeState: 'captcha',
+        formState: 'challenge',
+        secret: 'must-not-escape',
+      },
+    }
+    const observer = stubObserverHarness(state)
+    const signal = await observer.challengeSignals()
+    expect(signal).toEqual({
+      urlOrigin: 'https://example.com',
+      urlPath: '/',
+      visiblePasswordInputCount: 20,
+      visibleOtpInputCount: 2,
+      captchaIframeCount: 1,
+      captchaProviderMarkerCount: 1,
+      explicitChallengeState: 'captcha',
+      formState: 'challenge',
+    })
+    expect(JSON.stringify(signal)).not.toContain('must-not-escape')
+    signal.urlPath = '/mutated'
+    expect(observer.lastChallengeSignals?.urlPath).toBe('/')
+  })
+
+  test('drops malformed, unsafe, and sensitive URL paths', async () => {
+    const state: StubState = {
+      loaderId: 'loader-1',
+      url: 'javascript:alert(1)',
+      nodes: [],
+    }
+    const observer = stubObserverHarness(state)
+    expect(await observer.challengeSignals()).toMatchObject({
+      urlOrigin: 'https://invalid.invalid',
+      urlPath: '/',
+    })
+    state.url = 'https://user:pass@example.com/account/session-secret'
+    expect(await observer.challengeSignals()).toMatchObject({
+      urlOrigin: 'https://invalid.invalid',
+      urlPath: '/',
+    })
+    state.url = 'https://example.com/path/%ZZ'
+    expect(await observer.challengeSignals()).toMatchObject({
+      urlOrigin: 'https://example.com',
+      urlPath: '/',
+    })
+  })
+
+  test('scanner uses conservative visibility and only allowlisted attributes', async () => {
+    const state: StubState = {
+      loaderId: 'loader-1',
+      url: 'https://example.com',
+      nodes: [],
+    }
+    const observer = stubObserverHarness(state)
+    await observer.challengeSignals()
+    expect(state.challengeExpression).toContain("el.type==='hidden'")
+    expect(state.challengeExpression).toContain("s.visibility!=='visible'")
+    expect(state.challengeExpression).toContain(
+      "hasAttribute('data-hcaptcha-widget-id')",
+    )
+    expect(state.challengeExpression).toContain('nodeCap=3000')
+    expect(state.challengeExpression).toContain('visited<nodeCap')
+    expect(state.challengeExpression).toContain('document.createTreeWalker')
+    expect(state.challengeExpression).not.toContain('querySelectorAll')
+    expect(state.challengeExpression).not.toContain('innerText')
+    expect(state.challengeExpression).not.toContain('placeholder')
+  })
+
   test('snapshot and diff never expose password values returned by AX', async () => {
     const sentinel = 'observer-password-sentinel-93ac'
     const state = {

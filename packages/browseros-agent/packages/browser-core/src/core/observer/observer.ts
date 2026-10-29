@@ -18,6 +18,71 @@ export interface SnapshotResult {
   url: string
 }
 
+/** Bounded, secret-free metadata for downstream challenge detection. */
+export interface ChallengeSignal {
+  urlOrigin: string
+  urlPath: string
+  visiblePasswordInputCount: number
+  visibleOtpInputCount: number
+  captchaIframeCount: number
+  captchaProviderMarkerCount: number
+  explicitChallengeState: 'none' | 'captcha' | 'mfa' | 'unknown'
+  formState: 'none' | 'login' | 'consent' | 'challenge' | 'unknown'
+}
+
+const CHALLENGE_SIGNAL_JS = `(function(){
+  var cap=20, nodeCap=3000, count=function(n){return Math.min(cap,n)};
+  var visible=function(el){
+    if(!el||!el.isConnected||el.type==='hidden'||el.disabled)return false;
+    var r=el.getBoundingClientRect();
+    if(r.width===0||r.height===0)return false;
+    var depth=0;
+    for(var p=el;p&&p.nodeType===1&&depth<32;p=p.parentElement,depth++){
+      var s=getComputedStyle(p);
+      if(s.display==='none'||s.visibility!=='visible'||Number(s.opacity)===0)return false;
+    }
+    return !p;
+  };
+  var passwords=0,otps=0,frames=0,markers=0,hasVisibleForm=false,hasConsentCheckbox=false;
+  var state='none';
+  var root=document.body,walker=root&&document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT),visited=0,node;
+  while(walker&&visited<nodeCap&&(node=walker.nextNode())){
+    visited++;
+    var tag=node.tagName.toLowerCase();
+    if(!visible(node))continue;
+    if(tag==='form')hasVisibleForm=true;
+    if(tag==='input'){
+      if(node.type==='password')passwords++;
+      if(node.getAttribute('autocomplete')==='one-time-code')otps++;
+      if(node.type==='checkbox'&&node.form)hasConsentCheckbox=true;
+    }else if(tag==='iframe'){
+      try{var h=new URL(node.src,location.href).hostname.toLowerCase();if(h==='google.com'||h.endsWith('.google.com')||h==='recaptcha.net'||h.endsWith('.recaptcha.net')||h==='hcaptcha.com'||h.endsWith('.hcaptcha.com')||h==='challenges.cloudflare.com')frames++}catch(_){}
+    }
+    if(node.hasAttribute('data-hcaptcha-widget-id')||node.hasAttribute('data-turnstile-widget')||node.classList.contains('g-recaptcha'))markers++;
+    if(node.hasAttribute('data-challenge-state')){
+      var v=node.getAttribute('data-challenge-state');
+      if(v==='captcha'||v==='mfa')state=v;
+      else if(v!==null&&v!=='none'&&state==='none')state='unknown';
+    }
+  }
+  var formState='none';
+  if(hasVisibleForm){
+    if(otps>0)formState='challenge';else if(passwords>0)formState='login';
+    else if(hasConsentCheckbox)formState='consent';
+    else formState='unknown';
+  }
+  return {visiblePasswordInputCount:count(passwords),visibleOtpInputCount:count(otps),captchaIframeCount:count(frames),captchaProviderMarkerCount:count(markers),explicitChallengeState:state,formState:formState};
+})()`
+
+const EMPTY_CHALLENGE_SIGNAL: Omit<ChallengeSignal, 'urlOrigin' | 'urlPath'> = {
+  visiblePasswordInputCount: 0,
+  visibleOtpInputCount: 0,
+  captchaIframeCount: 0,
+  captchaProviderMarkerCount: 0,
+  explicitChallengeState: 'none',
+  formState: 'none',
+}
+
 interface MainFrameState {
   url: string
   documentId?: DocumentId
@@ -48,6 +113,7 @@ export class Observer {
   private baseline?: { text: string; url: string }
   private refs = new RefMap()
   private refScope?: RefScope
+  private lastSignals?: ChallengeSignal
 
   constructor(
     private readonly pages: PageManager,
@@ -70,6 +136,40 @@ export class Observer {
 
   get lastRefs(): RefMap {
     return this.refs
+  }
+
+  get lastChallengeSignals(): ChallengeSignal | undefined {
+    return this.lastSignals ? { ...this.lastSignals } : undefined
+  }
+
+  /** Collects only allowlisted challenge metadata; it never reads page text or field values. */
+  async challengeSignals(): Promise<ChallengeSignal> {
+    const { session } = await this.pages.getSession(this.pageId)
+    let url = 'unknown'
+    try {
+      const tree = await session.Page.getFrameTree()
+      url = frameUrl((tree.frameTree as FrameTreeNode).frame)
+    } catch {
+      // Keep the safe unknown URL when frame metadata is unavailable.
+    }
+    const safeUrl = projectSafeUrl(url)
+    try {
+      const result = await session.Runtime.evaluate({
+        expression: CHALLENGE_SIGNAL_JS,
+        returnByValue: true,
+        awaitPromise: false,
+      })
+      const signals = {
+        ...safeUrl,
+        ...parseChallengeCounts(result.result?.value),
+      }
+      this.lastSignals = signals
+      return { ...signals }
+    } catch {
+      const signals = { ...safeUrl, ...EMPTY_CHALLENGE_SIGNAL }
+      this.lastSignals = signals
+      return { ...signals }
+    }
   }
 
   /** Resolve a ref from the last snapshot to a live element, routed to its frame's session. */
@@ -225,6 +325,55 @@ export class Observer {
   ): Promise<Map<FrameId | undefined, DocumentId>> {
     const result = await session.Page.getFrameTree()
     return collectFrameDocuments(result.frameTree as FrameTreeNode)
+  }
+}
+
+function parseChallengeCounts(
+  value: unknown,
+): Omit<ChallengeSignal, 'urlOrigin' | 'urlPath'> {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return { ...EMPTY_CHALLENGE_SIGNAL }
+  const record = value as Record<string, unknown>
+  const bounded = (n: unknown): number =>
+    typeof n === 'number' && Number.isSafeInteger(n) && n >= 0
+      ? Math.min(20, n)
+      : 0
+  const explicit = ['none', 'captcha', 'mfa', 'unknown'].includes(
+    String(record.explicitChallengeState),
+  )
+    ? (record.explicitChallengeState as ChallengeSignal['explicitChallengeState'])
+    : 'unknown'
+  const form = ['none', 'login', 'consent', 'challenge', 'unknown'].includes(
+    String(record.formState),
+  )
+    ? (record.formState as ChallengeSignal['formState'])
+    : 'unknown'
+  return {
+    visiblePasswordInputCount: bounded(record.visiblePasswordInputCount),
+    visibleOtpInputCount: bounded(record.visibleOtpInputCount),
+    captchaIframeCount: bounded(record.captchaIframeCount),
+    captchaProviderMarkerCount: bounded(record.captchaProviderMarkerCount),
+    explicitChallengeState: explicit,
+    formState: form,
+  }
+}
+
+function projectSafeUrl(
+  raw: string,
+): Pick<ChallengeSignal, 'urlOrigin' | 'urlPath'> {
+  try {
+    const url = new URL(raw)
+    if (url.protocol !== 'https:' || url.username || url.password) {
+      return { urlOrigin: 'https://invalid.invalid', urlPath: '/' }
+    }
+    return {
+      urlOrigin:
+        url.origin.length <= 255 ? url.origin : 'https://invalid.invalid',
+      // Paths commonly contain account identifiers, email addresses, or tokens.
+      urlPath: '/',
+    }
+  } catch {
+    return { urlOrigin: 'https://invalid.invalid', urlPath: '/' }
   }
 }
 

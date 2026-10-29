@@ -24,6 +24,23 @@ export interface DurableConversationRun {
   tracePersistenceDegraded: boolean
 }
 
+export type HumanWaitPhase =
+  | 'waiting'
+  | 'human_completed'
+  | 'cancelled'
+  | 'interrupted'
+
+export interface DurableHumanWait {
+  conversationId: string
+  runId: string
+  requestId: string
+  phase: HumanWaitPhase
+  createdAt: number
+  updatedAt: number
+  completedAt: number | null
+  version: number
+}
+
 /** Stores lifecycle metadata only; prompts, messages, credentials, and tool I/O stay transient. */
 export interface ConversationRunLifecycleStore {
   start(conversationId: string, runId: string, startedAt: number): void
@@ -46,6 +63,38 @@ export interface ConversationRunLifecycleStore {
     at: number,
   ): AgentTaskTraceEvent
   getTraceEvents(conversationId: string, runId: string): AgentTaskTraceEvent[]
+  /** Persists opaque identity only, and only while this exact run is active. */
+  beginHumanWait(
+    conversationId: string,
+    runId: string,
+    requestId: string,
+    at: number,
+  ): DurableHumanWait | undefined
+  getHumanWait(
+    conversationId: string,
+    runId: string,
+  ): DurableHumanWait | undefined
+  getCurrentHumanWait?(conversationId: string): DurableHumanWait | undefined
+  /** Atomically consumes an interrupted wait for one fresh conversation authorization. */
+  authorizeFreshConversation?(
+    conversationId: string,
+    runId: string,
+    requestId: string,
+    freshConversationId: string,
+  ): string | undefined
+  /** CAS: true only for the first exact active-run/request completion. */
+  completeHumanWait(
+    conversationId: string,
+    runId: string,
+    requestId: string,
+    at: number,
+  ): boolean
+  cancelHumanWait(
+    conversationId: string,
+    runId: string,
+    requestId: string,
+    at: number,
+  ): boolean
   delete(conversationId: string): boolean
 }
 
@@ -61,6 +110,30 @@ type RunRow = {
 type TraceEventRow = {
   event_id: string
   event_json: string
+}
+
+type HumanWaitRow = {
+  conversation_id: string
+  run_id: string
+  request_id: string
+  phase: HumanWaitPhase
+  created_at: number
+  updated_at: number
+  completed_at: number | null
+  version: number
+}
+
+function decodeHumanWait(row: HumanWaitRow): DurableHumanWait {
+  return {
+    conversationId: row.conversation_id,
+    runId: row.run_id,
+    requestId: row.request_id,
+    phase: row.phase,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at,
+    version: row.version,
+  }
 }
 
 function decodeTraceEventRow(row: TraceEventRow, runId: string) {
@@ -82,21 +155,43 @@ export class DbConversationRunLifecycleStore
   implements ConversationRunLifecycleStore
 {
   constructor() {
-    getDbHandle()
-      .sqlite.prepare(
-        "UPDATE conversation_run_state SET status = 'interrupted', finished_at = COALESCE(finished_at, ?) WHERE status = 'running'",
-      )
-      .run(Date.now())
+    const sqlite = getDbHandle().sqlite
+    sqlite.transaction(() => {
+      sqlite
+        .prepare(
+          "UPDATE conversation_run_state SET status = 'interrupted', finished_at = COALESCE(finished_at, ?) WHERE status = 'running'",
+        )
+        .run(Date.now())
+      sqlite
+        .prepare(
+          `UPDATE conversation_human_waits SET phase = 'interrupted', updated_at = ?, version = version + 1
+         WHERE phase = 'waiting' AND EXISTS (
+           SELECT 1 FROM conversation_run_state s
+           WHERE s.conversation_id = conversation_human_waits.conversation_id
+             AND s.run_id = conversation_human_waits.run_id AND s.status = 'interrupted'
+         )`,
+        )
+        .run(Date.now())
+    })()
   }
 
   start(conversationId: string, runId: string, startedAt: number): void {
-    getDbHandle()
-      .sqlite.prepare(
-        `INSERT INTO conversation_run_state (conversation_id, run_id, status, started_at, finished_at, trace_persistence_degraded)
+    const sqlite = getDbHandle().sqlite
+    sqlite.transaction(() => {
+      sqlite
+        .prepare(
+          `INSERT INTO conversation_run_state (conversation_id, run_id, status, started_at, finished_at, trace_persistence_degraded)
        VALUES (?, ?, 'running', ?, NULL, 0)
        ON CONFLICT(conversation_id) DO UPDATE SET run_id = excluded.run_id, status = 'running', started_at = excluded.started_at, finished_at = NULL, trace_persistence_degraded = 0`,
-      )
-      .run(conversationId, runId, startedAt)
+        )
+        .run(conversationId, runId, startedAt)
+      sqlite
+        .prepare(
+          `UPDATE conversation_human_waits SET phase = 'interrupted', updated_at = ?, version = version + 1
+         WHERE conversation_id = ? AND phase = 'waiting' AND run_id <> ?`,
+        )
+        .run(startedAt, conversationId, runId)
+    })()
   }
 
   markTracePersistenceDegraded(conversationId: string, runId: string): void {
@@ -113,11 +208,22 @@ export class DbConversationRunLifecycleStore
     status: Exclude<ConversationRunStatus, 'running'>,
     finishedAt: number,
   ): void {
-    getDbHandle()
-      .sqlite.prepare(
-        "UPDATE conversation_run_state SET status = ?, finished_at = ? WHERE conversation_id = ? AND run_id = ? AND status = 'running'",
-      )
-      .run(status, finishedAt, conversationId, runId)
+    const sqlite = getDbHandle().sqlite
+    sqlite.transaction(() => {
+      const result = sqlite
+        .prepare(
+          "UPDATE conversation_run_state SET status = ?, finished_at = ? WHERE conversation_id = ? AND run_id = ? AND status = 'running'",
+        )
+        .run(status, finishedAt, conversationId, runId)
+      if (result.changes > 0) {
+        sqlite
+          .prepare(
+            `UPDATE conversation_human_waits SET phase = 'interrupted', updated_at = ?, version = version + 1
+           WHERE conversation_id = ? AND run_id = ? AND phase = 'waiting'`,
+          )
+          .run(finishedAt, conversationId, runId)
+      }
+    })()
   }
 
   get(conversationId: string): DurableConversationRun | undefined {
@@ -258,6 +364,148 @@ export class DbConversationRunLifecycleStore
     return rows.map((row) => decodeTraceEventRow(row, runId))
   }
 
+  beginHumanWait(
+    conversationId: string,
+    runId: string,
+    requestId: string,
+    at: number,
+  ): DurableHumanWait | undefined {
+    const sqlite = getDbHandle().sqlite
+    return sqlite.transaction(() => {
+      const active = sqlite
+        .prepare(
+          "SELECT 1 FROM conversation_run_state WHERE conversation_id = ? AND run_id = ? AND status = 'running'",
+        )
+        .get(conversationId, runId)
+      if (!active) return undefined
+      sqlite
+        .prepare(
+          `INSERT INTO conversation_human_waits
+           (conversation_id, run_id, request_id, phase, created_at, updated_at, completed_at, version)
+         VALUES (?, ?, ?, 'waiting', ?, ?, NULL, 1)
+         ON CONFLICT(conversation_id, run_id) DO UPDATE SET
+           request_id = excluded.request_id, phase = 'waiting', created_at = excluded.created_at,
+           updated_at = excluded.updated_at, completed_at = NULL,
+           version = conversation_human_waits.version + 1`,
+        )
+        .run(conversationId, runId, requestId, at, at)
+      const row = sqlite
+        .query<HumanWaitRow, [string, string]>(
+          'SELECT conversation_id, run_id, request_id, phase, created_at, updated_at, completed_at, version FROM conversation_human_waits WHERE conversation_id = ? AND run_id = ?',
+        )
+        .get(conversationId, runId)
+      return row ? decodeHumanWait(row) : undefined
+    })()
+  }
+
+  getHumanWait(
+    conversationId: string,
+    runId: string,
+  ): DurableHumanWait | undefined {
+    const row = getDbHandle()
+      .sqlite.query<HumanWaitRow, [string, string]>(
+        'SELECT conversation_id, run_id, request_id, phase, created_at, updated_at, completed_at, version FROM conversation_human_waits WHERE conversation_id = ? AND run_id = ?',
+      )
+      .get(conversationId, runId)
+    return row ? decodeHumanWait(row) : undefined
+  }
+
+  getCurrentHumanWait(conversationId: string): DurableHumanWait | undefined {
+    const row = getDbHandle()
+      .sqlite.query<HumanWaitRow, [string]>(
+        `SELECT w.conversation_id, w.run_id, w.request_id, w.phase, w.created_at, w.updated_at, w.completed_at, w.version
+         FROM conversation_human_waits w
+         JOIN conversation_run_state s ON s.conversation_id = w.conversation_id AND s.run_id = w.run_id
+         WHERE w.conversation_id = ? AND w.phase IN ('waiting', 'interrupted')
+           AND ((w.phase = 'waiting' AND s.status = 'running') OR (w.phase = 'interrupted' AND s.status = 'interrupted'))`,
+      )
+      .get(conversationId)
+    return row ? decodeHumanWait(row) : undefined
+  }
+
+  authorizeFreshConversation(
+    conversationId: string,
+    runId: string,
+    requestId: string,
+    freshConversationId: string,
+  ): string | undefined {
+    const sqlite = getDbHandle().sqlite
+    return sqlite.transaction(() => {
+      const current = sqlite
+        .query<
+          { fresh_conversation_id: string | null },
+          [string, string, string]
+        >(
+          `SELECT w.fresh_conversation_id
+             FROM conversation_human_waits w
+             JOIN conversation_run_state s ON s.conversation_id = w.conversation_id AND s.run_id = w.run_id
+             WHERE w.conversation_id = ? AND w.run_id = ? AND w.request_id = ?
+               AND w.phase = 'interrupted' AND s.status = 'interrupted'`,
+        )
+        .get(conversationId, runId, requestId)
+      if (!current) return undefined
+      if (current.fresh_conversation_id) return current.fresh_conversation_id
+
+      const updated = sqlite
+        .prepare(
+          `UPDATE conversation_human_waits
+             SET fresh_conversation_id = ?, version = version + 1
+             WHERE conversation_id = ? AND run_id = ? AND request_id = ?
+               AND phase = 'interrupted' AND fresh_conversation_id IS NULL
+               AND EXISTS (SELECT 1 FROM conversation_run_state s
+                 WHERE s.conversation_id = ? AND s.run_id = ? AND s.status = 'interrupted')`,
+        )
+        .run(
+          freshConversationId,
+          conversationId,
+          runId,
+          requestId,
+          conversationId,
+          runId,
+        )
+      return updated.changes === 1 ? freshConversationId : undefined
+    })()
+  }
+
+  completeHumanWait(
+    conversationId: string,
+    runId: string,
+    requestId: string,
+    at: number,
+  ): boolean {
+    const sqlite = getDbHandle().sqlite
+    return sqlite.transaction(
+      () =>
+        sqlite
+          .prepare(
+            `UPDATE conversation_human_waits SET phase = 'human_completed', updated_at = ?, completed_at = ?, version = version + 1
+         WHERE conversation_id = ? AND run_id = ? AND request_id = ? AND phase = 'waiting'
+           AND EXISTS (SELECT 1 FROM conversation_run_state s
+             WHERE s.conversation_id = ? AND s.run_id = ? AND s.status = 'running')`,
+          )
+          .run(at, at, conversationId, runId, requestId, conversationId, runId)
+          .changes === 1,
+    )()
+  }
+
+  cancelHumanWait(
+    conversationId: string,
+    runId: string,
+    requestId: string,
+    at: number,
+  ): boolean {
+    const sqlite = getDbHandle().sqlite
+    return sqlite.transaction(
+      () =>
+        sqlite
+          .prepare(
+            `UPDATE conversation_human_waits SET phase = 'cancelled', updated_at = ?, version = version + 1
+         WHERE conversation_id = ? AND run_id = ? AND request_id = ? AND phase = 'waiting'`,
+          )
+          .run(at, conversationId, runId, requestId).changes === 1,
+    )()
+  }
+
   delete(conversationId: string): boolean {
     const sqlite = getDbHandle().sqlite
     return sqlite.transaction(() => {
@@ -269,7 +517,12 @@ export class DbConversationRunLifecycleStore
       const state = sqlite
         .prepare('DELETE FROM conversation_run_state WHERE conversation_id = ?')
         .run(conversationId).changes
-      return traces + state > 0
+      const waits = sqlite
+        .prepare(
+          'DELETE FROM conversation_human_waits WHERE conversation_id = ?',
+        )
+        .run(conversationId).changes
+      return traces + state + waits > 0
     })()
   }
 }

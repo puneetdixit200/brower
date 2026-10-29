@@ -1,6 +1,32 @@
 import { describe, expect, test } from 'bun:test'
 import type { UIMessage } from 'ai'
-import { getMessageSegments } from './getMessageSegments'
+import { getMessageSegments, hasPendingHumanWait } from './getMessageSegments'
+
+describe('hasPendingHumanWait', () => {
+  const messageWithWait = (state: string): UIMessage =>
+    ({
+      id: 'message-1',
+      role: 'assistant',
+      parts: [
+        {
+          type: 'tool-wait_for_human',
+          toolCallId: 'request-1',
+          state,
+          input: {},
+        },
+      ],
+    }) as unknown as UIMessage
+
+  test('detects an unresolved wait tool part', () => {
+    expect(hasPendingHumanWait([messageWithWait('input-available')])).toBe(true)
+  })
+
+  test('ignores a completed wait tool part', () => {
+    expect(hasPendingHumanWait([messageWithWait('output-available')])).toBe(
+      false,
+    )
+  })
+})
 
 describe('getMessageSegments', () => {
   test('keeps provider-executed tool parts regardless of call id prefix', () => {

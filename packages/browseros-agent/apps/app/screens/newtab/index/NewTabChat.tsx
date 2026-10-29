@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react'
 import { type FC, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router'
+import { HumanInterventionResume } from '@/components/chat/HumanInterventionResume'
 import { NoProviderNotice } from '@/components/chat/NoProviderNotice'
 import {
   createAITabAction,
@@ -26,6 +27,7 @@ import { ChatError } from '@/screens/sidepanel/index/ChatError'
 import { ChatFooter } from '@/screens/sidepanel/index/ChatFooter'
 import { ChatHeader } from '@/screens/sidepanel/index/ChatHeader'
 import { ChatMessages } from '@/screens/sidepanel/index/ChatMessages'
+import { hasPendingHumanWait } from '@/screens/sidepanel/index/getMessageSegments'
 
 export const NewTabChat: FC = () => {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -54,6 +56,9 @@ export const NewTabChat: FC = () => {
     retryRestoreConversation,
     conversationId,
     serverRunId,
+    humanInterventionWait,
+    resumeDetectedHumanIntervention,
+    startFreshConversationFromInterruption,
     providers,
     selectedProvider,
     handleSelectProvider,
@@ -200,6 +205,16 @@ export const NewTabChat: FC = () => {
           />
         ) : (
           <>
+            <HumanInterventionResume
+              wait={
+                humanInterventionWait?.phase === 'waiting' &&
+                hasPendingHumanWait(messages)
+                  ? null
+                  : humanInterventionWait
+              }
+              onResume={resumeDetectedHumanIntervention}
+              onStartFresh={startFreshConversationFromInterruption}
+            />
             {searchParams.has('conversationId') && messages.length > 0 && (
               <h1 className="mb-2 line-clamp-2 font-semibold text-lg">
                 {conversationTitle(

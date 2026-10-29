@@ -20,6 +20,7 @@ import {
   type ToolDefinition,
   type ToolResult,
 } from '@browseros/browser-mcp/tools/framework'
+import { detectHumanChallenge } from '../../../agent/human-challenge-detector'
 import { logger } from '../../../lib/logger'
 import type { ActiveConversationRun } from '../conversation-runs'
 import type { ConversationTabGroups } from './conversation-tab-groups'
@@ -122,6 +123,7 @@ export async function dispatchBrowserTool(
 
   try {
     const result = await executeBrowserTool(call)
+    await pauseForDetectedHumanChallenge(call, result)
     collectDeclaredPageEffects(call, result)
     const effected = await runEffects({
       call,
@@ -134,6 +136,37 @@ export async function dispatchBrowserTool(
     await runObservers({ call, error, durationMs: durationMs() })
     throw error
   }
+}
+
+/**
+ * A high-confidence browser-core signal pauses only the exact live chat run.
+ * Signal metadata stays server-side and is never added to tool output or logs.
+ */
+export async function pauseForDetectedHumanChallenge(
+  call: BrowserToolCall,
+  result: ToolResult,
+): Promise<void> {
+  if (
+    call.tool.name !== 'snapshot' ||
+    result.isError ||
+    !call.run?.waitForHumanIntervention ||
+    typeof call.args.page !== 'number' ||
+    !Number.isSafeInteger(call.args.page)
+  ) {
+    return
+  }
+
+  let signals: Awaited<ReturnType<BrowserSession['challengeSignals']>>
+  try {
+    signals = await call.context.session.challengeSignals(call.args.page)
+  } catch {
+    // A failed/ambiguous observation must not block ordinary page inspection.
+    return
+  }
+  const challenge = detectHumanChallenge(signals)
+  if (challenge.kind === 'ambiguous') return
+
+  await call.run.waitForHumanIntervention()
 }
 
 /** Returns the first rejection in declared guard order. */

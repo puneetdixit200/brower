@@ -11,6 +11,7 @@ import {
   ConversationRunAlreadyActiveError,
   ConversationRuns,
 } from '../../../src/api/services/conversation-runs'
+import type { DurableHumanWait } from '../../../src/lib/conversations/conversation-run-lifecycle-store'
 
 const firstChunk: UIMessageChunk = { type: 'text-start', id: 'answer' }
 const secondChunk: UIMessageChunk = {
@@ -83,6 +84,180 @@ describe('ConversationRuns', () => {
         wait?.requestId ?? '',
       ),
     ).toBe(false)
+  })
+
+  it('lets browser dispatch request a wait through the pinned active-run capability', async () => {
+    const runs = new ConversationRuns()
+    const conversationId = crypto.randomUUID()
+    let waitStarted = false
+    const starting = runs.start({
+      conversationId,
+      messages: [],
+      createStream: async () => {
+        const activeRun = runs.activeRun(conversationId)
+        if (!activeRun?.waitForHumanIntervention) {
+          throw new Error('active run cannot request a human wait')
+        }
+        waitStarted = true
+        await activeRun.waitForHumanIntervention()
+        return new ReadableStream<UIMessageChunk>({
+          start(controller) {
+            controller.close()
+          },
+        })
+      },
+    })
+    for (let attempt = 0; attempt < 20 && !waitStarted; attempt += 1) {
+      await Promise.resolve()
+    }
+    const wait = runs.getSnapshot(conversationId)?.humanIntervention
+    expect(waitStarted).toBe(true)
+    expect(wait?.requestId).toBeDefined()
+    const active = runs.activeRun(conversationId)
+    expect(active).toBeDefined()
+    expect(
+      runs.resumeAfterHumanIntervention(
+        conversationId,
+        active?.runId ?? '',
+        wait?.requestId ?? '',
+      ),
+    ).toBe(true)
+    await starting
+  })
+
+  it('persists an opaque wait before advertising it and completes only its exact request', async () => {
+    const rows = new Map<string, DurableHumanWait>()
+    const lifecycleStore = {
+      start: () => {},
+      finish: () => {},
+      get: () => undefined,
+      appendTraceEvent: () => {},
+      markTracePersistenceDegraded: () => {},
+      ensureInterruptionTraceEvent: () => {
+        throw new Error('not used')
+      },
+      getTraceEvents: () => [],
+      delete: () => false,
+      beginHumanWait: (
+        conversationId: string,
+        runId: string,
+        requestId: string,
+      ) => {
+        const row: DurableHumanWait = {
+          conversationId,
+          runId,
+          requestId,
+          phase: 'waiting',
+          createdAt: 1,
+          updatedAt: 1,
+          completedAt: null,
+          version: 1,
+        }
+        rows.set(conversationId, row)
+        return row
+      },
+      getHumanWait: () => undefined,
+      completeHumanWait: (
+        conversationId: string,
+        runId: string,
+        requestId: string,
+      ) => {
+        const row = rows.get(conversationId)
+        if (
+          !row ||
+          row.runId !== runId ||
+          row.requestId !== requestId ||
+          row.phase !== 'waiting'
+        ) {
+          return false
+        }
+        row.phase = 'human_completed'
+        return true
+      },
+      cancelHumanWait: () => false,
+    }
+    const runs = new ConversationRuns({ lifecycleStore })
+    const conversationId = crypto.randomUUID()
+    let waiting = false
+    const starting = runs.start({
+      conversationId,
+      messages: [],
+      createStream: async () => {
+        const active = runs.activeRun(conversationId)
+        if (!active?.waitForHumanIntervention) throw new Error('missing wait')
+        waiting = true
+        await active.waitForHumanIntervention()
+        return new ReadableStream<UIMessageChunk>({
+          start(controller) {
+            controller.close()
+          },
+        })
+      },
+    })
+
+    for (let attempt = 0; attempt < 20 && !waiting; attempt += 1) {
+      await Promise.resolve()
+    }
+    const wait = runs.getSnapshot(conversationId)?.humanIntervention
+    expect(waiting).toBe(true)
+    expect(rows.get(conversationId)).toMatchObject({
+      requestId: wait?.requestId,
+      phase: 'waiting',
+    })
+    const runId = runs.activeRun(conversationId)?.runId ?? ''
+    expect(
+      runs.resumeAfterHumanIntervention(
+        conversationId,
+        runId,
+        wait?.requestId ?? '',
+      ),
+    ).toBe(true)
+    expect(rows.get(conversationId)?.phase).toBe('human_completed')
+    expect(
+      runs.resumeAfterHumanIntervention(
+        conversationId,
+        runId,
+        wait?.requestId ?? '',
+      ),
+    ).toBe(false)
+    await starting
+  })
+
+  it('aborts the run when a durable human wait cannot be recorded', async () => {
+    const lifecycleStore = {
+      start: () => {},
+      finish: () => {},
+      get: () => undefined,
+      appendTraceEvent: () => {},
+      markTracePersistenceDegraded: () => {},
+      ensureInterruptionTraceEvent: () => {
+        throw new Error('not used')
+      },
+      getTraceEvents: () => [],
+      delete: () => false,
+      beginHumanWait: () => undefined,
+      getHumanWait: () => undefined,
+      completeHumanWait: () => false,
+      cancelHumanWait: () => false,
+    }
+    const runs = new ConversationRuns({ lifecycleStore })
+    const conversationId = crypto.randomUUID()
+    let signal: AbortSignal | undefined
+    const starting = runs.start({
+      conversationId,
+      messages: [],
+      createStream: async (runSignal) => {
+        signal = runSignal
+        const active = runs.activeRun(conversationId)
+        if (!active?.waitForHumanIntervention) throw new Error('missing wait')
+        await active.waitForHumanIntervention()
+        throw new Error('model must not continue without a durable wait')
+      },
+    })
+
+    await expect(starting).rejects.toThrow('Human wait is no longer available')
+    expect(signal?.aborted).toBe(true)
+    expect(runs.getSnapshot(conversationId)?.status).toBe('aborted')
   })
 
   it('rejects an outstanding human wait when that run is stopped', async () => {

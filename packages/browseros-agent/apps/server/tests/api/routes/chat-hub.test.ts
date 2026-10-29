@@ -49,6 +49,26 @@ describe('/chat server-owned run routes', () => {
     const app = route(runs)
     const path = `/${conversationId}/intervention/${requestId}/resume`
 
+    const unauthenticatedWaitRead = await app.request(
+      `/${conversationId}/intervention`,
+      { headers: { Host: 'localhost' } },
+      localServer,
+    )
+    expect(unauthenticatedWaitRead.status).toBe(403)
+
+    const waitingState = await requestFromExtension(
+      app,
+      `/${conversationId}/intervention`,
+    )
+    expect(waitingState.status).toBe(200)
+    const waitMetadata = await waitingState.json()
+    expect(waitMetadata).toEqual({ runId, requestId, phase: 'waiting' })
+    expect(Object.keys(waitMetadata).sort()).toEqual([
+      'phase',
+      'requestId',
+      'runId',
+    ])
+
     const unauthorized = await app.request(
       path,
       {
@@ -94,12 +114,116 @@ describe('/chat server-owned run routes', () => {
     await expect(accepted.json()).resolves.toEqual({ resumed: true })
     await starting
 
+    const clearedState = await requestFromExtension(
+      app,
+      `/${conversationId}/intervention`,
+    )
+    expect(await clearedState.json()).toEqual({ runId: null, requestId: null })
+
     const replay = await requestFromExtension(app, path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ runId }),
     })
     expect(replay.status).toBe(409)
+  })
+
+  it('authorizes one fresh conversation for the exact persisted interrupted wait', async () => {
+    const conversationId = crypto.randomUUID()
+    const runId = crypto.randomUUID()
+    const requestId = 'opaque-interrupted-wait'
+    let consumed = false
+    let authorizedConversationId: string | undefined
+    const lifecycleStore = {
+      start: () => {},
+      finish: () => {},
+      get: () => undefined,
+      appendTraceEvent: () => {},
+      markTracePersistenceDegraded: () => {},
+      ensureInterruptionTraceEvent: () => {
+        throw new Error('not used')
+      },
+      getTraceEvents: () => [],
+      getCurrentHumanWait: () =>
+        consumed
+          ? undefined
+          : {
+              conversationId,
+              runId,
+              requestId,
+              phase: 'interrupted' as const,
+              createdAt: 100,
+              updatedAt: 200,
+              completedAt: null,
+              version: 2,
+            },
+      authorizeFreshConversation: (
+        currentConversationId: string,
+        currentRunId: string,
+        currentRequestId: string,
+        freshConversationId: string,
+      ) => {
+        if (
+          currentConversationId !== conversationId ||
+          currentRunId !== runId ||
+          currentRequestId !== requestId ||
+          freshConversationId === conversationId
+        )
+          return undefined
+        if (consumed) return authorizedConversationId
+        consumed = true
+        authorizedConversationId = freshConversationId
+        return authorizedConversationId
+      },
+    }
+    const app = route(new ConversationRuns({ lifecycleStore }))
+    const getPath = `/${conversationId}/intervention`
+    const state = await requestFromExtension(app, getPath)
+    expect(await state.json()).toEqual({
+      runId,
+      requestId,
+      phase: 'interrupted',
+    })
+
+    const path = `/${conversationId}/intervention/${requestId}/fresh`
+    const unauthorized = await app.request(
+      path,
+      {
+        method: 'POST',
+        headers: { Host: 'localhost', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ runId }),
+      },
+      localServer,
+    )
+    expect(unauthorized.status).toBe(403)
+
+    const mismatch = await requestFromExtension(app, path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ runId: crypto.randomUUID() }),
+    })
+    expect(mismatch.status).toBe(409)
+
+    const accepted = await requestFromExtension(app, path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ runId }),
+    })
+    expect(accepted.status).toBe(200)
+    const fresh = await accepted.json()
+    expect(Object.keys(fresh)).toEqual(['conversationId'])
+    expect(fresh.conversationId).toMatch(/^[0-9a-f-]{36}$/i)
+    expect(fresh.conversationId).not.toBe(conversationId)
+
+    const duplicate = await requestFromExtension(app, path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ runId }),
+    })
+    expect(duplicate.status).toBe(200)
+    expect(await duplicate.json()).toEqual({
+      conversationId: fresh.conversationId,
+    })
   })
 
   it('requires a trusted app origin and a live conversation capability for artifact reads', async () => {

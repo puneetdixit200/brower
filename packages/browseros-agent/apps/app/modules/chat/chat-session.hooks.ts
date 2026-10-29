@@ -70,6 +70,12 @@ import {
   resolveConversationRunMessages,
 } from './conversation-run-client'
 import { useExecutionHistoryTracker } from './execution-history-tracker.hooks'
+import {
+  fetchHumanIntervention,
+  type HumanInterventionWait,
+  resumeHumanIntervention,
+  startFreshHumanConversation,
+} from './human-intervention-client'
 import { PanelConversationAttachment } from './panel-conversation-attachment'
 import {
   type SidepanelChatTarget,
@@ -84,6 +90,10 @@ const getLastMessageText = (messages: UIMessage[]) => {
     .filter((part) => part.type === 'text')
     .map((part) => part.text)
     .join('')
+}
+
+interface DetectedHumanInterventionWait extends HumanInterventionWait {
+  conversationId: string
 }
 
 const getLastUserMessageText = (messages: UIMessage[]) => {
@@ -245,6 +255,87 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   const [conversationId, setConversationId] = useState(crypto.randomUUID())
   const [serverRunId, setServerRunId] = useState<string | undefined>()
   const conversationIdRef = useRef(conversationId)
+  conversationIdRef.current = conversationId
+  const serverRunIdRef = useRef(serverRunId)
+  serverRunIdRef.current = serverRunId
+  const [humanInterventionWait, setHumanInterventionWait] =
+    useState<DetectedHumanInterventionWait | null>(null)
+  const humanInterventionWaitRef = useRef<DetectedHumanInterventionWait | null>(
+    null,
+  )
+  humanInterventionWaitRef.current = humanInterventionWait
+  const resumeDetectedHumanIntervention = useCallback(async () => {
+    const wait = humanInterventionWaitRef.current
+    const conversationAtClick = conversationIdRef.current
+    if (
+      !wait ||
+      wait.conversationId !== conversationAtClick ||
+      wait.runId !== serverRunIdRef.current
+    )
+      return false
+    const resumed = await resumeHumanIntervention({
+      conversationId: conversationAtClick,
+      runId: wait.runId,
+      requestId: wait.requestId,
+    })
+    if (
+      resumed &&
+      conversationIdRef.current === conversationAtClick &&
+      serverRunIdRef.current === wait.runId &&
+      humanInterventionWaitRef.current?.requestId === wait.requestId &&
+      humanInterventionWaitRef.current.runId === wait.runId
+    ) {
+      setHumanInterventionWait(null)
+      return true
+    }
+    return false
+  }, [])
+
+  useEffect(() => {
+    setHumanInterventionWait(null)
+    const conversationAtStart = conversationId
+    const runAtStart = serverRunId
+    const controller = new AbortController()
+    let active = true
+    let polling = false
+    const poll = async () => {
+      if (polling) return
+      polling = true
+      try {
+        const wait = await fetchHumanIntervention(
+          conversationAtStart,
+          undefined,
+          controller.signal,
+        )
+        if (
+          active &&
+          conversationIdRef.current === conversationAtStart &&
+          serverRunIdRef.current === runAtStart
+        ) {
+          setHumanInterventionWait(
+            wait &&
+              ((runAtStart &&
+                wait.phase === 'waiting' &&
+                wait.runId === runAtStart) ||
+                (!runAtStart && wait.phase === 'interrupted'))
+              ? { ...wait, conversationId: conversationAtStart }
+              : null,
+          )
+        }
+      } finally {
+        polling = false
+      }
+    }
+    void poll()
+    const timer = runAtStart
+      ? window.setInterval(() => void poll(), 1000)
+      : undefined
+    return () => {
+      active = false
+      controller.abort()
+      if (timer !== undefined) window.clearInterval(timer)
+    }
+  }, [conversationId, serverRunId])
   const optionsRef = useRef(options)
   const panelTabRef = useRef<Promise<number | undefined> | undefined>(undefined)
   const attachmentRef = useRef<PanelConversationAttachment | undefined>(
@@ -514,6 +605,51 @@ export const useChatSession = (options?: ChatSessionOptions) => {
     // before installing another transcript so old onFinish work cannot mutate it.
     await streamRequestRef.current?.catch(() => undefined)
   }, [detachStream])
+
+  const startFreshConversationFromInterruption = useCallback(async () => {
+    const wait = humanInterventionWaitRef.current
+    const previousConversationId = conversationIdRef.current
+    if (
+      wait?.phase !== 'interrupted' ||
+      wait.conversationId !== previousConversationId ||
+      serverRunIdRef.current
+    ) {
+      return false
+    }
+
+    const nextConversationId = await startFreshHumanConversation({
+      conversationId: previousConversationId,
+      runId: wait.runId,
+      requestId: wait.requestId,
+    })
+    if (
+      !nextConversationId ||
+      conversationIdRef.current !== previousConversationId ||
+      humanInterventionWaitRef.current?.requestId !== wait.requestId
+    ) {
+      return false
+    }
+
+    attachmentRef.current?.retire(previousConversationId)
+    pendingMessagesRef.current = []
+    localStreamConversationRef.current = undefined
+    await detachView()
+    if (conversationIdRef.current !== previousConversationId) return false
+
+    conversationIdRef.current = nextConversationId
+    messagesRef.current = []
+    setMessages([])
+    setConversationId(nextConversationId)
+    setServerRunId(undefined)
+    setHumanInterventionWait(null)
+    setTextToAction(new Map())
+    setLiked({})
+    setDisliked({})
+    setRestoredConversationId(null)
+    setRestoreError(null)
+    setSearchParams({}, { replace: true })
+    return true
+  }, [detachView, setMessages, setSearchParams])
 
   useEffect(() => {
     if (options?.origin !== 'newtab') return
@@ -1094,5 +1230,8 @@ export const useChatSession = (options?: ChatSessionOptions) => {
     onClickDislike,
     conversationId,
     serverRunId,
+    humanInterventionWait,
+    resumeDetectedHumanIntervention,
+    startFreshConversationFromInterruption,
   }
 }

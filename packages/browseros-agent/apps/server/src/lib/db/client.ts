@@ -208,6 +208,21 @@ function bootstrapCurrentSchema(sqlite: BunDatabase): void {
         'ALTER TABLE scheduled_job_runs ADD COLUMN conversation_id text',
       )
     }
+    const humanWaitColumns = sqlite
+      .query<{ name: string }, []>(
+        'PRAGMA table_info(conversation_human_waits)',
+      )
+      .all()
+    if (
+      humanWaitColumns.length > 0 &&
+      !humanWaitColumns.some(
+        (column) => column.name === 'fresh_conversation_id',
+      )
+    ) {
+      sqlite.exec(
+        'ALTER TABLE conversation_human_waits ADD COLUMN fresh_conversation_id text',
+      )
+    }
     const insertMigration = sqlite.prepare(`
       INSERT INTO __drizzle_migrations ("hash", "created_at")
       SELECT ?, ?
@@ -355,6 +370,16 @@ const currentMigrationHistory = [
     tag: '0024_add_conversation_run_trace_degradation',
     hash: '442ff475c47478ff982bb4296e1a97c3e489835274a49528857c61210e1e12b4',
     createdAt: 1793577600000,
+  },
+  {
+    tag: '0025_add_conversation_human_waits',
+    hash: '130bde1576fe4ccdc98cb6cba56f12fb591e55a93eb5c1825986fe2ae3251ac8',
+    createdAt: 1793664000000,
+  },
+  {
+    tag: '0026_one_shot_fresh_conversation_authorization',
+    hash: '4689d7e28c298e4b33a43ebfdebfa4b9a05c9a55b078415c86de598b9b9bcc62',
+    createdAt: 1793750400000,
   },
 ]
 
@@ -505,6 +530,8 @@ const currentSchemaStatements = [
   `CREATE INDEX IF NOT EXISTS conversation_run_state_status_idx ON conversation_run_state (status)`,
   `CREATE TABLE IF NOT EXISTS conversation_run_trace_events (sequence integer PRIMARY KEY AUTOINCREMENT NOT NULL, conversation_id text NOT NULL, run_id text NOT NULL, event_id text NOT NULL UNIQUE, event_json text NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS conversation_run_trace_events_scope_idx ON conversation_run_trace_events (conversation_id, run_id, sequence)`,
+  `CREATE TABLE IF NOT EXISTS conversation_human_waits (conversation_id text NOT NULL, run_id text NOT NULL, request_id text NOT NULL, phase text NOT NULL CHECK (phase IN ('waiting', 'human_completed', 'cancelled', 'interrupted')), created_at integer NOT NULL, updated_at integer NOT NULL, completed_at integer, fresh_conversation_id text, version integer NOT NULL DEFAULT 1, PRIMARY KEY (conversation_id, run_id))`,
+  `CREATE INDEX IF NOT EXISTS conversation_human_waits_phase_idx ON conversation_human_waits (phase)`,
   `CREATE TABLE IF NOT EXISTS action_policy_rules (action_id text PRIMARY KEY NOT NULL, decision text NOT NULL CHECK (decision IN ('allow', 'ask', 'deny')), expires_at integer, updated_at integer NOT NULL)`,
   `
     CREATE TABLE IF NOT EXISTS memories (

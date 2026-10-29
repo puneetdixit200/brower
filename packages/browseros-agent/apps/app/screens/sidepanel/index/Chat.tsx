@@ -1,5 +1,6 @@
 import { Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { HumanInterventionResume } from '@/components/chat/HumanInterventionResume'
 import { NoProviderNotice } from '@/components/chat/NoProviderNotice'
 import { isIncognitoWindow } from '@/lib/browseros/incognito'
 import { panelTabIdFromUrl } from '@/lib/browseros/panelTab'
@@ -29,6 +30,7 @@ import { ChatEmptyState } from './ChatEmptyState'
 import { ChatError } from './ChatError'
 import { ChatFooter } from './ChatFooter'
 import { ChatMessages } from './ChatMessages'
+import { hasPendingHumanWait } from './getMessageSegments'
 import { HumanLoginHandoff } from './HumanLoginHandoff'
 import { continuationTabs } from './human-login-handoff'
 import { IncognitoNotice } from './IncognitoNotice'
@@ -74,6 +76,9 @@ export const Chat = () => {
     sendBlocked,
     conversationId,
     serverRunId,
+    humanInterventionWait,
+    resumeDetectedHumanIntervention,
+    startFreshConversationFromInterruption,
   } = useChatSessionContext()
 
   const {
@@ -372,6 +377,16 @@ export const Chat = () => {
   return (
     <>
       <main className="mt-4 flex h-full flex-1 flex-col space-y-4 overflow-y-auto">
+        <HumanInterventionResume
+          wait={
+            humanInterventionWait?.phase === 'waiting' &&
+            hasPendingHumanWait(messages)
+              ? null
+              : humanInterventionWait
+          }
+          onResume={resumeDetectedHumanIntervention}
+          onStartFresh={startFreshConversationFromInterruption}
+        />
         {isRestoringConversation ? (
           <div className="flex flex-1 items-center justify-center">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

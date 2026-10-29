@@ -3,6 +3,7 @@ import type { CdpConnection } from './connection'
 import { Input } from './input/input'
 import { Navigation } from './navigation'
 import { FrameRegistry } from './observer/frames'
+import type { ChallengeSignal } from './observer/observer'
 import { Observer } from './observer/observer'
 import { PageManager, type PageManagerHooks } from './pages'
 import {
@@ -47,6 +48,11 @@ export class BrowserSession {
       this.observers.set(pageId, observer)
     }
     return observer
+  }
+
+  /** Returns the page's bounded challenge metadata without adding it to snapshots. */
+  async challengeSignals(pageId: number): Promise<ChallengeSignal> {
+    return this.observe(pageId).challengeSignals()
   }
 
   /** The action layer (click/fill/type/...) for a page, sharing its observation refs. */

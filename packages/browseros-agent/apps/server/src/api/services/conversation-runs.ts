@@ -80,6 +80,8 @@ export interface ActiveConversationRun {
   readonly signal: AbortSignal
   /** Binds tabs created by this run and requests their initial panel open. */
   associateTabs(tabIds: readonly number[]): boolean
+  /** Suspends this exact live run until the user explicitly resumes it. */
+  waitForHumanIntervention?(): Promise<void>
 }
 
 export interface ConversationRunActivity {
@@ -125,6 +127,12 @@ interface ConversationRunRecord {
 export interface HumanInterventionWait {
   requestId: string
   continuation: Promise<void>
+}
+
+export interface HumanInterventionCheckpoint {
+  runId: string
+  requestId: string
+  phase: 'waiting' | 'interrupted'
 }
 
 interface PanelAssignmentsSubscriber {
@@ -346,6 +354,34 @@ export class ConversationRuns {
       tabGroup: record.tabGroup,
       signal: record.abortController.signal,
       associateTabs: (tabIds) => this.associateTabs(record, tabIds),
+      waitForHumanIntervention: async () => {
+        let wait: HumanInterventionWait | undefined
+        try {
+          wait = this.requestHumanIntervention(
+            record.conversationId,
+            record.runId,
+          )
+        } catch (error) {
+          // A durable wait is required before the model can safely pause. If
+          // persistence fails, terminate this exact live run so the model
+          // cannot continue issuing tools past a detected challenge.
+          if (this.runs.get(record.conversationId) === record) {
+            void this.stop(record.conversationId).catch(() => undefined)
+          }
+          throw error
+        }
+        if (!wait) {
+          if (
+            this.runs.get(record.conversationId) === record &&
+            record.status === 'running' &&
+            !record.abortController.signal.aborted
+          ) {
+            void this.stop(record.conversationId).catch(() => undefined)
+          }
+          throw new Error('Human wait is no longer available for this run')
+        }
+        await wait.continuation
+      },
     }
   }
 
@@ -372,6 +408,19 @@ export class ConversationRuns {
     )
       return undefined
 
+    // Persist the opaque wait identity before exposing it through run state.
+    // A database error fails closed: the model must not continue past a
+    // challenge that cannot be safely represented for the user.
+    if (this.deps.lifecycleStore) {
+      const persisted = this.deps.lifecycleStore.beginHumanWait(
+        conversationId,
+        runId,
+        requestId,
+        Date.now(),
+      )
+      if (!persisted) return undefined
+    }
+
     let resolve!: () => void
     let reject!: (error: Error) => void
     const continuation = new Promise<void>((res, rej) => {
@@ -380,6 +429,18 @@ export class ConversationRuns {
     })
     const abort = () => {
       if (record.humanWait?.requestId !== requestId) return
+      try {
+        this.deps.lifecycleStore?.cancelHumanWait(
+          conversationId,
+          runId,
+          requestId,
+          Date.now(),
+        )
+      } catch {
+        // The run is already being stopped; its lifecycle finish/recovery
+        // path will invalidate the durable wait if this best-effort update
+        // cannot be written.
+      }
       record.humanWait = undefined
       reject(
         new DOMException('Run ended while waiting for the user', 'AbortError'),
@@ -410,6 +471,17 @@ export class ConversationRuns {
       wait.requestId !== requestId
     )
       return false
+    if (
+      this.deps.lifecycleStore &&
+      !this.deps.lifecycleStore.completeHumanWait(
+        conversationId,
+        runId,
+        requestId,
+        Date.now(),
+      )
+    ) {
+      return false
+    }
     record.abortController.signal.removeEventListener('abort', wait.abort)
     record.humanWait = undefined
     wait.resolve()
@@ -460,6 +532,45 @@ export class ConversationRuns {
     const record = this.runs.get(conversationId)
     if (!record) return undefined
     return this.snapshot(record)
+  }
+
+  /** Minimal live wait metadata for UI polling; never waits for stream preparation. */
+  getHumanIntervention(
+    conversationId: string,
+  ): HumanInterventionCheckpoint | undefined {
+    const record = this.runs.get(conversationId)
+    if (record?.status === 'running' && !record.deleting && record.humanWait) {
+      return {
+        runId: record.runId,
+        requestId: record.humanWait.requestId,
+        phase: 'waiting',
+      }
+    }
+    const persisted =
+      this.deps.lifecycleStore?.getCurrentHumanWait?.(conversationId)
+    if (!persisted) return undefined
+    if (persisted.phase !== 'waiting' && persisted.phase !== 'interrupted') {
+      return undefined
+    }
+    return {
+      runId: persisted.runId,
+      requestId: persisted.requestId,
+      phase: persisted.phase,
+    }
+  }
+
+  authorizeFreshConversation(
+    conversationId: string,
+    runId: string,
+    requestId: string,
+    freshConversationId: string,
+  ): string | undefined {
+    return this.deps.lifecycleStore?.authorizeFreshConversation?.(
+      conversationId,
+      runId,
+      requestId,
+      freshConversationId,
+    )
   }
 
   /**

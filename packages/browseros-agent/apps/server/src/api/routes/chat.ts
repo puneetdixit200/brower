@@ -275,6 +275,20 @@ export function createChatRoutes(deps: ChatRouteDeps): Hono<Env> {
       return c.json({ stopped: await service.stop(conversationId) })
     },
   )
+  const readHumanIntervention: MiddlewareHandler<Env> = async (c) => {
+    const parsed = ConversationIdParamSchema.safeParse(c.req.param())
+    if (!parsed.success)
+      return c.json({ error: 'Invalid conversation id' }, 400)
+    const intervention = service.getHumanIntervention(
+      parsed.data.conversationId,
+    )
+    c.header('Cache-Control', 'no-store')
+    if (!intervention) {
+      return c.json({ runId: null, requestId: null })
+    }
+    return c.json(intervention)
+  }
+  app.get('/:conversationId/intervention', readHumanIntervention)
   app.post('/:conversationId/intervention/:requestId/resume', async (c) => {
     if (!isTrustedAppRequest(c) || !c.req.header('origin')) {
       return c.json({ error: 'Forbidden' }, 403)
@@ -307,6 +321,46 @@ export function createChatRoutes(deps: ChatRouteDeps): Hono<Env> {
       requestId.data,
     )
     return c.json({ resumed }, resumed ? 200 : 409)
+  })
+  app.post('/:conversationId/intervention/:requestId/fresh', async (c) => {
+    if (!isTrustedAppRequest(c) || !c.req.header('origin')) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+    const parsedConversation = ConversationIdParamSchema.safeParse({
+      conversationId: c.req.param('conversationId'),
+    })
+    const requestId = z
+      .string()
+      .min(1)
+      .max(200)
+      .safeParse(c.req.param('requestId'))
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid request' }, 400)
+    }
+    const parsedBody = z
+      .object({ runId: z.string().uuid() })
+      .strict()
+      .safeParse(body)
+    if (
+      !parsedConversation.success ||
+      !requestId.success ||
+      !parsedBody.success
+    ) {
+      return c.json({ error: 'Invalid request' }, 400)
+    }
+    const freshConversationId = crypto.randomUUID()
+    const authorizedConversationId = service.authorizeFreshConversation(
+      parsedConversation.data.conversationId,
+      parsedBody.data.runId,
+      requestId.data,
+      freshConversationId,
+    )
+    return authorizedConversationId
+      ? c.json({ conversationId: authorizedConversationId })
+      : c.json({ error: 'Fresh conversation authorization unavailable' }, 409)
   })
   app.delete(
     '/:conversationId',

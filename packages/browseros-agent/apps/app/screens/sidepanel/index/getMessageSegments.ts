@@ -36,6 +36,29 @@ export type MessageSegment =
 
 const NUDGE_TOOLS = new Set(['suggest_schedule', 'suggest_app_connection'])
 
+export const hasPendingHumanWait = (messages: UIMessage[]): boolean =>
+  messages.some((message) =>
+    message.parts.some((part) => {
+      if (part.type !== 'dynamic-tool' && !part.type?.startsWith('tool-')) {
+        return false
+      }
+      const toolPart = part as {
+        type: string
+        toolName?: string
+        state: ToolInvocationState
+      }
+      const toolName =
+        toolPart.type === 'dynamic-tool'
+          ? toolPart.toolName
+          : toolPart.type.slice('tool-'.length)
+      return (
+        toolName === 'wait_for_human' &&
+        toolPart.state !== 'output-available' &&
+        toolPart.state !== 'output-error'
+      )
+    }),
+  )
+
 function parseNudgeOutput(output: unknown): NudgeData | null {
   try {
     const result = output as {

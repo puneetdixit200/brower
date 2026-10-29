@@ -204,6 +204,24 @@ export class ChatService {
     return await this.conversationRuns.getPreparedSnapshot(conversationId)
   }
 
+  getHumanIntervention(conversationId: string) {
+    return this.conversationRuns.getHumanIntervention(conversationId)
+  }
+
+  authorizeFreshConversation(
+    conversationId: string,
+    runId: string,
+    requestId: string,
+    freshConversationId: string,
+  ) {
+    return this.conversationRuns.authorizeFreshConversation(
+      conversationId,
+      runId,
+      requestId,
+      freshConversationId,
+    )
+  }
+
   subscribe(
     conversationId: string,
     runId?: string,
