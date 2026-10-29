@@ -15,7 +15,9 @@ The latest read-only native audit found no live build, no linked `chrome` binary
 
 ### Current continuation — 2026-10-29
 
-The last fetch found no commits beyond `847ec5c4c`. B03 Back/Forward controls and B04 current-window sidebar reordering are committed and pushed. B04 focused sidebar data/reorder suites pass 10/10 (36 assertions); app typecheck and targeted Biome pass. Independent review caught and fixed an unpinned end-position bug, missing keyboard operation, and an external drag payload trust flaw; B04 remains PARTIAL pending headed/native drag, tab-strip and session-restore acceptance.
+Latest local B10 source slice extracts recently-closed tab selection and requires a known current-window ID, matching non-incognito tab, and newest-first ordering. The focused suite passes 9/9; app typecheck and targeted Biome pass. Independent Luna review caught a missing-window-ID ambiguity, now fixed and covered. B10 remains PARTIAL: next test close/reopen, restart restore, private separation and profile integrity in headed disposable Aster; this source helper does not establish native crash recovery or profile-corruption safety.
+
+The latest fetch found no commits beyond `e9caf4ae6`. B03 Back/Forward controls, B04 current-window sidebar reordering, B05 download progress, B06 history filtering and B07 privacy gates are committed and pushed. B04 focused sidebar data/reorder suites pass 10/10 (36 assertions); app typecheck and targeted Biome pass. Independent review caught and fixed an unpinned end-position bug, missing keyboard operation, and an external drag payload trust flaw; B04 remains PARTIAL pending headed/native drag, tab-strip and session-restore acceptance.
 
 B05 now tracks download create/change events while its recent-download panel is open, coalesces and caps startup-race events, applies received-byte deltas directly, hides full paths, and removes listeners on close/unmount. Six focused tests pass (21 assertions), plus app typecheck, targeted Biome and diff check; independent Luna review found no remaining issue. Keep B05 PARTIAL pending headed/native progress, file-on-disk, resume, private-window and packaged-runtime acceptance.
 
@@ -48,7 +50,7 @@ PASS rows are U04 and U05. Native browser acceptance, package release, performan
 - Branch: `feat/aster-linux-ui`.
 - User remote `aster`: `https://github.com/puneetdixit200/brower.git`. Preserve `origin`, the BrowserOS upstream remote.
 - First inspect status, branch, log and remote divergence. Preserve newer and uncommitted work. Fetch and fast-forward only when safe; never force-reset the user repository.
-- Latest pushed remote checkpoint is `cdefdeac2` (B03 selected-tab Back/Forward source controls); the current B04 sidebar reorder source slice is recorded above and in `PROGRESS.md`. Continue from `NEXT_STEPS.md`; retain the evidence and explicit remaining acceptance gates in `FEATURE_MATRIX.md` and `PROGRESS.md`.
+- Latest pushed remote checkpoint before the B10 source slice is `e9caf4ae6` (B08 credential boundary evidence); B10's uncommitted source and review checkpoint are recorded at the top of this file and in `PROGRESS.md`. Continue from `NEXT_STEPS.md`; retain the evidence and explicit remaining acceptance gates in `FEATURE_MATRIX.md` and `PROGRESS.md`.
 - Use Luna medium for implementation, planning, judging and independent review. Deploy no more than five Luna medium subagents concurrently. Do not use Sol or Terra for this project.
 - Delegate narrow owned tasks. Avoid duplicate exploration, huge handoffs, parallel builds sharing one output directory and broad test repetition without a relevant change.
 - User authorizes implementation, routine decisions, testing and reviewed milestone commits/pushes. Avoid unnecessary questions.
@@ -142,7 +144,7 @@ The canonical descriptions, dependencies and evidence remain in FEATURE_MATRIX.m
 | B07 | Incognito separated from normal history/tasks | NOT_STARTED |
 | B08 | Extensions and normal password-manager support | NOT_STARTED |
 | B09 | Media, WebRTC, permissions, devtools | NOT_STARTED |
-| B10 | Session restore without profile corruption | NOT_STARTED |
+| B10 | Session restore without profile corruption | PARTIAL (source-only) |
 | U01 | Collapsible/resizable original sidebar | PARTIAL (source-only) |
 | U02 | Sidebar groups: bookmarks/chats/tabs | PARTIAL (source-only) |
 | U03 | Recent task cards, real statuses | PARTIAL (source-only) |

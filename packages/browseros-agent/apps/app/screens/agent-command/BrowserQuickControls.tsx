@@ -24,6 +24,7 @@ import {
 } from './downloads-progress'
 import { loadRecentHistory } from './history-items'
 import { resolveHomeSearchUrl } from './home-search'
+import { selectRecentlyClosedTabSessionId } from './recently-closed-tab'
 import { captureVisibleTabContext } from './screenshot-context'
 
 export function BrowserQuickControls({
@@ -333,17 +334,15 @@ export function BrowserQuickControls({
       if (privateWindow) throw new Error('Unavailable in private windows')
       const currentWindow = await chrome.windows.getCurrent()
       const closed = await chrome.sessions.getRecentlyClosed({ maxResults: 15 })
-      const lastTab = closed.find(
-        (session) =>
-          session.tab?.sessionId &&
-          session.tab.windowId === currentWindow.id &&
-          !session.tab.incognito,
+      const sessionId = selectRecentlyClosedTabSessionId(
+        closed,
+        currentWindow.id,
       )
-      if (!lastTab?.tab?.sessionId) {
+      if (!sessionId) {
         setError('No recently closed tab in this window.')
         return
       }
-      await chrome.sessions.restore(lastTab.tab.sessionId)
+      await chrome.sessions.restore(sessionId)
     })
 
   const showRecentHistory = () =>

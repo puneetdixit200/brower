@@ -1,5 +1,9 @@
 # Progress
 
+### B10 recently closed tab restore source slice — 2026-10-29
+
+The recently-closed-tab selector now restores only a tab with a session ID whose window matches a known current-window ID, excludes incognito entries, and preserves Chromium's newest-first ordering. An independent Luna review identified the missing-window-ID ambiguity; the selector now fails closed and has a regression test. Focused tests pass 9/9; app typecheck and targeted Biome pass. This verifies selector behavior only, not native crash restore, session lifecycle or profile-corruption handling. Keep B10 PARTIAL. Next run headed disposable-profile checks for close/reopen, restart restore, regular/private separation and profile integrity when a runnable Aster binary is available.
+
 ### B08 credential and login-handoff source verification — 2026-10-29
 
 Verified the existing human-login handoff suite (10/10, 44 assertions), model-facing credential catalog fixture (1/1, 11 assertions), and credential-filter tests (2/2, 5 assertions). These source tests show that credential-export tools and internal raw page-code tools are excluded from the model catalog and that login continuation is human-mediated without replaying a tool call. They do not exercise Chromium's real saved-password autofill, extension interoperability or dummy-account sentinel behavior in an Aster package. Keep B08 and P01 PARTIAL; next run T07.1/T07.2 in a disposable headed Aster profile with fixture credentials only.
