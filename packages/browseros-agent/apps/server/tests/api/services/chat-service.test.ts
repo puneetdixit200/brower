@@ -40,6 +40,7 @@ interface StreamResponseOptions {
 
 let agentToReturn: MockAgent | undefined
 let includeFinishChunk = false
+let finishMessagesForMock: MockMessage[] | undefined
 let streamResponseHandler:
   | ((options: StreamResponseOptions) => Promise<Response>)
   | undefined
@@ -71,6 +72,11 @@ const createAgentUIStreamSpy = mock(async (options: StreamResponseOptions) => {
           emittedFinish = true
           controller.enqueue({ type: 'finish', finishReason: 'stop' })
           return
+        }
+        if (includeFinishChunk && finishMessagesForMock) {
+          const messages = finishMessagesForMock
+          finishMessagesForMock = undefined
+          await options.onFinish({ messages })
         }
         controller.close()
         return
@@ -217,6 +223,7 @@ function createSessionStore() {
 describe('ChatService research support assessment', () => {
   afterEach(() => {
     includeFinishChunk = false
+    finishMessagesForMock = undefined
     resolveLLMConfigSpy.mockImplementation(async () => ({
       provider: 'openai',
       model: 'gpt-5',
@@ -237,21 +244,19 @@ describe('ChatService research support assessment', () => {
 
     const fakeAgent = createFakeAgent()
     agentToReturn = fakeAgent
-    streamResponseHandler = async ({ onFinish, options }) => {
+    streamResponseHandler = async ({ options }) => {
       researchSupportModule.captureSuccessfulBuiltInRead(
         options?.taskId ?? '',
         { text: 'captured page evidence' },
       )
-      await onFinish({
-        messages: [
-          ...fakeAgent.messages,
-          {
-            id: crypto.randomUUID(),
-            role: 'assistant',
-            parts: [{ type: 'text', text: 'A researched answer.' }],
-          },
-        ],
-      })
+      finishMessagesForMock = [
+        ...fakeAgent.messages,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          parts: [{ type: 'text', text: 'A researched answer.' }],
+        },
+      ]
       return new Response('A researched answer.')
     }
 

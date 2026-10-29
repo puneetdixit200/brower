@@ -18,6 +18,17 @@ Each listener serves the same pages. The server replaces `{{FRAME_ORIGIN}}` in
 HTML with the second origin. Two ports alone are insufficient: use different
 sites so Chromium can isolate the frame.
 
+The CLI also prints `/mfa-login.html`, a dummy challenge with fake username,
+password, and one-time-code fields. The default listeners bind to loopback, but
+`--host 0.0.0.0` exposes the unauthenticated test server to other machines
+that can reach the host. Its POST handler incrementally discards request bytes
+and cancels once more than 16 KiB has been received; it returns only the fixed
+`STATUS: submitted` message for smaller bodies and a fixed 413 for larger ones.
+It does not authenticate,
+contact a service, or include submitted values in its response. The page is
+deliberately outside the CAPTCHA catalog: it does not exercise challenge
+detection, vendor solving, paid providers, or pause/resume behavior.
+
 Each standalone page loads its vendor's real script. It mirrors widget state into `window.__captchaFixture` and `document.documentElement.dataset.captchaFixture`. Success records token length, while errors and expiry clear it. Rendering tracks the visible iframe, or Turnstile's visible host when the iframe has a closed shadow root. Submissions use real vendor siteverify endpoints and return `ACCEPTED` or `REJECTED: <codes>` with `data-captcha-verdict`. `verifyUrls` substitutes local endpoints in unit tests.
 
 ## Pages and public test keys

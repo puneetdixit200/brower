@@ -1,17 +1,20 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
+  isLocalMfaFixtureUrl,
   sendHumanLoginContinuation,
   startHumanLoginHandoff,
 } from './human-login-handoff'
 
 export function HumanLoginHandoffNotice({
   warning,
+  localMfaFixture,
   continuationStatus,
   onContinue,
   onClose,
 }: {
   warning: string | null
+  localMfaFixture?: boolean
   continuationStatus: 'sending' | 'accepted' | 'rejected' | null
   onContinue: () => void
   onClose: () => void
@@ -27,6 +30,15 @@ export function HumanLoginHandoffNotice({
         page and avoid repeating that action. This request is advisory, not
         enforced.
       </p>
+      {localMfaFixture && (
+        <p role="note">
+          This URL matches the local dummy MFA fixture route. Confirm you
+          launched the captcha testbed before using fake values; another local
+          service could use the same path. Stop is required before the tab
+          opens, and continuing starts a fresh advisory turn; the stopped run
+          cannot resume.
+        </p>
+      )}
       {warning && <p role="alert">{warning}</p>}
       <Button
         size="sm"
@@ -110,6 +122,9 @@ export function HumanLoginHandoff({
       {handoff ? (
         <HumanLoginHandoffNotice
           warning={warning}
+          localMfaFixture={attachedTabs.some((tab) =>
+            isLocalMfaFixtureUrl(tab.url),
+          )}
           continuationStatus={continuationStatus}
           onContinue={continueAfterLogin}
           onClose={() => setHandoff(false)}

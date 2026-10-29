@@ -5,6 +5,22 @@ type LoginTabBrowser = {
   update: (id: number, properties: { active: true }) => Promise<unknown>
 }
 
+/** Recognizes only the local dummy MFA fixture path; it never inspects page data. */
+export function isLocalMfaFixtureUrl(value: string | undefined): boolean {
+  if (!value) return false
+  try {
+    const url = new URL(value)
+    const host = url.hostname.toLowerCase()
+    return (
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      (host === 'localhost' || host === '127.0.0.1' || host === '[::1]') &&
+      url.pathname === '/mfa-login.html'
+    )
+  } catch {
+    return false
+  }
+}
+
 export function continuationTabs<T extends LoginTab>(
   attachedTabs: readonly T[],
   currentWindowTabs: readonly T[],

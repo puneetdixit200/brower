@@ -29,6 +29,7 @@ test('tests that the CLI prints public fixture and demo URLs and stops on SIGINT
     }
     expect(output).toContain('http://captcha.test:')
     expect(output).toContain('Frame origin: http://frame.test:')
+    expect(output).toContain('dummy-login-mfa: http://captcha.test:')
     for (const page of [...FIXTURE_PAGES, ...SPOTTING_PAGES])
       expect(output).toContain(page.path ?? 'missing-path')
     for (const page of DEMO_PAGES)

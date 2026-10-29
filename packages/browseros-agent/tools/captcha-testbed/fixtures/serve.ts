@@ -29,6 +29,9 @@ try {
     framePort: parsePort(values['frame-port']),
   })
   console.log(`Frame origin: ${server.frameOrigin}`)
+  console.log(
+    `dummy-login-mfa: ${server.url('/mfa-login.html')} (local fake fields; status-only response)`,
+  )
   for (const page of [...FIXTURE_PAGES, ...SPOTTING_PAGES])
     console.log(`${page.id}: ${server.url(page.path ?? '/')}`)
   for (const page of DEMO_PAGES) console.log(`${page.id}: ${page.url}`)

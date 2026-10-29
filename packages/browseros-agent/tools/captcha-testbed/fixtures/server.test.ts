@@ -96,6 +96,53 @@ test('tests that the server serves every catalog page and health check', async (
   }
 })
 
+test('tests that the local dummy MFA page has fake login fields and no remote assets', async () => {
+  const response = await fetch(fixture.url('/mfa-login.html'))
+  const html = await response.text()
+  expect(response.status).toBe(200)
+  expect(html).toContain('action="/submit/mfa-login"')
+  expect(html).toContain('name="username"')
+  expect(html).toContain('name="password"')
+  expect(html).toContain('name="one-time-code"')
+  expect(html).not.toMatch(/(?:src|href)="https?:\/\//)
+})
+
+test('tests that dummy MFA submission returns only a fixed sanitized status', async () => {
+  const sentinels = [
+    'SENTINEL_USERNAME_73',
+    'SENTINEL_PASSWORD_91',
+    'SENTINEL_OTP_28',
+  ]
+  const response = await fetch(fixture.url('/submit/mfa-login'), {
+    method: 'POST',
+    body: new URLSearchParams({
+      username: sentinels[0],
+      password: sentinels[1],
+      'one-time-code': sentinels[2],
+    }),
+  })
+  const html = await response.text()
+  expect(response.status).toBe(200)
+  expect(html).toContain('role="status">STATUS: submitted</p>')
+  for (const sentinel of sentinels) expect(html).not.toContain(sentinel)
+})
+
+test('tests that oversized dummy MFA submissions are canceled and rejected without reflecting values', async () => {
+  const sentinel = 'OVERSIZED_SENTINEL_42'
+  const response = await fetch(fixture.url('/submit/mfa-login'), {
+    method: 'POST',
+    body: new URLSearchParams({
+      username: `${sentinel}${'x'.repeat(20 * 1024)}`,
+      password: 'fake',
+      'one-time-code': '000000',
+    }),
+  })
+  const body = await response.text()
+  expect(response.status).toBe(413)
+  expect(body).toBe('Request too large')
+  expect(body).not.toContain(sentinel)
+})
+
 test.each(cases)(
   'tests that %s verifies its response field with the correct secret',
   async (id, family, field, secret) => {

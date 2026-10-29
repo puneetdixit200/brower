@@ -31,6 +31,14 @@ import { ChatMessages } from './ChatMessages'
 import { HumanLoginHandoff } from './HumanLoginHandoff'
 import { continuationTabs } from './human-login-handoff'
 import { IncognitoNotice } from './IncognitoNotice'
+import {
+  canDrainPromptQueue,
+  clearPromptQueue,
+  dispatchNextPrompt,
+  enqueuePrompt,
+  isPromptQueueRetryCurrent,
+  MAX_QUEUED_PROMPTS,
+} from './prompt-queue'
 import { ResearchSupportConsent } from './ResearchSupportConsent'
 import { prepareSourceResearch } from './research-request'
 
@@ -76,6 +84,8 @@ export const Chat = () => {
 
   const [input, setInput] = useState('')
   const [queuedPrompts, setQueuedPrompts] = useState<string[]>([])
+  const queuedPromptsRef = useRef(queuedPrompts)
+  const queueGeneration = useRef(0)
   const queueAwaitingRun = useRef(false)
   const [attachedTabs, setAttachedTabs] = useState<chrome.tabs.Tab[]>([])
   const [assessResearchSupport, setAssessResearchSupport] = useState(false)
@@ -85,6 +95,7 @@ export const Chat = () => {
   const [draftIncognito, setDraftIncognito] = useState(true)
   const [draftLoaded, setDraftLoaded] = useState(false)
   const [mounted, setMounted] = useState(false)
+  queuedPromptsRef.current = queuedPrompts
 
   useEffect(() => {
     setMounted(true)
@@ -174,27 +185,60 @@ export const Chat = () => {
       return
     }
     if (
-      status !== 'ready' ||
-      !canSend ||
-      queuedPrompts.length === 0 ||
-      queueAwaitingRun.current
+      !canDrainPromptQueue(
+        status,
+        canSend,
+        queuedPrompts.length,
+        queueAwaitingRun.current,
+      )
     ) {
       return
     }
     queueAwaitingRun.current = true
-    const sent = sendMessage({ text: queuedPrompts[0] })
-    if (sent) {
-      setQueuedPrompts((previous) => previous.slice(1))
+    const attempt = dispatchNextPrompt(queuedPrompts, (text) =>
+      sendMessage({ text }),
+    )
+    if (attempt.accepted) {
+      setQueuedPrompts(attempt.remaining)
     } else {
       queueAwaitingRun.current = false
+      // Refusal can be transient without changing chat status. Retry while
+      // the same head prompt remains queued; the effect cleanup cancels this
+      // retry when status, sendability, or the queue changes.
+      const scheduledPrompt = queuedPrompts[0]
+      const scheduledGeneration = queueGeneration.current
+      const retryTimer = window.setTimeout(() => {
+        if (
+          scheduledPrompt &&
+          isPromptQueueRetryCurrent(
+            queuedPromptsRef.current,
+            scheduledPrompt,
+            scheduledGeneration,
+            queueGeneration.current,
+          )
+        ) {
+          setQueuedPrompts((previous) => [...previous])
+        }
+      }, 250)
+      return () => window.clearTimeout(retryTimer)
     }
   }, [status, canSend, queuedPrompts, sendMessage])
 
   const queueCurrentPrompt = () => {
-    const value = input.trim()
-    if (!value || queuedPrompts.length >= 5) return
-    setQueuedPrompts((previous) => [...previous, value])
+    if (queuedPrompts.length >= MAX_QUEUED_PROMPTS) return
+    const next = enqueuePrompt(queuedPrompts, input)
+    if (next === queuedPrompts) return
+    queuedPromptsRef.current = next
+    setQueuedPrompts(next)
     setInput('')
+  }
+
+  const clearQueuedPrompts = () => {
+    const cleared = clearPromptQueue(queueGeneration.current)
+    queueGeneration.current = cleared.generation
+    queuedPromptsRef.current = cleared.queue
+    queueAwaitingRun.current = false
+    setQueuedPrompts(cleared.queue)
   }
 
   // Trigger JTBD popup when AI finishes responding
@@ -220,8 +264,7 @@ export const Chat = () => {
   const handleStop = () => {
     track(SIDEPANEL_STOP_CLICKED_EVENT)
     // Stop is definitive, not a signal to start the next queued action.
-    setQueuedPrompts([])
-    queueAwaitingRun.current = false
+    clearQueuedPrompts()
     stop()
   }
 
@@ -363,12 +406,15 @@ export const Chat = () => {
           aria-label="Queued agent prompts"
         >
           <span>
-            {queuedPrompts.length} queued prompts (maximum 5, this chat only)
+            {queuedPrompts.length} queued prompts (maximum {MAX_QUEUED_PROMPTS},
+            this chat only)
           </span>
           {(status === 'streaming' || status === 'submitted') && (
             <button
               type="button"
-              disabled={!input.trim() || queuedPrompts.length >= 5}
+              disabled={
+                !input.trim() || queuedPrompts.length >= MAX_QUEUED_PROMPTS
+              }
               onClick={queueCurrentPrompt}
               className="rounded-md border px-2 py-1 disabled:opacity-50"
             >
@@ -379,7 +425,7 @@ export const Chat = () => {
             <button
               type="button"
               className="rounded-md border px-2 py-1"
-              onClick={() => setQueuedPrompts([])}
+              onClick={clearQueuedPrompts}
             >
               Clear queue
             </button>
