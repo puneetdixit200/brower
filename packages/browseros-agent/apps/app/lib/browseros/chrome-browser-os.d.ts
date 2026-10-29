@@ -33,6 +33,8 @@ declare namespace chrome.browserOS {
 
   function getBrowserosVersionNumber(callback: (version: string) => void): void
 
+  function stopTabLoading(tabId: number): Promise<void>
+
   type SelectionType = 'file' | 'folder'
 
   interface ChoosePathOptions {

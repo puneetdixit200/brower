@@ -9,10 +9,14 @@ import {
   Puzzle,
   RotateCw,
   Settings2,
+  Square,
   SquarePlus,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { navigateSelectedWebTab } from './browser-navigation-actions'
+import {
+  navigateSelectedWebTab,
+  stopSelectedWebTabLoading,
+} from './browser-navigation-actions'
 import {
   createPendingDownloadUpdates,
   type DownloadProgressRow,
@@ -138,6 +142,18 @@ export function BrowserQuickControls({
   const navigateSelected = (direction: 'back' | 'forward') => {
     void action(() =>
       navigateSelectedWebTab(chrome.tabs, selectedTabId, direction),
+    )
+  }
+
+  const stopSelectedLoading = () => {
+    void action(() =>
+      stopSelectedWebTabLoading(
+        {
+          query: (queryInfo) => chrome.tabs.query(queryInfo),
+          stopTabLoading: (tabId) => chrome.browserOS.stopTabLoading(tabId),
+        },
+        selectedTabId,
+      ),
     )
   }
 
@@ -447,6 +463,11 @@ export function BrowserQuickControls({
             run: () => navigateSelected('forward'),
           },
           { name: 'Reload selected webpage', Icon: RotateCw, run: reload },
+          {
+            name: 'Stop selected webpage loading',
+            Icon: Square,
+            run: stopSelectedLoading,
+          },
           { name: 'Reopen closed tab', Icon: History, run: restoreClosed },
           { name: 'Recent history', Icon: History, run: showRecentHistory },
           {
@@ -479,6 +500,7 @@ export function BrowserQuickControls({
                 name === 'Back selected webpage' ||
                 name === 'Forward selected webpage' ||
                 name === 'Reload selected webpage' ||
+                name === 'Stop selected webpage loading' ||
                 name === 'Screenshot' ||
                 name === 'Select screenshot context') &&
                 selectedTabId === null) ||

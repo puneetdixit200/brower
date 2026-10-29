@@ -1,9 +1,9 @@
 diff --git a/chrome/browser/extensions/api/browser_os/browser_os_api.cc b/chrome/browser/extensions/api/browser_os/browser_os_api.cc
 new file mode 100644
-index 0000000000000000000000000000000000000000..3b0172e8340200d55781af150bf3f9fc93f21a17
+index 0000000000000000000000000000000000000000..b6c48dd7cc744240f387547a8842dfd093f0eb7b
 --- /dev/null
 +++ b/chrome/browser/extensions/api/browser_os/browser_os_api.cc
-@@ -0,0 +1,391 @@
+@@ -0,0 +1,426 @@
 +// Copyright 2024 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -24,7 +24,9 @@ index 0000000000000000000000000000000000000000..3b0172e8340200d55781af150bf3f9fc
 +#include "base/version_info/version_info.h"
 +#include "build/build_config.h"
 +#include "chrome/browser/browser_process.h"
++#include "chrome/browser/browseros/core/browseros_constants.h"
 +#include "chrome/browser/browseros/metrics/browseros_metrics.h"
++#include "chrome/browser/extensions/extension_tab_util.h"
 +#include "chrome/browser/infobars/confirm_infobar_creator.h"
 +#include "chrome/browser/platform_util.h"
 +#include "chrome/browser/profiles/profile.h"
@@ -391,6 +393,39 @@ index 0000000000000000000000000000000000000000..3b0172e8340200d55781af150bf3f9fc
 +#endif
 +  return RespondNow(
 +      ArgumentList(browser_os::SetDockBadge::Results::Create(set)));
++}
++
++ExtensionFunction::ResponseAction BrowserOSStopTabLoadingFunction::Run() {
++  std::optional<browser_os::StopTabLoading::Params> params =
++      browser_os::StopTabLoading::Params::Create(args());
++  EXTENSION_FUNCTION_VALIDATE(params);
++
++  if (!browseros::IsAsterProduct() ||
++      extension_id() != browseros::kAsterAgentExtensionId) {
++    return RespondNow(Error("This API is available only to the Aster agent"));
++  }
++
++  Profile* profile = Profile::FromBrowserContext(browser_context());
++  if (!profile || profile->IsOffTheRecord()) {
++    return RespondNow(Error("A regular Aster profile is required"));
++  }
++
++  content::WebContents* web_contents = nullptr;
++  if (!ExtensionTabUtil::GetTabById(params->tab_id, browser_context(),
++                                    /*include_incognito=*/false,
++                                    &web_contents) ||
++      !web_contents) {
++    return RespondNow(Error("Tab is not owned by this profile"));
++  }
++
++  if (web_contents->GetBrowserContext() != browser_context() ||
++      Profile::FromBrowserContext(web_contents->GetBrowserContext()) !=
++          profile) {
++    return RespondNow(Error("Tab is not owned by this profile"));
++  }
++
++  web_contents->Stop();
++  return RespondNow(NoArguments());
 +}
 +
 +}  // namespace api

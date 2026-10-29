@@ -2,7 +2,7 @@ diff --git a/extensions/browser/extension_function_histogram_value.h b/extension
 index 4f8efeb0d3dc9d682c5c5fa31c2a9a0f58746b47..227bacbe89ca753877fb24c5d976738614c0c581 100644
 --- a/extensions/browser/extension_function_histogram_value.h
 +++ b/extensions/browser/extension_function_histogram_value.h
-@@ -2051,6 +2051,38 @@ enum HistogramValue {
+@@ -2051,6 +2051,39 @@ enum HistogramValue {
    ENTERPRISE_WEBRTC_STARTCAPTURE = 1986,
    ENTERPRISE_WEBRTC_GETCAPTURESTATUS = 1987,
    ENTERPRISE_WEBRTC_STOPCAPTURE = 1988,
@@ -38,6 +38,7 @@ index 4f8efeb0d3dc9d682c5c5fa31c2a9a0f58746b47..227bacbe89ca753877fb24c5d9767386
 +  BROWSER_OS_REQUESTATTENTION = 2016,
 +  BROWSER_OS_CANCELATTENTION = 2017,
 +  BROWSER_OS_SETDOCKBADGE = 2018,
++  BROWSER_OS_STOPTABLOADING = 2019,
    // Last entry: Add new entries above, then run:
    // tools/metrics/histograms/update_extension_histograms.py
    ENUM_BOUNDARY

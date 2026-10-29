@@ -1,9 +1,9 @@
 diff --git a/chrome/common/extensions/api/browser_os.idl b/chrome/common/extensions/api/browser_os.idl
 new file mode 100644
-index 0000000000000000000000000000000000000000..86e967a89c198b8e77258e5c4db6565542552076
+index 0000000000000000000000000000000000000000..81f33d9f1c0381bc3433b0e5cf97d8d412e8ed4a
 --- /dev/null
 +++ b/chrome/common/extensions/api/browser_os.idl
-@@ -0,0 +1,178 @@
+@@ -0,0 +1,185 @@
 +// Copyright 2024 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -180,5 +180,12 @@ index 0000000000000000000000000000000000000000..86e967a89c198b8e77258e5c4db65655
 +    static void setDockBadge(
 +        DOMString text,
 +        SetDockBadgeCallback callback);
++
++    // Stops the active load in a specific Aster tab. The tab ID must refer to
++    // a regular-profile tab owned by the calling Aster extension.
++    // |tabId|: Explicit tab to stop; there is no active-tab fallback.
++    static void stopTabLoading(
++        long tabId,
++        optional VoidCallback callback);
 +  };
 +};

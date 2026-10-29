@@ -137,7 +137,7 @@ The canonical descriptions, dependencies and evidence remain in FEATURE_MATRIX.m
 |---|---|---|
 | B01 | Start browser, render HTTPS pages securely | NOT_STARTED |
 | B02 | Navigate/search from address bar | NOT_STARTED |
-| B03 | Forward/back/reload/stop navigation | NOT_STARTED |
+| B03 | Forward/back/reload/stop navigation | PARTIAL |
 | B04 | Tab create/select/close/reopen/pin/drag | NOT_STARTED |
 | B05 | Downloads, progress, files on disk | NOT_STARTED |
 | B06 | History, bookmarks, search/import/export where supported | NOT_STARTED |

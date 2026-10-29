@@ -2,7 +2,7 @@ diff --git a/tools/metrics/histograms/metadata/extensions/enums.xml b/tools/metr
 index 460630d8491054408e0e404cb576d147822515a9..7c517f81b3bddbce60d2be83838016aedb560202 100644
 --- a/tools/metrics/histograms/metadata/extensions/enums.xml
 +++ b/tools/metrics/histograms/metadata/extensions/enums.xml
-@@ -2921,6 +2921,36 @@ Called by update_extension_histograms.py.-->
+@@ -2921,6 +2921,37 @@ Called by update_extension_histograms.py.-->
    <int value="1986" label="ENTERPRISE_WEBRTC_STARTCAPTURE"/>
    <int value="1987" label="ENTERPRISE_WEBRTC_GETCAPTURESTATUS"/>
    <int value="1988" label="ENTERPRISE_WEBRTC_STOPCAPTURE"/>
@@ -36,6 +36,7 @@ index 460630d8491054408e0e404cb576d147822515a9..7c517f81b3bddbce60d2be83838016ae
 +  <int value="2016" label="BROWSER_OS_REQUESTATTENTION"/>
 +  <int value="2017" label="BROWSER_OS_CANCELATTENTION"/>
 +  <int value="2018" label="BROWSER_OS_SETDOCKBADGE"/>
++  <int value="2019" label="BROWSER_OS_STOPTABLOADING"/>
  </enum>
  
  <!-- LINT.ThenChange(//extensions/browser/extension_function_histogram_value.h:HistogramValue) -->
