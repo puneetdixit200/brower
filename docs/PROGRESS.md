@@ -1,5 +1,9 @@
 # Progress
 
+### T19/T30 production approval-to-dispatch server fixture — 2026-10-30
+
+The deterministic fixture now uses real ChatService, AiSdkAgent, ToolLoopAgent, SQLite approval grants and execution claims, and an in-memory tool callback. Pending approval prevents dispatch; explicit approval dispatches once; repeating the approval returns 409; denial adds no dispatch. Root verification: `bun test tests/api/services/chat-service.test.ts tests/agent/tool-execution-claim.test.ts tests/agent/stale-approval-execution.test.ts` passes 29/29 (128 assertions). Server typecheck, targeted Biome and independent Luna review pass. This is a server integration fixture, not external MCP/browser transport, live-provider, process-restart or Aster-native evidence. A06/R02 remain PARTIAL.
+
 ### T20a explicit native build-tool selection — 2026-10-30
 
 `bos_build/steps/compile/standard.py` accepts a validated absolute `BROWSEROS_NINJA_BINARY` argv executable and supplies the depot_tools environment for individual targets. The default remains autoninja. Root verification with the existing `work/aster-native-venv/bin/python -m bos_build.steps.compile.standard_test` passes 23/23; independent Luna review passes. This fixes selection around the broken depot_tools wrapper only. Read-only inspection preserves all 319 native changes and confirms no build log or linked browser; no build, GN regeneration or graph dry-run ran. T20a/B01 remain PARTIAL pending safe incremental-state/provenance recovery, adequate resources and native launch.

@@ -5,7 +5,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { UIMessageChunk } from 'ai'
 import * as _ai from 'ai'
+import { MockLanguageModelV3 } from 'ai/test'
+import { z } from 'zod'
 import { actionPolicyIdForCandidate } from '../../../src/agent/action-policy'
+import * as mcpBuilderModule from '../../../src/agent/mcp-builder'
+import * as providerFactoryModule from '../../../src/agent/provider-factory'
 import * as researchSupportModule from '../../../src/agent/research-support-assessment'
 import type { KlavisProxyStatus } from '../../../src/api/services/klavis'
 import { consumeApprovalOperation } from '../../../src/lib/conversations/approval-operation-ledger'
@@ -32,6 +36,11 @@ interface StoredSession {
 }
 
 const BROWSEROS_TARGET = { type: 'browseros', providerId: 'browseros' } as const
+const realCreateAgentUIStream = _ai.createAgentUIStream
+const realCreateLanguageModel = providerFactoryModule.createLanguageModel
+const realSerializesReasoningContent =
+  providerFactoryModule.serializesReasoningContent
+const realCreateMcpClients = mcpBuilderModule.createMcpClients
 
 interface StreamResponseOptions {
   uiMessages?: MockMessage[]
@@ -46,6 +55,58 @@ let finishMessagesForMock: MockMessage[] | undefined
 let streamResponseHandler:
   | ((options: StreamResponseOptions) => Promise<Response>)
   | undefined
+let useProductionAgentFixture = false
+let productionToolDispatches: unknown[] = []
+let productionModelCalls = 0
+
+const productionFixtureModel = new MockLanguageModelV3({
+  doStream: async () => {
+    productionModelCalls += 1
+    const part =
+      productionModelCalls % 2 === 1
+        ? {
+            type: 'tool-call' as const,
+            toolCallId: 'provider-send-call-1',
+            toolName: 'send_message',
+            input: JSON.stringify({
+              destination: 'user@example.test',
+              body: 'hello',
+            }),
+          }
+        : {
+            type: 'text-delta' as const,
+            id: 'answer',
+            delta: 'Handled the request.',
+          }
+    const finishReason = {
+      unified:
+        part.type === 'tool-call' ? ('tool-calls' as const) : ('stop' as const),
+      raw: part.type === 'tool-call' ? 'tool_calls' : 'stop',
+    }
+    return {
+      stream: new ReadableStream({
+        start(controller) {
+          controller.enqueue({ type: 'stream-start', warnings: [] })
+          if (part.type === 'tool-call') controller.enqueue(part)
+          else {
+            controller.enqueue({ type: 'text-start', id: part.id })
+            controller.enqueue(part)
+            controller.enqueue({ type: 'text-end', id: part.id })
+          }
+          controller.enqueue({
+            type: 'finish',
+            finishReason,
+            usage: {
+              inputTokens: { total: 1, noCache: 1 },
+              outputTokens: { total: 1, text: 1 },
+            },
+          })
+          controller.close()
+        },
+      }),
+    }
+  },
+})
 
 const createAgentSpy = mock(async (config: unknown) => {
   if (!agentToReturn) {
@@ -55,6 +116,9 @@ const createAgentSpy = mock(async (config: unknown) => {
 })
 
 const createAgentUIStreamSpy = mock(async (options: StreamResponseOptions) => {
+  if (useProductionAgentFixture) {
+    return realCreateAgentUIStream(options as never)
+  }
   if (!streamResponseHandler) {
     throw new Error('No stream response handler configured')
   }
@@ -127,9 +191,59 @@ mock.module('ai', () => ({
   generateObject: generateObjectSpy,
 }))
 
+mock.module('../../../src/agent/provider-factory', () => ({
+  ...providerFactoryModule,
+  createLanguageModel: async (
+    ...args: Parameters<typeof providerFactoryModule.createLanguageModel>
+  ) =>
+    useProductionAgentFixture
+      ? { model: productionFixtureModel }
+      : realCreateLanguageModel(...args),
+  serializesReasoningContent: (
+    ...args: Parameters<typeof providerFactoryModule.serializesReasoningContent>
+  ) =>
+    useProductionAgentFixture ? false : realSerializesReasoningContent(...args),
+}))
+
+mock.module('../../../src/agent/mcp-builder', () => ({
+  ...mcpBuilderModule,
+  createMcpClients: async (specs: Array<{ name: string }> = []) => {
+    if (!useProductionAgentFixture) {
+      return realCreateMcpClients(specs as never)
+    }
+    return {
+      clients: [],
+      tools: specs.some((spec) => spec.name === 'browseros')
+        ? {}
+        : {
+            send_message: {
+              description: 'Send a message to the selected recipient.',
+              inputSchema: z.object({
+                destination: z.string(),
+                body: z.string(),
+              }),
+              execute: async (input: { destination: string; body: string }) => {
+                productionToolDispatches.push(input)
+                return { sent: true }
+              },
+            },
+          },
+    }
+  },
+}))
+
+// Capture the production implementation before registering the ordinary unit
+// fixture below. The integration case selects it explicitly via its flag.
+const { AiSdkAgent: ProductionAiSdkAgent } = await import(
+  '../../../src/agent/ai-sdk-agent'
+)
+
 mock.module('../../../src/agent/ai-sdk-agent', () => ({
   AiSdkAgent: {
-    create: createAgentSpy,
+    create: (config: unknown) =>
+      useProductionAgentFixture
+        ? ProductionAiSdkAgent.create(config as never)
+        : createAgentSpy(config),
   },
 }))
 
@@ -1396,6 +1510,112 @@ describe('ChatService history persistence', () => {
     ).toBe(false)
     expect(consumeApprovalOperation(binding)).toBe(true)
     expect(consumeApprovalOperation(binding)).toBe(false)
+  })
+
+  it('runs the production ChatService and ToolLoopAgent through approval, claim, dispatch, denial and replay', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'browseros-chat-tool-loop-'))
+    tempDirs.push(dir)
+    initializeDb({ dbPath: join(dir, 'browseros.sqlite') })
+    const sessionStore = createSessionStore()
+    const service = new ChatService({
+      sessionStore: sessionStore as never,
+      klavis: createKlavisStub() as never,
+      browser: persistenceBrowser() as never,
+    })
+    useProductionAgentFixture = true
+    productionModelCalls = 0
+    productionToolDispatches = []
+
+    const makeRequest = (
+      conversationId: string,
+      message: string,
+      approvalResponse?: { id: string; approved: boolean },
+    ) => ({
+      ...browserOsRequest(conversationId, false),
+      message,
+      browserContext: {
+        activeTab: { id: 3, url: 'https://example.com', title: 'Example' },
+        customMcpServers: [{ name: 'fixture', url: 'http://fixture.test/mcp' }],
+      },
+      ...(approvalResponse ? { approvalResponse } : {}),
+    })
+
+    try {
+      const approvedConversation = crypto.randomUUID()
+      await (
+        await service.processMessage(
+          makeRequest(approvedConversation, 'Send the message.') as never,
+          new AbortController().signal,
+        )
+      ).text()
+      const approvedMessages = (
+        sessionStore.get(approvedConversation) as unknown as {
+          agent: { messages: Array<{ parts: Array<Record<string, unknown>> }> }
+        }
+      ).agent.messages
+      const approvedRequest = approvedMessages
+        .flatMap((message) => message.parts)
+        .find((part) => part.state === 'approval-requested')
+      expect(approvedRequest?.toolCallId).toBe('provider-send-call-1')
+      if (!approvedRequest) throw new Error('Expected a pending approval')
+      expect(productionToolDispatches).toEqual([])
+
+      const approvalId = (approvedRequest.approval as { id: string }).id
+      await (
+        await service.processMessage(
+          makeRequest(approvedConversation, '', {
+            id: approvalId,
+            approved: true,
+          }) as never,
+          new AbortController().signal,
+        )
+      ).text()
+      expect(productionToolDispatches).toEqual([
+        { destination: 'user@example.test', body: 'hello' },
+      ])
+
+      const replay = await service.processMessage(
+        makeRequest(approvedConversation, '', {
+          id: approvalId,
+          approved: true,
+        }) as never,
+        new AbortController().signal,
+      )
+      expect(replay.status).toBe(409)
+      expect(productionToolDispatches).toHaveLength(1)
+
+      const deniedConversation = crypto.randomUUID()
+      await (
+        await service.processMessage(
+          makeRequest(deniedConversation, 'Send the message.') as never,
+          new AbortController().signal,
+        )
+      ).text()
+      const deniedMessages = (
+        sessionStore.get(deniedConversation) as unknown as {
+          agent: { messages: Array<{ parts: Array<Record<string, unknown>> }> }
+        }
+      ).agent.messages
+      const deniedRequest = deniedMessages
+        .flatMap((message) => message.parts)
+        .find((part) => part.state === 'approval-requested')
+      const deniedApprovalId = (
+        deniedRequest?.approval as { id?: string } | undefined
+      )?.id
+      expect(deniedApprovalId).toBeTruthy()
+      await (
+        await service.processMessage(
+          makeRequest(deniedConversation, '', {
+            id: deniedApprovalId as string,
+            approved: false,
+          }) as never,
+          new AbortController().signal,
+        )
+      ).text()
+      expect(productionToolDispatches).toHaveLength(1)
+    } finally {
+      useProductionAgentFixture = false
+    }
   })
 
   it('hydrates from and persists to the store in local mode', async () => {
