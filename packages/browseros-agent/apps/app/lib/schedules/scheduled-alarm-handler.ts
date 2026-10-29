@@ -9,7 +9,7 @@ export interface ScheduledAlarmDependencies {
   getJob(jobId: string): Promise<ScheduledJob | undefined | null>
   rearmDaily(job: ScheduledJob): Promise<void>
   scheduleReconciliation(): Promise<void>
-  run(jobId: string): Promise<void>
+  run(jobId: string, occurrenceKey: string): Promise<void>
 }
 
 export async function handleScheduledAlarm(
@@ -49,5 +49,5 @@ export async function handleScheduledAlarm(
   }
 
   if (!isAlarmWithinGracePeriod(alarm.scheduledTime, deliveredAt)) return
-  await dependencies.run(jobId)
+  await dependencies.run(jobId, new Date(alarm.scheduledTime).toISOString())
 }

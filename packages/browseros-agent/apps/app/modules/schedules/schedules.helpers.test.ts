@@ -41,6 +41,7 @@ function runRow(
   return {
     id: 'run-1',
     jobId: 'job-1',
+    occurrenceKey: null,
     conversationId: null,
     status: 'completed',
     startedAt: EPOCH,
@@ -116,6 +117,13 @@ describe('toScheduledJobRun', () => {
     expect(run.completedAt).toBe(ISO)
   })
 
+  it('preserves a scheduled occurrence key', () => {
+    expect(
+      toScheduledJobRun(runRow({ occurrenceKey: '2026-02-25T01:00:00.000Z' }))
+        .occurrenceKey,
+    ).toBe('2026-02-25T01:00:00.000Z')
+  })
+
   it('leaves an unfinished run without a completion time', () => {
     expect(toScheduledJobRun(runRow()).completedAt).toBeUndefined()
   })
@@ -139,6 +147,18 @@ describe('toScheduledJobRunPayload', () => {
     expect(payload.startedAt).toBe(EPOCH)
     expect(payload.completedAt).toBe(EPOCH)
     expect(payload.jobId).toBe('job-1')
+  })
+
+  it('sends the occurrence key on the atomic run claim', () => {
+    const run = toScheduledJobRun(
+      runRow({
+        status: 'running',
+        occurrenceKey: '2026-02-25T01:00:00.000Z',
+      }),
+    )
+    expect(toScheduledJobRunPayload(run).occurrenceKey).toBe(
+      '2026-02-25T01:00:00.000Z',
+    )
   })
 })
 

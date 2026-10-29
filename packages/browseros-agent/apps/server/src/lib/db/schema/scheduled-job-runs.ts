@@ -76,5 +76,26 @@ export const scheduledJobRuns = sqliteTable(
   ],
 )
 
+/** Bounded replay tombstones, independent of the capped run-history table. */
+export const scheduledJobOccurrenceClaims = sqliteTable(
+  'scheduled_job_occurrence_claims',
+  {
+    jobId: text('job_id')
+      .notNull()
+      .references(() => scheduledJobs.id, { onDelete: 'cascade' }),
+    occurrenceKey: text('occurrence_key').notNull(),
+    runId: text('run_id').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('scheduled_job_occurrence_claims_job_key_unique').on(
+      table.jobId,
+      table.occurrenceKey,
+    ),
+    index('scheduled_job_occurrence_claims_expires_at_idx').on(table.expiresAt),
+  ],
+)
+
 export type ScheduledJobRunRow = InferSelectModel<typeof scheduledJobRuns>
 export type NewScheduledJobRunRow = InferInsertModel<typeof scheduledJobRuns>

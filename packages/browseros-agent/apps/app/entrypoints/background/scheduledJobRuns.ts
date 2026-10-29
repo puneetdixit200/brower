@@ -33,6 +33,7 @@ import {
   listScheduledJobsOrNull,
   putScheduledJob,
   putScheduledJobRun,
+  startScheduledJobRun,
 } from '@/modules/schedules/schedules.api'
 import { applyLastRunAt } from '@/modules/schedules/schedules.helpers'
 
@@ -151,19 +152,21 @@ export const scheduledJobRuns = async () => {
     jobId: string,
     status: ScheduledJobRun['status'],
     conversationId?: string,
-  ): Promise<ScheduledJobRun> => {
+    occurrenceKey?: string,
+  ): Promise<ScheduledJobRun | null> => {
     // Trimming to the per-job cap happens on the server now, so creating a run
     // no longer has to rewrite the job's whole history to stay bounded.
     const jobRun: ScheduledJobRun = {
       id: crypto.randomUUID(),
       jobId,
+      occurrenceKey,
       conversationId,
       startedAt: new Date().toISOString(),
       status,
     }
 
-    await putScheduledJobRun(jobRun)
-    return jobRun
+    const claimed = await startScheduledJobRun(jobRun)
+    return claimed ? jobRun : null
   }
 
   // Takes the run rather than its id: the caller already holds it, and merging
@@ -218,7 +221,10 @@ export const scheduledJobRuns = async () => {
     return message
   }
 
-  const executeScheduledJob = async (jobId: string): Promise<void> => {
+  const executeScheduledJob = async (
+    jobId: string,
+    occurrenceKey?: string,
+  ): Promise<void> => {
     if (activeJobIds.has(jobId)) {
       throw new Error(`Job is already running: ${jobId}`)
     }
@@ -250,7 +256,13 @@ export const scheduledJobRuns = async () => {
         await putScheduledJob(updatedJob)
       }
 
-      const jobRun = await createJobRun(jobId, 'running', conversationId)
+      const jobRun = await createJobRun(
+        jobId,
+        'running',
+        conversationId,
+        occurrenceKey,
+      )
+      if (!jobRun) return
       const abortController = new AbortController()
       runAbortControllers.set(jobRun.id, abortController)
 
@@ -311,9 +323,9 @@ export const scheduledJobRuns = async () => {
       },
       rearmDaily: createAlarmFromJob,
       scheduleReconciliation: scheduleAlarmReconciliation,
-      run: async (jobId) => {
+      run: async (jobId, occurrenceKey) => {
         try {
-          await executeScheduledJob(jobId)
+          await executeScheduledJob(jobId, occurrenceKey)
         } catch (error) {
           if (
             !(error instanceof Error) ||

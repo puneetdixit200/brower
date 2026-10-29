@@ -18,6 +18,7 @@ describe('scheduled alarm delivery handling', () => {
   test('uses the delivery timestamp even when loading the job takes past grace', async () => {
     let currentTime = 10_000
     const calls: string[] = []
+    let occurrenceKey: string | undefined
 
     await handleScheduledAlarm(
       { name: 'scheduled-job-daily-1', scheduledTime: 10_000 },
@@ -33,13 +34,15 @@ describe('scheduled alarm delivery handling', () => {
         scheduleReconciliation: async () => {
           calls.push('reconcile')
         },
-        run: async () => {
+        run: async (_jobId, key) => {
+          occurrenceKey = key
           calls.push('run')
         },
       },
     )
 
     expect(calls).toEqual(['rearm', 'run'])
+    expect(occurrenceKey).toBe(new Date(10_000).toISOString())
   })
 
   test('schedules reconciliation instead of losing a daily alarm when the store is unavailable', async () => {

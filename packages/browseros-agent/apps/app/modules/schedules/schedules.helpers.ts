@@ -25,6 +25,7 @@ export interface ScheduledJobRow {
 export interface ScheduledJobRunRow {
   id: string
   jobId: string
+  occurrenceKey?: string | null
   conversationId: string | null
   status: ScheduledJobRun['status']
   startedAt: number
@@ -109,6 +110,7 @@ export function toScheduledJobRun(row: ScheduledJobRunRow): ScheduledJobRun {
   return {
     id: row.id,
     jobId: row.jobId,
+    occurrenceKey: orUndefined(row.occurrenceKey ?? null),
     conversationId: orUndefined(row.conversationId),
     status: row.status,
     startedAt: new Date(row.startedAt).toISOString(),
@@ -124,6 +126,7 @@ export function toScheduledJobRun(row: ScheduledJobRunRow): ScheduledJobRun {
 export function toScheduledJobRunPayload(run: ScheduledJobRun) {
   return {
     jobId: run.jobId,
+    occurrenceKey: run.occurrenceKey,
     conversationId: run.conversationId,
     status: run.status,
     // Required by the server, and a run always carries the time it began.

@@ -271,3 +271,8 @@ This guard intentionally provides read-only continuation today. It does not impl
 ### Latest focused follow-up — 2026-10-29
 
 The heartbeat liveness probe now sets Fetch `redirect: 'error'`. A redirect cannot leave the validated loopback boundary and return a forged inactive response that would release a running claim. Its focused regression suite passes 7/7. This closes the redirect-following gap only; it does not prove worker/server restart or packaged no-overlap behavior. Continue the fresh per-operation authorization/idempotency design and runtime gates above.
+
+
+### T30.2 scheduled-occurrence replay guard — 2026-10-29
+
+Alarm handling now sends the canonical scheduled timestamp as an occurrence key. SQLite atomically stores a per-job claim separately from the run-history rows, rejects duplicate and expired keys, and retains the claim for a 30-day replay horizon. The 15-run history cap remains in force, and deleting a terminal run does not release the occurrence claim. The app skips only the explicit duplicate-occurrence conflict; other failed claims remain errors. Focused server route/store tests pass 33/33 and app scheduler tests pass 42/42; server/app typechecks, targeted Biome and diff check pass. This prevents duplicate scheduled firings within the stated horizon; it does not provide tool-level exactly-once side effects or packaged restart acceptance. Keep R02 PARTIAL.

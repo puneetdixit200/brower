@@ -81,6 +81,34 @@ export async function putScheduledJobRun(run: ScheduledJobRun): Promise<void> {
   await bumpScheduleRevision()
 }
 
+/** Returns false only when an atomic scheduled-occurrence claim already exists. */
+export async function startScheduledJobRun(
+  run: ScheduledJobRun,
+): Promise<boolean> {
+  const client = await runsClient()
+  const response = await client[':runId'].$put({
+    param: { runId: run.id },
+    json: toScheduledJobRunPayload(run),
+  })
+  if (response.status === 409) {
+    const body: unknown = await response.json().catch(() => null)
+    if (
+      typeof body === 'object' &&
+      body !== null &&
+      'code' in body &&
+      body.code === 'occurrence_already_claimed'
+    ) {
+      return false
+    }
+    throw new Error(`Failed to start run (${response.status})`)
+  }
+  if (!response.ok) {
+    throw new Error(`Failed to start run (${response.status})`)
+  }
+  await bumpScheduleRevision()
+  return true
+}
+
 /**
  * Jobs for callers outside React, returning null when the server could not be
  * reached. The alarm runner uses this to tell "no jobs are due" apart from

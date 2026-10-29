@@ -26,6 +26,7 @@ export interface ToolCallExecution {
 export interface ScheduledJobRun {
   id: string
   jobId: string
+  occurrenceKey?: string
   conversationId?: string
   startedAt: string
   completedAt?: string

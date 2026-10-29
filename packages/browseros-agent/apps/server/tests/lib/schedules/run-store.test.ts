@@ -10,6 +10,8 @@ import {
   createScheduledJobRunStore,
   dbScheduledJobRunStore,
   MAX_RUNS_PER_JOB,
+  OCCURRENCE_REPLAY_HORIZON_MS,
+  validateScheduledOccurrenceAge,
 } from '../../../src/lib/schedules/run-store'
 import { dbScheduledJobStore } from '../../../src/lib/schedules/schedule-store'
 
@@ -227,6 +229,177 @@ describe('dbScheduledJobRunStore', () => {
       ),
     ).toBeNull()
     expect(await dbScheduledJobRunStore.list()).toHaveLength(1)
+  })
+
+  test('reserves one occurrence across concurrent and terminal claims', async () => {
+    await useTempDbWithJob()
+    const occurrenceKey = new Date(Date.now() - 1000).toISOString()
+    const [first, competing] = await Promise.all([
+      dbScheduledJobRunStore.start(
+        baseRun({
+          id: 'occurrence-first',
+          status: 'running',
+          occurrenceKey,
+        }),
+      ),
+      dbScheduledJobRunStore.start(
+        baseRun({
+          id: 'occurrence-replay',
+          status: 'running',
+          occurrenceKey,
+        }),
+      ),
+    ])
+
+    expect([first, competing].filter(Boolean)).toHaveLength(1)
+    const owner = first ?? competing
+    if (!owner) throw new Error('Expected one occurrence claimant')
+    const terminal = await dbScheduledJobRunStore.finish({
+      ...owner,
+      occurrenceKey,
+      status: 'completed',
+      completedAt: 2000,
+    })
+    expect(terminal?.status).toBe('completed')
+    expect(await dbScheduledJobRunStore.prune(JOB_ID, 0)).toBe(1)
+    expect(await dbScheduledJobRunStore.get(owner.id)).toBeNull()
+
+    expect(
+      await dbScheduledJobRunStore.start(
+        baseRun({
+          id: 'after-terminal-replay',
+          status: 'running',
+          occurrenceKey,
+        }),
+      ),
+    ).toBeNull()
+    expect(
+      await dbScheduledJobRunStore.start(
+        baseRun({
+          id: 'next-occurrence',
+          status: 'running',
+          occurrenceKey: new Date(Date.now() - 500).toISOString(),
+        }),
+      ),
+    ).toMatchObject({ id: 'next-occurrence', status: 'running' })
+  })
+
+  test('keeps occurrence claims after run deletion and returns a stable route conflict', async () => {
+    await useTempDbWithJob()
+    const routes = createScheduledJobRunRoutes()
+    const occurrenceKey = new Date(Date.now() - 1000).toISOString()
+    const payload = {
+      jobId: JOB_ID,
+      occurrenceKey,
+      status: 'running',
+      startedAt: 1000,
+    }
+    const put = (id: string, data: Record<string, unknown>) =>
+      routes.request(`/${id}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+
+    expect((await put('claimed-occurrence', payload)).status).toBe(200)
+    expect(
+      (
+        await put('claimed-occurrence', {
+          ...payload,
+          status: 'completed',
+          completedAt: 2000,
+        })
+      ).status,
+    ).toBe(200)
+    expect(
+      (await routes.request('/claimed-occurrence', { method: 'DELETE' }))
+        .status,
+    ).toBe(200)
+
+    const replay = await put('deleted-run-replay', payload)
+    expect(replay.status).toBe(409)
+    expect(await replay.json()).toMatchObject({
+      code: 'occurrence_already_claimed',
+    })
+    expect(await dbScheduledJobRunStore.get('deleted-run-replay')).toBeNull()
+  })
+
+  test('rejects stale occurrence keys even after the claim horizon', async () => {
+    await useTempDbWithJob()
+    const occurrenceKey = new Date(
+      Date.now() - OCCURRENCE_REPLAY_HORIZON_MS - 1000,
+    ).toISOString()
+
+    expect(
+      await dbScheduledJobRunStore.startWithOutcome(
+        baseRun({
+          id: 'stale-occurrence',
+          status: 'running',
+          occurrenceKey,
+        }),
+      ),
+    ).toEqual({ kind: 'stale_occurrence' })
+    expect(await dbScheduledJobRunStore.get('stale-occurrence')).toBeNull()
+  })
+
+  test('uses inclusive expiry and bounded future-skew boundaries', () => {
+    const now = Date.UTC(2026, 9, 29, 0, 0, 0)
+    const maxFutureSkewMs = 5 * 60 * 1000
+
+    expect(
+      validateScheduledOccurrenceAge(now - OCCURRENCE_REPLAY_HORIZON_MS, now),
+    ).toEqual({ kind: 'stale_occurrence' })
+    expect(
+      validateScheduledOccurrenceAge(
+        now - OCCURRENCE_REPLAY_HORIZON_MS + 1,
+        now,
+      ),
+    ).toBeNull()
+    expect(
+      validateScheduledOccurrenceAge(now + maxFutureSkewMs, now),
+    ).toBeNull()
+    expect(
+      validateScheduledOccurrenceAge(now + maxFutureSkewMs + 1, now),
+    ).toEqual({ kind: 'invalid_occurrence' })
+  })
+
+  test('caps occurrence run history while retaining bounded replay claims', async () => {
+    await useTempDbWithJob()
+    const occurrenceKeys: string[] = []
+    for (let i = 0; i < MAX_RUNS_PER_JOB + 2; i += 1) {
+      const occurrenceKey = new Date(Date.now() - 1000 + i).toISOString()
+      occurrenceKeys.push(occurrenceKey)
+      const started = await dbScheduledJobRunStore.start(
+        baseRun({
+          id: `occurrence-run-${i}`,
+          status: 'running',
+          startedAt: 1000 + i,
+          occurrenceKey,
+        }),
+      )
+      expect(started).not.toBeNull()
+      await dbScheduledJobRunStore.finish({
+        ...baseRun({
+          id: `occurrence-run-${i}`,
+          status: 'completed',
+          startedAt: 1000 + i,
+          occurrenceKey,
+          completedAt: 2000 + i,
+        }),
+      })
+      await dbScheduledJobRunStore.prune(JOB_ID)
+    }
+
+    expect(await dbScheduledJobRunStore.list()).toHaveLength(MAX_RUNS_PER_JOB)
+    expect(
+      await dbScheduledJobRunStore.start(
+        baseRun({
+          id: 'old-run-replay',
+          status: 'running',
+          occurrenceKey: occurrenceKeys[0],
+        }),
+      ),
+    ).toBeNull()
   })
 
   test('heartbeat claims must use the saved job conversation identity', async () => {

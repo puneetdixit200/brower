@@ -792,3 +792,8 @@ This is a conservative read-only guard, not complete heartbeat mutation continua
 ### T30.2 liveness redirect boundary — 2026-10-29
 
 The app's heartbeat liveness probe now rejects redirects. Its initial endpoint is validated as an explicit loopback HTTP URL, but default Fetch redirect handling could otherwise send the status check outside that trust boundary. A redirected response must never release a running scheduled-job claim, so the probe sets `redirect: 'error'` and maps the resulting failure to `unknown` (fail closed). The focused liveness suite passes 7/7. This is source-level test evidence only; actual service-worker/server restart, no-overlap, and packaged Aster behavior remain unverified. R02 remains PARTIAL and the overall feature matrix remains 2/72 PASS (2.8%).
+
+
+### T30.2 scheduled-occurrence replay guard — 2026-10-29
+
+The app now attaches the alarm's canonical UTC scheduled time to its run claim. The server validates the timestamp, atomically reserves `(jobId, occurrenceKey)` in a separate SQLite table, and rejects duplicate claims with a stable conflict code. Claims expire after 30 days; stale keys are rejected at the same boundary before cleanup, and cleanup never removes a claim for a still-running run. Run-history pruning remains capped at 15 rows, and deleting a terminal run leaves its tombstone intact. Focused server route/store tests pass 33/33; app scheduler tests pass 42/42; server/app typechecks, targeted Biome and `git diff --check` pass. This is scheduled-firing dedupe, not tool-side-effect idempotency. Service-worker/server crash, live-provider, and packaged Aster no-overlap acceptance remain open; R02 remains PARTIAL and the matrix remains 2/72 PASS (2.8%).

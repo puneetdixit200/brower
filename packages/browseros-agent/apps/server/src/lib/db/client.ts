@@ -381,6 +381,11 @@ const currentMigrationHistory = [
     hash: '4689d7e28c298e4b33a43ebfdebfa4b9a05c9a55b078415c86de598b9b9bcc62',
     createdAt: 1793750400000,
   },
+  {
+    tag: '0027_deduplicate_scheduled_occurrences',
+    hash: 'fcbb4e5df67542294c504fed02a529f5bb074ea7d02a2bb7c2c74a2cfbbb69e6',
+    createdAt: 1793836800000,
+  },
 ]
 
 // TODO(nikhil): Remove this fallback once Windows/Linux packaging always includes Drizzle migrations.
@@ -482,6 +487,24 @@ const currentSchemaStatements = [
   `
     CREATE UNIQUE INDEX IF NOT EXISTS scheduled_job_runs_one_running_per_job
     ON scheduled_job_runs (job_id) WHERE status = 'running'
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS scheduled_job_occurrence_claims (
+      job_id text NOT NULL,
+      occurrence_key text NOT NULL,
+      run_id text NOT NULL,
+      expires_at integer NOT NULL,
+      created_at integer NOT NULL,
+      FOREIGN KEY (job_id) REFERENCES scheduled_jobs(id) ON UPDATE no action ON DELETE cascade
+    )
+  `,
+  `
+    CREATE UNIQUE INDEX IF NOT EXISTS scheduled_job_occurrence_claims_job_key_unique
+    ON scheduled_job_occurrence_claims (job_id, occurrence_key)
+  `,
+  `
+    CREATE INDEX IF NOT EXISTS scheduled_job_occurrence_claims_expires_at_idx
+    ON scheduled_job_occurrence_claims (expires_at)
   `,
   `
     CREATE TABLE IF NOT EXISTS oauth_tokens (

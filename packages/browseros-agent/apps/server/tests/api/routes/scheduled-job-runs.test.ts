@@ -69,6 +69,10 @@ function memoryStore(initial: ScheduledJobRunRow[] = []) {
       rows.set(saved.id, saved)
       return saved
     },
+    startWithOutcome: async (input: ScheduledJobRunUpsert) => {
+      const run = await store.start(input)
+      return run ? { kind: 'started', run } : { kind: 'conflict' }
+    },
     finish: async (input: ScheduledJobRunUpsert) => {
       const existing = rows.get(input.id)
       if (

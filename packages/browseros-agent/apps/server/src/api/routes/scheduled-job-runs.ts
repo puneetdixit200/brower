@@ -31,6 +31,7 @@ const ToolCallSchema = z.object({
  */
 const UpsertRunSchema = z.object({
   jobId: z.string().min(1),
+  occurrenceKey: z.string().datetime().nullish(),
   conversationId: z.string().uuid().nullish(),
   status: z.enum(['running', 'completed', 'failed']),
   startedAt: z.number(),
@@ -64,10 +65,40 @@ export function createScheduledJobRunRoutes(
           ...c.req.valid('json'),
           id: c.req.valid('param').runId,
         }
-        const run =
-          input.status === 'running'
-            ? await store.start(input)
-            : await store.finish(input)
+        let run: Awaited<ReturnType<ScheduledJobRunStore['get']>>
+        if (input.status === 'running') {
+          const startOutcome = await store.startWithOutcome(input)
+          if (startOutcome.kind === 'occurrence_already_claimed') {
+            return c.json(
+              {
+                code: 'occurrence_already_claimed',
+                error: 'Scheduled occurrence has already been claimed',
+              },
+              409,
+            )
+          }
+          if (startOutcome.kind === 'stale_occurrence') {
+            return c.json(
+              {
+                code: 'stale_occurrence',
+                error: 'Scheduled occurrence is too old',
+              },
+              409,
+            )
+          }
+          if (startOutcome.kind === 'invalid_occurrence') {
+            return c.json(
+              {
+                code: 'invalid_occurrence',
+                error: 'Scheduled occurrence is invalid',
+              },
+              400,
+            )
+          }
+          run = startOutcome.kind === 'started' ? startOutcome.run : null
+        } else {
+          run = await store.finish(input)
+        }
         if (!run) {
           return c.json(
             { error: 'Run identity is invalid or the run is no longer active' },
