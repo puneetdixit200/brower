@@ -22,6 +22,7 @@ import {
   mergeDownloadSnapshot,
   mergeDownloadUpdate,
 } from './downloads-progress'
+import { loadRecentHistory } from './history-items'
 import { resolveHomeSearchUrl } from './home-search'
 import { captureVisibleTabContext } from './screenshot-context'
 
@@ -348,17 +349,14 @@ export function BrowserQuickControls({
   const showRecentHistory = () =>
     void action(async () => {
       if (privateWindow) throw new Error('Unavailable in private windows')
-      const items = await chrome.history.search({
-        text: '',
-        startTime: 0,
-        maxResults: 8,
-      })
       setHistory(
-        items.flatMap((item) =>
-          item.url &&
-          (item.url.startsWith('https://') || item.url.startsWith('http://'))
-            ? [{ id: item.id, title: item.title || item.url, url: item.url }]
-            : [],
+        await loadRecentHistory((endTime) =>
+          chrome.history.search({
+            text: '',
+            startTime: 0,
+            maxResults: 32,
+            ...(endTime === undefined ? {} : { endTime }),
+          }),
         ),
       )
       setShowHistory(true)

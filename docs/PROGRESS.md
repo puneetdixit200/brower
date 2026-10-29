@@ -1,5 +1,9 @@
 # Progress
 
+### B06 recent history source slice — 2026-10-29
+
+Recent history selection now validates HTTP(S) URLs, fills at most eight rows from a bounded backward search (32 results per page, eight pages maximum), deduplicates IDs and falls back to the URL for missing titles. The private-window check remains before history access. Five focused selector/paging tests pass (7 assertions); existing bookmark-data tests pass 6/6 (21 assertions) and history-context tests pass 4/4 (10 assertions). App typecheck, targeted Biome and `git diff --check` pass. The search can return fewer than eight rows when the bounded history window contains too few eligible URLs or page-boundary timestamps prevent further progress. Headed UI, native import/export, restart and profile acceptance remain open; keep B06 PARTIAL and matrix accounting at 2/72 PASS (2.8%).
+
 ### B05 live download progress source slice — 2026-10-29
 
 `BrowserQuickControls` now subscribes to download-created and download-changed events only while its recent-download panel is open in a non-private window. The panel merges event updates with the initial eight-item snapshot, coalesces and caps pending startup updates by download ID, applies received-byte deltas directly, refreshes changed items for other fields, and removes listeners on close or unmount. Filenames are reduced to basenames before they enter rendered state. Six focused helper tests pass (21 assertions), along with app typecheck, targeted Biome and `git diff --check`; independent Luna review found no remaining issue. This does not verify headed/native progress, files on disk, resume or packaged runtime. Keep B05 PARTIAL and matrix accounting at 2/72 PASS (2.8%).
