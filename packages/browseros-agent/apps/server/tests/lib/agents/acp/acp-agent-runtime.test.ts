@@ -573,6 +573,7 @@ describe('AcpAgentRuntime', () => {
           acpAgentStore: { get: async () => fixture.agent },
           acpRuntime: fixture.runtime,
           conversationStore: store,
+          heartbeatContinuationResolver: async () => false,
         })
         const response = await service.processMessage(
           {
@@ -786,6 +787,121 @@ describe('AcpAgentRuntime', () => {
         signal: new AbortController().signal,
       }),
     ).toEqual({ outcome: 'reject_once' })
+    await fixture.runtime.closeAllForAgent(fixture.agent.id)
+  })
+
+  it('denies ACP mutations and unknown permissions in read-only mode despite saved allow decisions', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'acp-readonly-policy-'))
+    temporaryDirectories.push(root)
+    const db = initializeDb({ dbPath: join(root, 'state.sqlite') })
+    const store = new DbActionPolicyStore(db.db)
+    const fixture = await runtimeFixture({})
+    await collect(
+      await fixture.runtime.stream({
+        agent: fixture.agent,
+        conversationId: 'conversation-readonly-policy',
+        browserToolLeaseToken: BROWSER_TOOL_LEASE_TOKEN,
+        readOnly: true,
+        messages: [textMessage('user-readonly', 'user', 'inspect only')],
+      }),
+    )
+    const callback = fixture.providerSettings[0]?.onPermissionRequest
+    expect(callback).toBeDefined()
+    if (!callback) throw new Error('Expected ACP permission callback')
+
+    const permission = (name: string, kind: 'edit' | 'execute' | 'read') =>
+      ({
+        sessionId: 'test-session',
+        inferredKind: kind,
+        raw: {
+          toolCall: {
+            toolCallId: name,
+            name,
+            title: name,
+            rawInput: {},
+          },
+        },
+      }) as AcpPermissionRequest
+    const signal = { signal: new AbortController().signal }
+
+    await store.put('filesystem.write', { decision: 'allow', expiresAt: null })
+    expect(await callback(permission('Write', 'edit'), signal)).toEqual({
+      outcome: 'reject_once',
+    })
+    expect(
+      await callback(permission('mystery_mutator', 'execute'), signal),
+    ).toEqual({
+      outcome: 'reject_once',
+    })
+    expect(await callback(permission('Read', 'read'), signal)).toBeUndefined()
+
+    await fixture.runtime.closeAllForAgent(fixture.agent.id)
+  })
+
+  it('denies mutation and unknown ACP permissions in read-only mode even when saved policy allows them', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'acp-heartbeat-readonly-'))
+    temporaryDirectories.push(root)
+    const db = initializeDb({ dbPath: join(root, 'state.sqlite') })
+    const store = new DbActionPolicyStore(db.db)
+    const fixture = await runtimeFixture({})
+    await collect(
+      await fixture.runtime.stream({
+        agent: fixture.agent,
+        conversationId: 'heartbeat-readonly',
+        browserToolLeaseToken: BROWSER_TOOL_LEASE_TOKEN,
+        readOnly: true,
+        messages: [textMessage('heartbeat-user', 'user', 'inspect state')],
+      }),
+    )
+    const callback = fixture.providerSettings[0]?.onPermissionRequest
+    expect(callback).toBeDefined()
+    if (!callback) throw new Error('Expected ACP permission callback')
+
+    const signal = { signal: new AbortController().signal }
+    const allowedWrite = {
+      sessionId: 'test-session',
+      inferredKind: 'edit',
+      raw: {
+        toolCall: {
+          toolCallId: 'filesystem.write',
+          name: 'Write',
+          title: 'Write file',
+          rawInput: { path: '/workspace/file.txt' },
+        },
+      },
+    } as AcpPermissionRequest
+    await store.put('filesystem.write', { decision: 'allow', expiresAt: null })
+    expect(await callback(allowedWrite, signal)).toEqual({
+      outcome: 'reject_once',
+    })
+
+    const unknown = {
+      sessionId: 'test-session',
+      inferredKind: 'execute',
+      raw: {
+        toolCall: {
+          toolCallId: 'unknown',
+          name: 'mystery_mutator',
+          title: 'Unknown tool',
+          rawInput: {},
+        },
+      },
+    } as AcpPermissionRequest
+    expect(await callback(unknown, signal)).toEqual({ outcome: 'reject_once' })
+
+    const safeRead = {
+      sessionId: 'test-session',
+      inferredKind: 'read',
+      raw: {
+        toolCall: {
+          toolCallId: 'filesystem.read',
+          name: 'Read',
+          title: 'Read file',
+          rawInput: { path: '/workspace/file.txt' },
+        },
+      },
+    } as AcpPermissionRequest
+    expect(await callback(safeRead, signal)).toBeUndefined()
     await fixture.runtime.closeAllForAgent(fixture.agent.id)
   })
 
@@ -1027,6 +1143,28 @@ describe('AcpAgentRuntime', () => {
     expect(fixture.acpRuntime.closeCalls).toEqual([
       { reason: 'policy-change', discardPersistentState: false },
     ])
+  })
+
+  it('replaces an ACP session when heartbeat continuation read-only mode changes', async () => {
+    const fixture = await runtimeFixture({})
+    const request = {
+      agent: fixture.agent,
+      conversationId: 'conversation-heartbeat-mode',
+      browserToolLeaseToken: BROWSER_TOOL_LEASE_TOKEN,
+      readOnly: false,
+      messages: [textMessage('user-1', 'user', 'hello')],
+    }
+
+    await collect(await fixture.runtime.stream(request))
+    await collect(await fixture.runtime.stream({ ...request, readOnly: true }))
+
+    expect(fixture.providerSettings).toHaveLength(2)
+    expect(fixture.acpRuntime.closeCalls).toEqual([
+      { reason: 'policy-change', discardPersistentState: false },
+    ])
+    expect(fixture.providerSettings[1]?.mcpServers?.[0]?.url).toContain(
+      'read_only=1',
+    )
   })
 })
 

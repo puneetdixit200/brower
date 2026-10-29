@@ -94,9 +94,9 @@ describe('buildAcpAgentPolicy', () => {
     expect(agentArgv(policy, 'claude')).toContain(
       '@agentclientprotocol/claude-agent-acp@^0.75.1',
     )
+    expect(policy.readOnly).toBe(true)
     expect(policy.mcpServers.map((server) => server.name)).toEqual([
       'browseros',
-      'github',
     ])
     expect(policy.mcpServers[0]).toEqual({
       type: 'http',

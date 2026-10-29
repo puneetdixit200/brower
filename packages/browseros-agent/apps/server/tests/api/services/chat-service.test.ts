@@ -178,6 +178,7 @@ const ChatService = class extends RealChatService {
     super({
       serverPort: 32123,
       browserMcp: createBrowserMcpStub() as never,
+      heartbeatContinuationResolver: async () => false,
       ...deps,
     })
   }
@@ -1052,6 +1053,61 @@ describe('ChatService chat/agent mode switches', () => {
 
     expect(createAgentSpy.mock.calls.length - createCallsBefore).toBe(1)
     expect(firstAgent.dispose).not.toHaveBeenCalled()
+  })
+
+  it('rebuilds the first heartbeat session when server history marks the next turn as a continuation', async () => {
+    const firstAgent = createFakeAgent()
+    const secondAgent = createFakeAgent()
+    agentToReturn = firstAgent
+    let heartbeatContinuation = false
+    const leases: Array<{ readOnly: boolean }> = []
+    const browserMcp = {
+      createLease: mock((input: { readOnly?: boolean }) => {
+        const lease = { readOnly: input.readOnly ?? false }
+        leases.push(lease)
+        return {
+          token: `heartbeat-test-lease-${leases.length}`,
+          updateBrowserContext: mock(() => {}),
+          revoke: mock(() => {}),
+        }
+      }),
+    }
+    streamResponseHandler = async ({ onFinish, uiMessages }) => {
+      await onFinish({ messages: uiMessages ?? [] })
+      return new Response('ok')
+    }
+    const service = new ChatService({
+      sessionStore: createSessionStore() as never,
+      klavis: createKlavisStub() as never,
+      browser: { resolveTabIds: mock(async () => new Map()) } as never,
+      browserMcp: browserMcp as never,
+      heartbeatContinuationResolver: async () => heartbeatContinuation,
+      serverPort: 32123,
+    })
+    const createCallsBefore = createAgentSpy.mock.calls.length
+    const conversationId = crypto.randomUUID()
+    const request = {
+      ...modeRequest(conversationId, 'agent'),
+      isScheduledTask: true,
+    }
+
+    await service.processMessage(request, new AbortController().signal)
+    heartbeatContinuation = true
+    agentToReturn = secondAgent
+    await service.processMessage(request, new AbortController().signal)
+
+    const createCalls = createAgentSpy.mock.calls.slice(createCallsBefore)
+    expect(createCalls).toHaveLength(2)
+    expect(firstAgent.dispose).toHaveBeenCalledTimes(1)
+    expect(leases.map((lease) => lease.readOnly)).toEqual([false, true])
+    const firstAgentArgs = createCalls[0]?.[0] as
+      | { resolvedConfig?: { heartbeatContinuation?: boolean } }
+      | undefined
+    const secondAgentArgs = createCalls[1]?.[0] as
+      | { resolvedConfig?: { heartbeatContinuation?: boolean } }
+      | undefined
+    expect(firstAgentArgs?.resolvedConfig?.heartbeatContinuation).toBe(false)
+    expect(secondAgentArgs?.resolvedConfig?.heartbeatContinuation).toBe(true)
   })
 })
 

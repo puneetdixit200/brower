@@ -35,6 +35,7 @@ export interface AcpAgentPolicy {
   adapter: string
   cwd: string
   sessionKey: string
+  readOnly: boolean
   agentRegistryOverrides: Record<string, string | string[]>
   mcpServers: AcpxMcpServerConfig[]
   sessionOptions: SessionAgentOptions
@@ -72,6 +73,7 @@ export async function buildAcpAgentPolicy(
     adapter,
     cwd: input.agent.workingDirectory?.trim() || workspace,
     sessionKey: deriveAcpSessionKey(input.agent.id, input.conversationId),
+    readOnly: input.readOnly,
     agentRegistryOverrides: { [adapter]: launcher.argv },
     mcpServers: buildAcpMcpServers({
       serverPort: input.serverPort,

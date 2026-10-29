@@ -17,6 +17,39 @@ const fixtures = [
 ]
 
 describe('ToolLoopAgent approval fixtures', () => {
+  it('allows reads and denies mutation-capable tools on heartbeat continuations', async () => {
+    expect(
+      await handleToolApproval(
+        {
+          toolCall: {
+            toolName: 'navigate',
+            input: { url: 'https://example.com' },
+          },
+        },
+        true,
+      ),
+    ).toBeUndefined()
+
+    expect(
+      await handleToolApproval(
+        { toolCall: { toolName: 'act', input: { action: 'click' } } },
+        true,
+      ),
+    ).toMatchObject({ type: 'denied' })
+
+    expect(
+      await handleToolApproval(
+        {
+          toolCall: {
+            toolName: 'filesystem_write',
+            input: { path: '/tmp/out' },
+          },
+        },
+        true,
+      ),
+    ).toMatchObject({ type: 'denied' })
+  })
+
   for (const selected of fixtures) {
     it(`runs only the explicitly approved ${selected.name} fixture`, async () => {
       const executions = Object.fromEntries(

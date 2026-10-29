@@ -17,6 +17,13 @@ const passwordSentinel = 'SAVED_PASSWORD_SENTINEL_DO_NOT_SEND'
 const credentialExecute = mock(async () => passwordSentinel)
 const rawPageCodeExecute = mock(async () => passwordSentinel)
 const safeExecute = mock(async () => 'Safe status result')
+const buildMcpServerSpecs = mock(async () => [
+  {
+    name: 'custom-untrusted',
+    url: 'http://127.0.0.1:4321/mcp',
+    transport: 'streamable-http' as const,
+  },
+])
 const createMcpClients = mock(async (specs: mcpBuilder.McpServerSpec[]) => {
   if (specs.length === 0) return { clients: [], tools: {} }
   if (specs[0]?.name.startsWith('custom-')) {
@@ -86,13 +93,7 @@ mock.module('../../src/agent/provider-factory', () => ({
 mock.module('../../src/agent/mcp-builder', () => ({
   ...mcpBuilder,
   buildInternalBrowserMcpSpec: mock(() => ({ name: 'browseros' }) as never),
-  buildMcpServerSpecs: mock(async () => [
-    {
-      name: 'custom-untrusted',
-      url: 'http://127.0.0.1:4321/mcp',
-      transport: 'streamable-http',
-    },
-  ]),
+  buildMcpServerSpecs,
   createMcpClients,
 }))
 
@@ -129,6 +130,42 @@ describe('AiSdkAgent production credential tool catalog boundary', () => {
     })
     try {
       expect(createMcpClients).toHaveBeenCalledTimes(2)
+      expect(agent.toolLoopAgent.tools.read?.description).toBe(
+        'Built-in BrowserOS read tool.',
+      )
+      expect(agent.toolLoopAgent.tools.navigate?.description).toBe(
+        'Built-in BrowserOS navigate tool.',
+      )
+    } finally {
+      await agent.dispose()
+    }
+  })
+
+  it('omits external MCP servers from heartbeat continuation tool catalogs', async () => {
+    createMcpClients.mockClear()
+    buildMcpServerSpecs.mockClear()
+    model = new MockLanguageModelV3({
+      doGenerate: async (): Promise<LanguageModelV3GenerateResult> => ({
+        content: [{ type: 'text', text: 'Done.' }],
+        finishReason: { unified: 'stop', raw: 'stop' },
+        usage,
+        warnings: [],
+      }),
+    })
+
+    const agent = await AiSdkAgent.create({
+      resolvedConfig: {
+        ...resolvedConfig(),
+        chatMode: false,
+        heartbeatContinuation: true,
+      },
+      serverPort: 1,
+      browserToolLeaseToken: 'test-token',
+    })
+    try {
+      expect(buildMcpServerSpecs).not.toHaveBeenCalled()
+      expect(createMcpClients).toHaveBeenCalledTimes(2)
+      expect(createMcpClients.mock.calls[1]?.[0]).toEqual([])
       expect(agent.toolLoopAgent.tools.read?.description).toBe(
         'Built-in BrowserOS read tool.',
       )
@@ -185,6 +222,7 @@ describe('AiSdkAgent production credential tool catalog boundary', () => {
     try {
       await agent.toolLoopAgent.generate({
         prompt: 'Check the current status.',
+        options: { taskId: crypto.randomUUID() },
       })
 
       expect(createMcpClients).toHaveBeenCalledTimes(2)

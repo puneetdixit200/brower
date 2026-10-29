@@ -314,6 +314,7 @@ export class AcpAgentRuntime {
           const action = classifyAcpPermissionRequest(request)
           if (action === 'safe-read') return undefined
           if (!action) return { outcome: 'reject_once' }
+          if (policy.readOnly) return { outcome: 'reject_once' }
           const decision = await decideActionPolicy({
             toolName: action.toolName,
             input: request.raw.toolCall.rawInput,

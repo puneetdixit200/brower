@@ -35,7 +35,9 @@ export function buildAcpMcpServers(
     },
   ]
 
-  for (const server of browserContext?.customMcpServers ?? []) {
+  for (const server of input.readOnly
+    ? []
+    : (browserContext?.customMcpServers ?? [])) {
     if (server.name.trim().toLowerCase() === BROWSEROS_MCP_NAME) continue
     servers.push({
       type: 'http',

@@ -26,6 +26,8 @@ export interface AgentSession {
    */
   chatMode: boolean
   permissionMode?: 'guard' | 'read-only'
+  /** Server-derived heartbeat continuation mode when the agent was built. */
+  heartbeatContinuation: boolean
   /** Browser-generated output paths returned during this conversation. */
   outputFileAccess?: BrowserOutputFileAccess
 }

@@ -32,6 +32,7 @@ function deps(
     agent?: AcpAgentDefinition | null
     streamError?: Error
     firstStreamError?: Error
+    heartbeatContinuation?: boolean | (() => boolean)
   } = {},
 ) {
   const calls: AcpAgentStreamInput[] = []
@@ -121,11 +122,44 @@ function deps(
     },
     acpRuntime: acpRuntime as never,
     conversationStore: conversationStore as never,
+    heartbeatContinuationResolver: async () =>
+      typeof options.heartbeatContinuation === 'function'
+        ? options.heartbeatContinuation()
+        : (options.heartbeatContinuation ?? false),
   })
   return { calls, close, leases, service, conversationStore }
 }
 
 describe('ChatService ACP dispatch', () => {
+  it('forces heartbeat continuations through a read-only ACP lease', async () => {
+    let continuation = false
+    const fixture = deps({ heartbeatContinuation: () => continuation })
+    const request = {
+      target: { type: 'claude', agentId: AGENT_ID },
+      conversationId: crypto.randomUUID(),
+      message: 'continue the heartbeat',
+      isScheduledTask: true,
+      mode: 'agent',
+      origin: 'sidepanel',
+    } as const
+
+    const first = await fixture.service.processMessage(
+      request,
+      new AbortController().signal,
+    )
+    expect(await first.text()).toContain('"delta":"done"')
+    continuation = true
+    const second = await fixture.service.processMessage(
+      { ...request, message: 'inspect the current state' },
+      new AbortController().signal,
+    )
+
+    expect(await second.text()).toContain('"delta":"done"')
+    expect(fixture.leases.map((lease) => lease.readOnly)).toEqual([false, true])
+    expect(fixture.leases[0]?.revoked).toBe(true)
+    expect(fixture.calls.map((call) => call.readOnly)).toEqual([false, true])
+  })
+
   it('streams an ACP target without resolving an LLM provider', async () => {
     const fixture = deps()
     const response = await fixture.service.processMessage(

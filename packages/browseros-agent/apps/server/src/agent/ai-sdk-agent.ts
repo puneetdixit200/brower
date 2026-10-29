@@ -56,6 +56,7 @@ import {
   AgentToolCallEnvelopeSchema,
   AgentToolResultEnvelopeSchema,
 } from './task-contract'
+import { decideToolApproval } from './tool-approval-policy'
 import type { ResolvedAgentConfig } from './types'
 
 // Approval signatures are process-scoped. A restart invalidates an unresolved
@@ -67,17 +68,34 @@ export interface AgentToolCallOptions {
 }
 
 /** The server-side approval check shared by production agents and fixture tests. */
-export async function handleToolApproval({
-  toolCall,
-  tools: availableTools,
-}: {
-  toolCall: { toolName: string; input: unknown }
-  tools?: ToolSet
-}) {
+export async function handleToolApproval(
+  {
+    toolCall,
+    tools: availableTools,
+  }: {
+    toolCall: { toolName: string; input: unknown }
+    tools?: ToolSet
+  },
+  heartbeatContinuation = false,
+) {
   if (toolCall.toolName === 'wait_for_human') return undefined
   const tool = availableTools?.[toolCall.toolName] as
     | { description?: string }
     | undefined
+  if (
+    heartbeatContinuation &&
+    decideToolApproval({
+      toolName: toolCall.toolName,
+      input: toolCall.input,
+      description: tool?.description,
+    }).required
+  ) {
+    return {
+      type: 'denied' as const,
+      reason:
+        'Heartbeat continuations are read-only; start a user-approved task to make changes.',
+    }
+  }
   const decision = await decideActionPolicy({
     toolName: toolCall.toolName,
     input: toolCall.input,
@@ -379,6 +397,7 @@ export class AiSdkAgent {
       // read-only capability, so omit them entirely in Read-only mode.
       const customSpecs =
         config.resolvedConfig.permissionMode === 'read-only' ||
+        config.resolvedConfig.heartbeatContinuation === true ||
         config.resolvedConfig.chatMode
           ? []
           : await buildMcpServerSpecs({
@@ -555,7 +574,11 @@ export class AiSdkAgent {
         model,
         instructions,
         tools,
-        toolApproval: handleToolApproval,
+        toolApproval: (input) =>
+          handleToolApproval(
+            input,
+            config.resolvedConfig.heartbeatContinuation === true,
+          ),
         experimental_toolApprovalSecret: TOOL_APPROVAL_SECRET,
         stopWhen: [stepCountIs(AGENT_LIMITS.MAX_TURNS)],
         prepareStep,

@@ -58,6 +58,7 @@ import {
   type SaveConversationInput,
 } from '../../lib/conversations/conversation-store'
 import { logger } from '../../lib/logger'
+import { isHeartbeatContinuation as deriveHeartbeatContinuation } from '../../lib/schedules/heartbeat-continuation-policy'
 import { readAuthorizedBrowserOutputArtifact } from '../../tools/filesystem/browser-output-artifact'
 import type { KlavisService } from '../services/klavis'
 import type {
@@ -101,6 +102,8 @@ export interface ChatServiceDeps {
   acpRuntime?: Pick<AcpAgentRuntime, 'stream' | 'close'>
   conversationStore?: Pick<ConversationStore, 'get' | 'save'>
   conversationRuns?: ConversationRuns
+  /** Injectable server-side schedule lookup for isolated service tests. */
+  heartbeatContinuationResolver?: (conversationId: string) => Promise<boolean>
 }
 
 export class ChatService {
@@ -268,6 +271,9 @@ export class ChatService {
     const { sessionStore } = this.deps
 
     const llmConfig = await resolveLLMConfig(request, this.deps.browserosId)
+    const heartbeatContinuation = await this.resolveHeartbeatContinuation(
+      request.conversationId,
+    )
 
     let session = sessionStore.get(request.conversationId)
 
@@ -299,6 +305,7 @@ export class ChatService {
         request.permissionMode,
       ),
       isScheduledTask: request.isScheduledTask,
+      heartbeatContinuation,
       origin: request.origin,
       declinedApps: request.declinedApps,
       browserosId: this.deps.browserosId,
@@ -319,6 +326,7 @@ export class ChatService {
       workingDir: session.workingDir,
       chatMode: session.chatMode,
       permissionMode: session.permissionMode ?? 'guard',
+      heartbeatContinuation: session.heartbeatContinuation,
     }
 
     const mcpChanged = !!prior && prior.mcpServerKey !== mcpServerKey
@@ -326,6 +334,9 @@ export class ChatService {
       !!prior && prior.workingDir !== request.userWorkingDir
     const permissionModeChanged =
       !!prior && prior.permissionMode !== agentConfig.permissionMode
+    const heartbeatContinuationChanged =
+      !!prior &&
+      prior.heartbeatContinuation !== agentConfig.heartbeatContinuation
     const modeChanged = !!prior && prior.chatMode !== requestChatMode
 
     // One rebuild reflects every change, because rebuildSession reads the
@@ -335,7 +346,11 @@ export class ChatService {
     // switching back does not restore them.
     if (
       session &&
-      (mcpChanged || workspaceChanged || modeChanged || permissionModeChanged)
+      (mcpChanged ||
+        workspaceChanged ||
+        modeChanged ||
+        permissionModeChanged ||
+        heartbeatContinuationChanged)
     ) {
       logger.info('Rebuilding session for mid-conversation input changes', {
         conversationId: request.conversationId,
@@ -343,6 +358,7 @@ export class ChatService {
         workspaceChanged,
         modeChanged,
         permissionModeChanged,
+        heartbeatContinuationChanged,
       })
       session = await this.rebuildSession(
         session,
@@ -439,6 +455,7 @@ export class ChatService {
         mcpServerKey,
         workingDir: request.userWorkingDir,
         chatMode: requestChatMode,
+        heartbeatContinuation: agentConfig.heartbeatContinuation === true,
         outputFileAccess,
       }
       sessionStore.set(request.conversationId, session)
@@ -761,6 +778,12 @@ export class ChatService {
     abortSignal: AbortSignal,
     updateMessages: (messages: UIMessage[]) => boolean,
   ): Promise<ReadableStream<UIMessageChunk>> {
+    const heartbeatContinuation = await this.resolveHeartbeatContinuation(
+      request.conversationId,
+    )
+    const readOnly =
+      resolvePermissionMode(request.mode, request.permissionMode) ===
+        'read-only' || heartbeatContinuation
     const agent = await this.getAcpAgentStore().get(request.target.agentId)
     if (!agent) {
       throw new ChatRequestError(
@@ -781,6 +804,7 @@ export class ChatService {
       agent.id,
       request,
       browserContext,
+      readOnly,
     )
     const userContent = formatUserMessage(
       request.message,
@@ -832,9 +856,7 @@ export class ChatService {
       },
       conversationId: request.conversationId,
       browserToolLeaseToken: acpToolLease.token,
-      readOnly:
-        resolvePermissionMode(request.mode, request.permissionMode) ===
-        'read-only',
+      readOnly,
       messages: promptMessages,
       browserContext,
       abortSignal,
@@ -905,10 +927,8 @@ export class ChatService {
     agentId: string,
     request: AcpChatRequest,
     browserContext: BrowserContext | undefined,
+    readOnly: boolean,
   ): BrowserToolLease {
-    const readOnly =
-      resolvePermissionMode(request.mode, request.permissionMode) ===
-      'read-only'
     // Only the agent identity and the read-only flag require a new capability.
     // The browser context is refreshed in place instead: re-minting the token
     // on every context change restarts the ACP agent process, and a custom
@@ -937,6 +957,14 @@ export class ChatService {
       outputFileAccess,
     })
     return lease
+  }
+
+  private resolveHeartbeatContinuation(
+    conversationId: string,
+  ): Promise<boolean> {
+    return (
+      this.deps.heartbeatContinuationResolver ?? deriveHeartbeatContinuation
+    )(conversationId)
   }
 
   // Best-effort: a persistence failure must not fail an already-streamed turn.
@@ -1033,6 +1061,7 @@ export class ChatService {
       workingDir: request.userWorkingDir,
       chatMode: agentConfig.chatMode ?? false,
       permissionMode: agentConfig.permissionMode,
+      heartbeatContinuation: agentConfig.heartbeatContinuation === true,
       outputFileAccess,
     }
     newSession.agent.messages = sanitizeMessagesForToolset(
@@ -1052,7 +1081,9 @@ export class ChatService {
     const browserToolLease = this.deps.browserMcp.createLease({
       conversationId: agentConfig.conversationId,
       readOnly:
-        agentConfig.chatMode || agentConfig.permissionMode === 'read-only',
+        agentConfig.chatMode ||
+        agentConfig.permissionMode === 'read-only' ||
+        agentConfig.heartbeatContinuation === true,
       outputFileAccess,
       browserContext,
       source: 'chat',
