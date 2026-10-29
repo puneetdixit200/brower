@@ -43,6 +43,10 @@ export async function getServerConversationLiveness(input: {
   try {
     const response = await (input.fetcher ?? fetch)(endpoint.toString(), {
       cache: 'no-store',
+      // A redirect could leave the loopback trust boundary. If a redirected
+      // endpoint can mimic the local state response, cleanup might release a
+      // live run's durable per-job claim.
+      redirect: 'error',
       signal: controller.signal,
     })
     if (response.status !== 200 && response.status !== 404) return 'unknown'

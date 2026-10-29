@@ -72,4 +72,49 @@ describe('heartbeat server liveness', () => {
       }),
     ).toBe('unknown')
   })
+
+  it('does not follow redirects outside the loopback trust boundary', async () => {
+    let redirectMode: RequestRedirect | undefined
+    const result = await getServerConversationLiveness({
+      conversationId,
+      agentServerUrl,
+      fetcher: async (_url, init) => {
+        redirectMode = init.redirect
+        if (init.redirect === 'error') {
+          throw new TypeError('redirect disallowed')
+        }
+        return Response.json({ conversationId, status: 'completed' })
+      },
+    })
+
+    expect(redirectMode).toBe('error')
+    expect(result).toBe('unknown')
+  })
+
+  it('keeps the claim when the loopback endpoint redirects', async () => {
+    let redirectedRequestCount = 0
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch(request) {
+        const url = new URL(request.url)
+        if (url.pathname === '/redirect-target') {
+          redirectedRequestCount += 1
+          return Response.json({ conversationId, status: 'completed' })
+        }
+        return Response.redirect(new URL('/redirect-target', request.url), 302)
+      },
+    })
+    try {
+      expect(
+        await getServerConversationLiveness({
+          conversationId,
+          agentServerUrl: `http://127.0.0.1:${server.port}`,
+        }),
+      ).toBe('unknown')
+      expect(redirectedRequestCount).toBe(0)
+    } finally {
+      server.stop(true)
+    }
+  })
 })
