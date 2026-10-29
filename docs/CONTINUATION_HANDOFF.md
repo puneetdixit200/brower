@@ -7,9 +7,9 @@
 
 Updated 2026-10-29. The full project remains incomplete. Work was stopped after the user-requested commit/push checkpoint; the 5%-remaining allowance threshold had not been reached. This continuation resumes the same project objective. This file supplements, and does not reduce, the original master specification or the 103-subtask implementation plan.
 
-### Latest continuation checkpoint — feature branch base `57cdb52db`, 2026-10-29
+### Latest continuation checkpoint — remote tip before the M06 slice `d141591e1`, 2026-10-29
 
-`git fetch aster --prune` found no commits beyond the then-current branch tip. Commits `335d0e6fe` and `57cdb52db` add early GN-safe filename validation for unpacked extension staging and bounded local note revision history with explicit undo. M03 has focused source coverage (14 tests, 97 assertions) and remains PARTIAL pending headed UI/runtime acceptance. T24.2/A08 has a two-conversation interleaving fixture; its corrected focused suite passes 24/24 (150 assertions), while headed multi-tab/provider/load acceptance remains open.
+`git fetch aster --prune` found no commits beyond the then-current branch tip. Commits `335d0e6fe` and `57cdb52db` add early GN-safe filename validation for unpacked extension staging and bounded local note revision history with explicit undo; `d141591e1` records the corrected T24.2/A08 two-conversation interleaving fixture. M03 has focused source coverage (14 tests, 97 assertions) and remains PARTIAL pending headed UI/runtime acceptance. A08 passes 24/24 focused tests (150 assertions), while headed multi-tab/provider/load acceptance remains open. The current M06 source slice adds route-contract tests (8/8 combined route/store tests, 121 assertions) with accurate originless-read behavior; M06 remains PARTIAL pending headed UI/private-context/package acceptance.
 
 The latest read-only native audit found no live build, no linked `chrome` binary and no `.ninja_log`; six relevant objects exist, and the pinned native checkout still has 319 changed paths. `NEXT_STEPS.md` is newer and authoritative for native work: preserve the checkout, do not start a build or regenerate GN until safe incremental-state recovery and a bounded dry run are established. The 72-row matrix remains 2/72 PASS (2.8%); the overall project remains incomplete.
 

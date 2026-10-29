@@ -293,3 +293,9 @@ The production tool execution boundary now claims side-effecting provider tool c
 ### Latest packaging slice — 2026-10-29
 
 The shared Aster unpacked-tree validator now blocks unsafe filenames before generated GN source-list staging; 27 focused Python tests pass across the validator, prepared resources, and bundled-extension staging. Continue with end-to-end packaging verification for a prepared Aster development extension, including manifest/asset staging and a native build only after the documented Ninja startup/incremental-state gate is resolved. Preserve the adjacent Chromium checkout's 319 modified paths. T20a still has no linked Aster browser or test binaries and no `.ninja_log`; do not launch a broad build or regenerate GN. Keep S05 PARTIAL / BLOCKED and the matrix at 2/72 PASS (2.8%).
+
+### T28.3 / M06 source follow-up — 2026-10-29
+
+Site-recipe route contracts are now covered by four isolated API tests (36 assertions), in addition to four existing store tests (85 assertions). The route fixtures verify trusted-origin and memory-opt-in gates, including originless localhost GET success only after memory opt-in, no-Origin mutation denial, foreign-Origin rejection, and incognito denial across reads and mutation/verification endpoints, input/UUID validation, CRUD, and canonical origin-bound manual revalidation. Server typecheck, targeted Biome, and diff check pass.
+
+Next for M06: exercise the Memory settings recipe panel in a headed Aster view, verify private-context behavior with a supported off-the-record extension, and confirm packaged persistence/restart behavior. Keep the row PARTIAL until those gates pass. Automated recipe execution remains outside scope.
