@@ -1,5 +1,7 @@
 # Aster next steps
 
+T14.3 / A13 source checkpoint (2026-10-30): refused or failed Home sends now preserve drafts/context, including edits while async acceptance is pending. Typecheck/lint/review pass; next verify missing-provider Send, delayed handoff and duplicate submission in a reliable headed runtime. No UI interaction test is claimed.
+
 Latest B05 source checkpoint (2026-10-30): Pause/Resume/Cancel and fresh privacy/item checks pass 12 focused tests plus typecheck/review. The sandboxed headed fixture reached the real in-progress row but stalled before verifying actions; retained evidence is under `docs/evidence/aster-b05-controls-2026-10-30/`. The corrected run localized the stall to Puppeteer click dispatch (five-second timeout), with confirmed cleanup. Two focused attempts hit the headed automation dependency: defer further retries and use a supported native/reliable click path when available; native/package acceptance stays open. The current compiled sidecar resources have retained provenance; next exercise real HTTP chat/provider/MCP approval transport in disposable state.
 
 Checkpoint: 2026-10-29, branch `feat/aster-linux-ui`. This repository contains the full current source and implementation plan, not a finished browser release. The user explicitly authorized resuming on 2026-10-28. The goal remains incomplete; the prior pause is retained as a historical checkpoint.

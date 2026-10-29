@@ -73,15 +73,16 @@ export const AgentCommandHome: FC = () => {
       // Answer the send rather than dropping it. This used to return silently,
       // which was invisible only because a provider was always present.
       setSendAttemptBlocked(true)
-      return
+      return false
     }
-    if (selectedProvider.kind === 'llm' && llmRoutingMode === 'wait') return
+    if (selectedProvider.kind === 'llm' && llmRoutingMode === 'wait')
+      return false
     const target = chatTargets.find(
       (entry) =>
         entry.kind === selectedProvider.kind &&
         entry.id === selectedProvider.id,
     )
-    if (!target) return
+    if (!target) return false
     await selectChatTarget(target)
     const message = withSelectedMemoryContext(
       withSelectedHistoryContext(input.text, input.selectedHistory),
@@ -102,7 +103,7 @@ export const AgentCommandHome: FC = () => {
         mode: 'chat',
         action,
       })
-      return
+      return true
     }
     // Never serialize raw prompts, selected contexts or tab IDs into a URL.
     // The one-use token expires quickly and the underlying message stays
@@ -120,6 +121,7 @@ export const AgentCommandHome: FC = () => {
         mode: 'agent',
       }).toString()}`,
     )
+    return true
   }
 
   return (

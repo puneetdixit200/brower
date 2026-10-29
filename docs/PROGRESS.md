@@ -1,5 +1,9 @@
 # Progress
 
+### T14.3 / A13 refused-send draft preservation — 2026-10-30
+
+Home now explicitly refuses Send when the provider/target is unavailable or routing is waiting. The composer awaits acceptance, preserves text/attachments/context on refusal or failure, shows a safe error for failures, and blocks duplicate submission. A revision guard preserves edits made during the await. App `bun run compile` (WXT prepare + TypeScript), targeted Biome and independent Luna review pass. No DOM interaction test or headed missing-provider acceptance ran; A13 remains PARTIAL.
+
 ### B05 download controls — 2026-10-30
 
 Pause/Resume/Cancel are implemented with fresh regular-window/item validation, per-item in-flight exclusion and safe errors. Unknown privacy fails closed; queried download snapshots override stale event deltas. Focused tests pass 12/12 (46 assertions), app typecheck and targeted Biome pass, and two independent Luna reviews found no remaining issue. The current development bundle builds with `NODE_OPTIONS=--max-old-space-size=3072 bun run build:dev`.

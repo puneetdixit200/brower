@@ -54,7 +54,9 @@ export interface ConversationInputSendInput {
 }
 
 export interface ConversationInputProps {
-  onSend: (input: ConversationInputSendInput) => void
+  onSend: (
+    input: ConversationInputSendInput,
+  ) => boolean | undefined | Promise<boolean | undefined>
   /**
    * Merged provider/agent picker shown only on the `home` variant. Lets the
    * composer target either an LLM provider (BrowserOS, etc.) or a named agent.
@@ -339,9 +341,13 @@ export const ConversationInput: FC<ConversationInputProps> = ({
   const [attachments, setAttachments] = useState<StagedAttachment[]>([])
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
   const [isStaging, setIsStaging] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const sendInFlight = useRef(false)
+  const draftRevision = useRef(0)
   const stagedScreenshotDataUrl = useRef<string | null>(null)
   const isConversation = variant === 'conversation'
 
@@ -356,6 +362,7 @@ export const ConversationInput: FC<ConversationInputProps> = ({
     try {
       const result = await stageAttachments(files, attachments.length)
       if (result.staged.length > 0) {
+        draftRevision.current += 1
         setAttachments((prev) => [...prev, ...result.staged])
       }
       if (result.errors.length > 0) {
@@ -367,6 +374,7 @@ export const ConversationInput: FC<ConversationInputProps> = ({
   }
 
   const removeAttachment = (id: string) => {
+    draftRevision.current += 1
     setAttachments((prev) => prev.filter((a) => a.id !== id))
     setAttachmentError(null)
   }
@@ -414,8 +422,10 @@ export const ConversationInput: FC<ConversationInputProps> = ({
       })
       .then((result) => {
         if (!active) return
-        if (result.staged.length)
+        if (result.staged.length) {
+          draftRevision.current += 1
           setAttachments((prev) => [...prev, ...result.staged])
+        }
         if (result.errors.length)
           setAttachmentError(
             result.errors.map((item) => item.message).join(' • '),
@@ -439,6 +449,7 @@ export const ConversationInput: FC<ConversationInputProps> = ({
   ])
 
   const toggleTab = (tab: chrome.tabs.Tab) => {
+    draftRevision.current += 1
     setSelectedTabs((prev) => {
       const isSelected = prev.some((selected) => selected.id === tab.id)
       if (isSelected) {
@@ -451,6 +462,7 @@ export const ConversationInput: FC<ConversationInputProps> = ({
   const closeTabMention = () => {
     if (!tabMention) return
     const nextInput = removeTabMention(input, tabMention)
+    draftRevision.current += 1
     setInput(nextInput)
     setTabMention(null)
     requestAnimationFrame(() => {
@@ -463,6 +475,8 @@ export const ConversationInput: FC<ConversationInputProps> = ({
   }
 
   const handleInputChange = (value: string) => {
+    draftRevision.current += 1
+    setSendError(null)
     const cursor = textareaRef.current?.selectionStart ?? value.length
     setTabMention((current) =>
       current
@@ -480,24 +494,40 @@ export const ConversationInput: FC<ConversationInputProps> = ({
   // and block input until the current turn finishes.
   const queueAware = Boolean(onStop)
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const text = input.trim()
-    if (disabled || isStaging) return
+    if (disabled || isStaging || sendInFlight.current) return
     if (streaming && !queueAware) return
     if (!text && attachments.length === 0) return
-    onSend({
-      text,
-      attachments,
-      selectedTabs,
-      selectedMemories,
-      selectedHistory,
-    })
-    setInput('')
-    setAttachments([])
-    setSelectedTabs([])
-    setSelectedMemories([])
-    setSelectedHistory([])
-    setAttachmentError(null)
+    sendInFlight.current = true
+    setIsSending(true)
+    setSendError(null)
+    const submittedRevision = draftRevision.current
+    try {
+      const accepted = await onSend({
+        text,
+        attachments,
+        selectedTabs,
+        selectedMemories,
+        selectedHistory,
+      })
+      if (accepted === false || submittedRevision !== draftRevision.current) {
+        return
+      }
+      setInput('')
+      setAttachments([])
+      setSelectedTabs([])
+      setSelectedMemories([])
+      setSelectedHistory([])
+      setAttachmentError(null)
+    } catch {
+      setSendError(
+        'Could not confirm the send. Your draft is still here; check the chat before retrying.',
+      )
+    } finally {
+      sendInFlight.current = false
+      setIsSending(false)
+    }
   }
 
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -593,6 +623,11 @@ export const ConversationInput: FC<ConversationInputProps> = ({
             error={attachmentError}
           />
         ) : null}
+        {sendError && (
+          <p role="alert" className="px-4 pt-2 text-destructive text-xs">
+            {sendError}
+          </p>
+        )}
         {(selectedMemories.length > 0 || selectedHistory.length > 0) && (
           <div className="flex flex-wrap gap-1.5 border-border/40 border-b px-4 pt-2">
             {selectedMemories.map((memory) => (
@@ -606,11 +641,12 @@ export const ConversationInput: FC<ConversationInputProps> = ({
                 <button
                   type="button"
                   aria-label="Remove saved memory"
-                  onClick={() =>
+                  onClick={() => {
+                    draftRevision.current += 1
                     setSelectedMemories((items) =>
                       items.filter((item) => item.id !== memory.id),
                     )
-                  }
+                  }}
                 >
                   <X className="size-3" />
                 </button>
@@ -627,11 +663,12 @@ export const ConversationInput: FC<ConversationInputProps> = ({
                 <button
                   type="button"
                   aria-label="Remove browser history"
-                  onClick={() =>
+                  onClick={() => {
+                    draftRevision.current += 1
                     setSelectedHistory((items) =>
                       items.filter((item) => item.id !== entry.id),
                     )
-                  }
+                  }}
                 >
                   <X className="size-3" />
                 </button>
@@ -693,6 +730,7 @@ export const ConversationInput: FC<ConversationInputProps> = ({
             disabled={
               !hasContent ||
               isStaging ||
+              isSending ||
               !!disabled ||
               (streaming && !queueAware)
             }
@@ -710,21 +748,27 @@ export const ConversationInput: FC<ConversationInputProps> = ({
           selectedTabs={selectedTabs}
           onToggleTab={toggleTab}
           selectedMemories={selectedMemories}
-          onAddMemory={(memory) =>
-            setSelectedMemories((items) =>
-              items.some((item) => item.id === memory.id) || items.length >= 3
-                ? items
-                : [...items, memory],
-            )
-          }
+          onAddMemory={(memory) => {
+            if (
+              selectedMemories.length >= 3 ||
+              selectedMemories.some((item) => item.id === memory.id)
+            ) {
+              return
+            }
+            draftRevision.current += 1
+            setSelectedMemories((items) => [...items, memory])
+          }}
           selectedHistory={selectedHistory}
-          onAddHistory={(entry) =>
-            setSelectedHistory((items) =>
-              items.some((item) => item.id === entry.id) || items.length >= 3
-                ? items
-                : [...items, entry],
-            )
-          }
+          onAddHistory={(entry) => {
+            if (
+              selectedHistory.length >= 3 ||
+              selectedHistory.some((item) => item.id === entry.id)
+            ) {
+              return
+            }
+            draftRevision.current += 1
+            setSelectedHistory((items) => [...items, entry])
+          }}
           showAgentSelector={variant === 'home'}
           onAttachClick={openFilePicker}
           attachDisabled={attachments.length >= 10 || isStaging || !!disabled}
