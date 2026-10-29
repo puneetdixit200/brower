@@ -5,6 +5,7 @@
  */
 
 export * from './action-policy'
+export * from './approval-operation-grants'
 export * from './conversation-human-waits'
 export * from './conversation-run-state'
 export * from './conversation-run-trace-events'

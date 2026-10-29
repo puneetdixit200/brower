@@ -17,6 +17,7 @@ import {
   type UIMessageChunk,
 } from 'ai'
 import {
+  actionPolicyIdForCandidate,
   decideActionPolicy,
   enforceCurrentActionPolicyOnApproval,
 } from '../../agent/action-policy'
@@ -52,6 +53,7 @@ import {
 import type { AcpAgentStore } from '../../lib/agents/storage/acp-agent-store'
 import { DbAcpAgentStore } from '../../lib/agents/storage/acp-agent-store'
 import { resolveLLMConfig } from '../../lib/clients/llm/config'
+import { issueApprovalOperation } from '../../lib/conversations/approval-operation-ledger'
 import {
   type ConversationStore,
   DbConversationStore,
@@ -525,6 +527,7 @@ export class ChatService {
     // does.
     const messagesBeforeTurn = [...session.agent.messages]
     let wrappedUserMessageId: string | undefined
+    let approvedSdkApprovalId: string | undefined
     if (request.approvalResponse) {
       if (request.message.trim()) {
         throw new ChatRequestError(
@@ -539,6 +542,26 @@ export class ChatService {
         request.approvalResponse,
         decideActionPolicy,
       )
+      const pendingApproval = findServerPendingApproval(
+        session.agent.messages,
+        approvalResponse.id,
+      )
+      if (approvalResponse.approved && pendingApproval) {
+        const candidate = {
+          toolName: pendingApproval.toolName,
+          input: pendingApproval.input,
+        }
+        issueApprovalOperation({
+          taskId: runId,
+          approvalId: approvalResponse.id,
+          toolCallId: pendingApproval.toolCallId,
+          toolName: pendingApproval.toolName,
+          actionId:
+            actionPolicyIdForCandidate(candidate) ?? pendingApproval.toolName,
+          input: pendingApproval.input,
+        })
+        approvedSdkApprovalId = approvalResponse.id
+      }
       const pending = applyToolApprovalResponse(
         session.agent.messages,
         approvalResponse,
@@ -602,6 +625,9 @@ export class ChatService {
         abortSignal,
         options: {
           taskId: runId,
+          ...(approvedSdkApprovalId
+            ? { approvalId: approvedSdkApprovalId }
+            : {}),
           assessResearchSupport: assessSupport,
         },
         // Without this the SDK substitutes its masking default, which discards
@@ -1131,6 +1157,58 @@ export class ChatService {
         : null
     return [klavisState, ...managed, ...custom].filter(Boolean).join(',')
   }
+}
+
+function findServerPendingApproval(
+  messages: UIMessage[],
+  approvalId: string,
+): {
+  toolName: string
+  toolCallId: string
+  input: unknown
+  description?: string
+} | null {
+  for (
+    let messageIndex = messages.length - 1;
+    messageIndex >= 0;
+    messageIndex--
+  ) {
+    const message = messages[messageIndex]
+    if (message.role !== 'assistant') continue
+    for (
+      let partIndex = message.parts.length - 1;
+      partIndex >= 0;
+      partIndex--
+    ) {
+      const part = message.parts[partIndex] as {
+        type?: string
+        state?: string
+        toolName?: string
+        toolCallId?: string
+        input?: unknown
+        description?: string
+        approval?: { id?: string }
+      }
+      if (
+        part.state !== 'approval-requested' ||
+        part.approval?.id !== approvalId ||
+        typeof part.toolCallId !== 'string'
+      )
+        continue
+      return {
+        toolName:
+          part.type === 'dynamic-tool'
+            ? (part.toolName ?? 'tool')
+            : (part.type?.replace(/^tool-/, '') ?? 'tool'),
+        toolCallId: part.toolCallId,
+        input: part.input,
+        ...(typeof part.description === 'string'
+          ? { description: part.description }
+          : {}),
+      }
+    }
+  }
+  return null
 }
 
 /** Carries an intentional HTTP result through the run's stream factory. */

@@ -20,6 +20,7 @@ import {
   wrapLanguageModel,
 } from 'ai'
 import { z } from 'zod'
+import { consumeApprovalOperation } from '../lib/conversations/approval-operation-ledger'
 import { claimToolExecution } from '../lib/conversations/tool-operation-claim-store'
 import { logger } from '../lib/logger'
 import { metrics } from '../lib/metrics'
@@ -29,7 +30,7 @@ import {
   type PinnedWorkspaceRoot,
   pinWorkspaceRoot,
 } from '../tools/filesystem/safe-file'
-import { decideActionPolicy } from './action-policy'
+import { actionPolicyIdForCandidate, decideActionPolicy } from './action-policy'
 import { createCompactionPrepareStep, type StepWithUsage } from './compaction'
 import {
   buildAgentToolCatalog,
@@ -65,6 +66,7 @@ import type { ResolvedAgentConfig } from './types'
 const TOOL_APPROVAL_SECRET = randomBytes(32)
 export interface AgentToolCallOptions {
   taskId: string
+  approvalId?: string
   assessResearchSupport?: boolean
 }
 
@@ -191,6 +193,7 @@ function summarizeToolResultError(
 const AgentToolRunContextSchema = z
   .object({
     taskId: z.string().uuid(),
+    approvalId: z.string().min(1).optional(),
     assessResearchSupport: z.boolean().optional(),
   })
   .strict()
@@ -199,22 +202,36 @@ export function buildAgentToolRunContexts(
   tools: ToolSet,
   taskId: string,
   assessResearchSupport = false,
-): Record<string, { taskId: string; assessResearchSupport?: boolean }> {
+  approvalId?: string,
+): Record<
+  string,
+  { taskId: string; approvalId?: string; assessResearchSupport?: boolean }
+> {
   return Object.fromEntries(
     Object.entries(tools)
       .filter(([, tool]) => tool.contextSchema !== undefined)
-      .map(([toolName]) => [toolName, { taskId, assessResearchSupport }]),
+      .map(([toolName]) => [
+        toolName,
+        {
+          taskId,
+          ...(approvalId ? { approvalId } : {}),
+          assessResearchSupport,
+        },
+      ]),
   )
 }
 
-function claimSideEffectToolCall(
+async function claimSideEffectToolCall(
   claimExecution: typeof claimToolExecution | undefined,
+  consumeApproval: typeof consumeApprovalOperation | undefined,
   taskId: string,
+  approvalId: string | undefined,
   toolCallId: unknown,
   toolName: string,
   input: unknown,
   description: unknown,
-): void {
+  evaluatePolicy: typeof decideActionPolicy,
+): Promise<void> {
   if (
     !claimExecution ||
     !decideToolApproval({
@@ -228,8 +245,31 @@ function claimSideEffectToolCall(
   if (typeof toolCallId !== 'string') {
     throw new Error('Missing provider tool-call identity for side effect')
   }
+  const candidate = {
+    toolName,
+    input,
+    description: typeof description === 'string' ? description : undefined,
+  }
+  const policy = await evaluatePolicy(candidate)
+  if (policy.decision === 'deny') {
+    throw new Error('Blocked by the current saved action policy')
+  }
   if (!claimExecution(taskId, toolCallId)) {
     throw new Error('Tool call already claimed; refusing replay')
+  }
+  if (
+    policy.decision === 'ask' &&
+    !consumeApproval?.({
+      taskId,
+      approvalId: approvalId ?? '',
+      toolCallId,
+      toolName,
+      actionId:
+        policy.actionId ?? actionPolicyIdForCandidate(candidate) ?? toolName,
+      input,
+    })
+  ) {
+    throw new Error('No fresh matching approval operation; refusing dispatch')
   }
 }
 
@@ -238,6 +278,10 @@ function claimSideEffectToolCall(
 export function addToolEnvelopeBoundary(
   tools: ToolSet,
   claimExecution?: typeof claimToolExecution,
+  consumeApproval:
+    | typeof consumeApprovalOperation
+    | undefined = consumeApprovalOperation,
+  evaluatePolicy: typeof decideActionPolicy = decideActionPolicy,
 ): ToolSet {
   const wrapped: ToolSet = {}
   for (const [toolName, tool] of Object.entries(tools)) {
@@ -267,13 +311,16 @@ export function addToolEnvelopeBoundary(
         })
         let output: unknown
         try {
-          claimSideEffectToolCall(
+          await claimSideEffectToolCall(
             claimExecution,
+            consumeApproval,
             call.taskId,
+            context.approvalId,
             options.toolCallId,
             toolName,
             input,
             tool.description,
+            evaluatePolicy,
           )
           // The envelope is validated here but its payload remains byte-for-
           // byte/identity equivalent to the input the tool normally receives.
@@ -371,11 +418,16 @@ export class AiSdkAgent {
   getToolRunContexts(
     taskId: string,
     assessResearchSupport = false,
-  ): Record<string, { taskId: string; assessResearchSupport?: boolean }> {
+    approvalId?: string,
+  ): Record<
+    string,
+    { taskId: string; approvalId?: string; assessResearchSupport?: boolean }
+  > {
     return buildAgentToolRunContexts(
       this._agent.tools,
       taskId,
       assessResearchSupport,
+      approvalId,
     )
   }
 
@@ -626,6 +678,7 @@ export class AiSdkAgent {
             tools,
             options.taskId,
             options.assessResearchSupport,
+            options.approvalId,
           ),
         }),
         ...buildAgentReasoningConfig(config.resolvedConfig),

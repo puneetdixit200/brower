@@ -397,6 +397,11 @@ const currentMigrationHistory = [
     hash: '1aeaa0a5260dc07422f9de72a66a10491083541ec172b0cd00b2c176287e2224',
     createdAt: 1794009600000,
   },
+  {
+    tag: '0030_pretty_spencer_smythe',
+    hash: 'aeb15d295bc73bb2ff445c0489834c2b0ad8233bea4a96353ca180d4e9b20cb5',
+    createdAt: 1794096000000,
+  },
 ]
 
 // TODO(nikhil): Remove this fallback once Windows/Linux packaging always includes Drizzle migrations.
@@ -595,6 +600,8 @@ const currentSchemaStatements = [
   `CREATE TRIGGER IF NOT EXISTS memories_fts_delete AFTER DELETE ON memories BEGIN DELETE FROM memories_fts WHERE memory_id = old.id; END`,
   `CREATE TABLE IF NOT EXISTS tool_operation_claims (claim_key text PRIMARY KEY NOT NULL, expires_at integer NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS tool_operation_claims_expires_at_idx ON tool_operation_claims (expires_at)`,
+  `CREATE TABLE IF NOT EXISTS approval_operation_grants (operation_hash text PRIMARY KEY NOT NULL, task_hash text NOT NULL, approval_hash text NOT NULL, tool_call_hash text NOT NULL, classification_hash text NOT NULL, input_hash text NOT NULL, expires_at integer NOT NULL, consumed_at integer)`,
+  `CREATE INDEX IF NOT EXISTS approval_operation_grants_expiry_idx ON approval_operation_grants (expires_at)`,
   `CREATE TABLE IF NOT EXISTS memory_revisions (sequence integer PRIMARY KEY AUTOINCREMENT NOT NULL, memory_id text NOT NULL, content text NOT NULL, source text NOT NULL, source_url text, source_id text, source_title text, updated_at integer NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS memory_revisions_memory_sequence_idx ON memory_revisions (memory_id, sequence)`,
   `

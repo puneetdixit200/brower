@@ -307,3 +307,8 @@ The shared Aster unpacked-tree validator now blocks unsafe filenames before gene
 Site-recipe route contracts are now covered by four isolated API tests (36 assertions), in addition to four existing store tests (85 assertions). The route fixtures verify trusted-origin and memory-opt-in gates, including originless localhost GET success only after memory opt-in, no-Origin mutation denial, foreign-Origin rejection, and incognito denial across reads and mutation/verification endpoints, input/UUID validation, CRUD, and canonical origin-bound manual revalidation. Server typecheck, targeted Biome, and diff check pass.
 
 Next for M06: exercise the Memory settings recipe panel in a headed Aster view, verify private-context behavior with a supported off-the-record extension, and confirm packaged persistence/restart behavior. Keep the row PARTIAL until those gates pass. Automated recipe execution remains outside scope.
+
+
+### T30.4 approval ledger follow-up — 2026-10-29
+
+Source now persists and atomically consumes a fresh server-owned approval grant for the exact dispatch run, provider tool-call identity, classified action and canonical input digest. Raw identifiers and inputs are not written to the ledger. Focused ledger/execution checks and server typecheck pass; R02 remains PARTIAL. Next close the remaining gates: full ChatService approval/continuation integration, independent-process authorization race/restart testing, live-provider signature invalidation after restart, packaged Aster restart/no-overlap, then native acceptance. These are separate from the 30-day provider-call claim and do not establish external exactly-once effects.

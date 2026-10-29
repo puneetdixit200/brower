@@ -28,6 +28,11 @@ describe('tool execution claim boundary', () => {
         },
       } as never,
       claim,
+      mock(() => true),
+      mock(async () => ({
+        decision: 'ask' as const,
+        actionId: 'filesystem.write' as const,
+      })),
     ) as unknown as Record<
       string,
       { execute: (input: unknown, options: unknown) => Promise<unknown> }
@@ -54,6 +59,11 @@ describe('tool execution claim boundary', () => {
         },
       } as never,
       claim,
+      mock(() => true),
+      mock(async () => ({
+        decision: 'ask' as const,
+        actionId: 'filesystem.write' as const,
+      })),
     ) as unknown as Record<
       string,
       { execute: (input: unknown, options: unknown) => Promise<unknown> }
@@ -68,6 +78,31 @@ describe('tool execution claim boundary', () => {
     expect(execute).not.toHaveBeenCalled()
   })
 
+  it('fails closed without a matching fresh approval operation', async () => {
+    const taskId = crypto.randomUUID()
+    const execute = mock(async () => ({ ok: true }))
+    const tools = addToolEnvelopeBoundary(
+      { filesystem_write: { description: 'Write a file.', execute } } as never,
+      mock(() => true),
+      mock(() => false),
+      mock(async () => ({
+        decision: 'ask' as const,
+        actionId: 'filesystem.write' as const,
+      })),
+    ) as unknown as Record<
+      string,
+      { execute: (input: unknown, options: unknown) => Promise<unknown> }
+    >
+
+    await expect(
+      tools.filesystem_write.execute(
+        { path: '/workspace/note.txt', content: 'hello' },
+        { toolCallId: 'provider-call-no-grant', context: { taskId } },
+      ),
+    ).rejects.toThrow(/No fresh matching approval operation/)
+    expect(execute).not.toHaveBeenCalled()
+  })
+
   it('does not consume a side-effect claim for an allowlisted read', async () => {
     const taskId = crypto.randomUUID()
     const claim = mock(() => true)
@@ -75,6 +110,8 @@ describe('tool execution claim boundary', () => {
     const tools = addToolEnvelopeBoundary(
       { read: { description: 'Read page content.', execute } } as never,
       claim,
+      mock(() => true),
+      mock(async () => ({ decision: 'ask' as const, actionId: null })),
     ) as unknown as Record<
       string,
       { execute: (input: unknown, options: unknown) => Promise<unknown> }
@@ -134,6 +171,8 @@ describe('tool execution claim boundary', () => {
         },
       } as ToolSet,
       claim,
+      mock(() => true),
+      mock(async () => ({ decision: 'ask' as const, actionId: null })),
     )
     const agent = new ToolLoopAgent<AgentToolCallOptions, ToolSet>({
       model,
