@@ -16,6 +16,7 @@ import {
   NEWTAB_TAB_TOGGLED_EVENT,
 } from '@/lib/constants/analyticsEvents'
 import { track } from '@/lib/metrics/track'
+import { resumeHumanIntervention } from '@/modules/chat/human-intervention-client'
 import { consumePendingHomeMessage } from '@/modules/chat/pending-home-message'
 import { useChatActions } from '@/modules/chat-actions/chat-actions.hooks'
 import { useActiveConversation } from '@/modules/conversations/active-conversation-context'
@@ -52,6 +53,7 @@ export const NewTabChat: FC = () => {
     restoreError,
     retryRestoreConversation,
     conversationId,
+    serverRunId,
     providers,
     selectedProvider,
     handleSelectProvider,
@@ -80,6 +82,15 @@ export const NewTabChat: FC = () => {
       aiTriggered: NEWTAB_AI_TRIGGERED_EVENT,
     },
   })
+
+  const resumeHumanWait = (requestId: string) =>
+    serverRunId
+      ? resumeHumanIntervention({
+          conversationId,
+          runId: serverRunId,
+          requestId,
+        })
+      : Promise.resolve(false)
 
   useEffect(() => {
     setActiveConversationId(isRestoringConversation ? null : conversationId)
@@ -209,6 +220,7 @@ export const NewTabChat: FC = () => {
               disliked={disliked}
               onClickDislike={onClickDislike}
               onToolApprovalResponse={respondToToolApproval}
+              onResumeHumanWait={resumeHumanWait}
               showJtbdPopup={false}
               showDontShowAgain={false}
               onTakeSurvey={() => {}}

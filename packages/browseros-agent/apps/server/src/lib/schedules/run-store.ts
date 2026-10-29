@@ -5,7 +5,7 @@
  */
 
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
-import { getDb } from '../db'
+import { type BrowserOsDatabase, getDb } from '../db'
 import {
   type NewScheduledJobRunRow,
   type ScheduledJobRunRow,
@@ -49,16 +49,23 @@ export interface ScheduledJobRunStore {
   prune(jobId: string, keep?: number): Promise<number>
 }
 
-async function list(): Promise<ScheduledJobRunRow[]> {
-  return getDb()
+type DatabaseProvider = () => BrowserOsDatabase
+
+async function list(
+  database: DatabaseProvider = getDb,
+): Promise<ScheduledJobRunRow[]> {
+  return database()
     .select()
     .from(scheduledJobRuns)
     .orderBy(desc(scheduledJobRuns.startedAt))
     .all()
 }
 
-async function get(id: string): Promise<ScheduledJobRunRow | null> {
-  const [row] = await getDb()
+async function get(
+  id: string,
+  database: DatabaseProvider = getDb,
+): Promise<ScheduledJobRunRow | null> {
+  const [row] = await database()
     .select()
     .from(scheduledJobRuns)
     .where(eq(scheduledJobRuns.id, id))
@@ -66,9 +73,12 @@ async function get(id: string): Promise<ScheduledJobRunRow | null> {
   return row ?? null
 }
 
-async function upsert(row: ScheduledJobRunUpsert): Promise<ScheduledJobRunRow> {
+async function upsert(
+  row: ScheduledJobRunUpsert,
+  database: DatabaseProvider = getDb,
+): Promise<ScheduledJobRunRow> {
   const now = Date.now()
-  const [saved] = await getDb()
+  const [saved] = await database()
     .insert(scheduledJobRuns)
     .values({ ...row, createdAt: row.createdAt ?? now, updatedAt: now })
     .onConflictDoUpdate({
@@ -81,11 +91,12 @@ async function upsert(row: ScheduledJobRunUpsert): Promise<ScheduledJobRunRow> {
 
 async function start(
   row: ScheduledJobRunUpsert,
+  database: DatabaseProvider = getDb,
 ): Promise<ScheduledJobRunRow | null> {
   // Acquire SQLite's write reservation before reading job identity. This
   // prevents a concurrent job update from changing the conversation between
   // validation and inserting the run.
-  return getDb().transaction(
+  return database().transaction(
     (tx) => {
       const job = tx
         .select({
@@ -144,6 +155,7 @@ async function start(
 
 async function finish(
   row: ScheduledJobRunUpsert,
+  database: DatabaseProvider = getDb,
 ): Promise<ScheduledJobRunRow | null> {
   if (row.status === 'running') return null
 
@@ -156,7 +168,7 @@ async function finish(
       : eq(scheduledJobRuns.conversationId, row.conversationId),
   ]
 
-  const [saved] = await getDb()
+  const [saved] = await database()
     .update(scheduledJobRuns)
     .set({
       status: row.status,
@@ -175,7 +187,7 @@ async function finish(
 
   // A completion PUT may be retried after its response was lost. Return the
   // terminal row unchanged only when it has the exact same identity/state.
-  const existing = await get(row.id)
+  const existing = await get(row.id, database)
   if (
     existing?.jobId === row.jobId &&
     existing.status === row.status &&
@@ -190,8 +202,9 @@ async function finish(
 async function prune(
   jobId: string,
   keep: number = MAX_RUNS_PER_JOB,
+  database: DatabaseProvider = getDb,
 ): Promise<number> {
-  const rows = await getDb()
+  const rows = await database()
     .select({ id: scheduledJobRuns.id, status: scheduledJobRuns.status })
     .from(scheduledJobRuns)
     .where(eq(scheduledJobRuns.jobId, jobId))
@@ -204,14 +217,17 @@ async function prune(
   const stale = terminalRows.slice(keep).map((row) => row.id)
   if (stale.length === 0) return 0
 
-  await getDb()
+  await database()
     .delete(scheduledJobRuns)
     .where(inArray(scheduledJobRuns.id, stale))
   return stale.length
 }
 
-async function remove(id: string): Promise<ScheduledJobRunRemoval> {
-  const deleted = await getDb()
+async function remove(
+  id: string,
+  database: DatabaseProvider = getDb,
+): Promise<ScheduledJobRunRemoval> {
+  const deleted = await database()
     .delete(scheduledJobRuns)
     .where(
       and(
@@ -221,16 +237,23 @@ async function remove(id: string): Promise<ScheduledJobRunRemoval> {
     )
     .returning({ id: scheduledJobRuns.id })
   if (deleted.length > 0) return 'removed'
-  const existing = await get(id)
+  const existing = await get(id, database)
   return existing?.status === 'running' ? 'running' : 'missing'
 }
 
-export const dbScheduledJobRunStore: ScheduledJobRunStore = {
-  list,
-  get,
-  upsert,
-  start,
-  finish,
-  remove,
-  prune,
+/** Creates a store bound to a specific database handle, useful for isolated runtimes and multi-handle checks. */
+export function createScheduledJobRunStore(
+  database: DatabaseProvider,
+): ScheduledJobRunStore {
+  return {
+    list: () => list(database),
+    get: (id) => get(id, database),
+    upsert: (row) => upsert(row, database),
+    start: (row) => start(row, database),
+    finish: (row) => finish(row, database),
+    remove: (id) => remove(id, database),
+    prune: (jobId, keep) => prune(jobId, keep, database),
+  }
 }
+
+export const dbScheduledJobRunStore = createScheduledJobRunStore(getDb)

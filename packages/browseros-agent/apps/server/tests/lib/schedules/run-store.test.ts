@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createScheduledJobRunRoutes } from '../../../src/api/routes/scheduled-job-runs'
 import { closeDb, initializeDb } from '../../../src/lib/db'
+import { openBrowserOsDatabase } from '../../../src/lib/db/client'
 import {
+  createScheduledJobRunStore,
   dbScheduledJobRunStore,
   MAX_RUNS_PER_JOB,
 } from '../../../src/lib/schedules/run-store'
@@ -47,8 +49,10 @@ describe('dbScheduledJobRunStore', () => {
   async function useTempDbWithJob(jobOverrides: Record<string, unknown> = {}) {
     const dir = mkdtempSync(join(tmpdir(), 'browseros-runs-test-'))
     tempDirs.push(dir)
-    initializeDb({ dbPath: join(dir, 'db', 'browseros.sqlite') })
+    const dbPath = join(dir, 'db', 'browseros.sqlite')
+    initializeDb({ dbPath })
     await dbScheduledJobStore.upsert({ ...baseJob(), ...jobOverrides })
+    return dbPath
   }
 
   test('round-trips a run including its tool calls', async () => {
@@ -104,6 +108,45 @@ describe('dbScheduledJobRunStore', () => {
         (run) => run.status === 'running',
       ),
     ).toHaveLength(1)
+  })
+
+  test('keeps a running claim exclusive across independent handles and reopen', async () => {
+    const dbPath = await useTempDbWithJob()
+    const claimed = await dbScheduledJobRunStore.start(
+      baseRun({ id: 'durable-owner', status: 'running' }),
+    )
+    expect(claimed).toMatchObject({ id: 'durable-owner', status: 'running' })
+
+    const secondHandle = openBrowserOsDatabase({ dbPath })
+    try {
+      const secondStore = createScheduledJobRunStore(() => secondHandle.db)
+      expect(
+        await secondStore.start(
+          baseRun({ id: 'other-store-run', status: 'running' }),
+        ),
+      ).toBeNull()
+      expect(await secondStore.get('durable-owner')).toMatchObject({
+        status: 'running',
+      })
+    } finally {
+      secondHandle.sqlite.close()
+    }
+
+    closeDb()
+    const reopenedHandle = openBrowserOsDatabase({ dbPath })
+    try {
+      const restartedStore = createScheduledJobRunStore(() => reopenedHandle.db)
+      expect(await restartedStore.get('durable-owner')).toMatchObject({
+        status: 'running',
+      })
+      expect(
+        await restartedStore.start(
+          baseRun({ id: 'after-reopen-run', status: 'running' }),
+        ),
+      ).toBeNull()
+    } finally {
+      reopenedHandle.sqlite.close()
+    }
   })
 
   test('treats a retry with the same run id as an idempotent claim', async () => {

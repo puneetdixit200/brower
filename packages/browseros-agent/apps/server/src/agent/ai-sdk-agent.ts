@@ -74,6 +74,7 @@ export async function handleToolApproval({
   toolCall: { toolName: string; input: unknown }
   tools?: ToolSet
 }) {
+  if (toolCall.toolName === 'wait_for_human') return undefined
   const tool = availableTools?.[toolCall.toolName] as
     | { description?: string }
     | undefined
@@ -108,6 +109,8 @@ export interface AiSdkAgentConfig {
   resourcesDir?: string | null
   /** Override the workspace pin operation for lifecycle tests and embedders. */
   pinWorkspaceRoot?: typeof pinWorkspaceRoot
+  /** Run-scoped continuation gate; absent for fixtures and non-interactive use. */
+  waitForHuman?: (runId: string, requestId: string) => Promise<void>
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -220,7 +223,13 @@ export function addToolEnvelopeBoundary(tools: ToolSet): ToolSet {
           // byte/identity equivalent to the input the tool normally receives.
           output = await execute(call.input, {
             ...options,
-            context: undefined,
+            // This one UI-control tool needs the validated task identity to
+            // bind its wait to the server-owned live run. Never pass context
+            // through to ordinary browser or filesystem tools.
+            context:
+              toolName === 'wait_for_human'
+                ? { taskId: call.taskId }
+                : undefined,
           })
         } catch (error) {
           AgentToolResultEnvelopeSchema.parse({
@@ -469,7 +478,7 @@ export class AiSdkAgent {
         ...restrictedInternalMcp.allowed,
         ...externalMcpTools,
         ...filesystemTools,
-        ...buildNudgeToolSet(),
+        ...buildNudgeToolSet({ waitForHuman: config.waitForHuman }),
       }
       const filtered = buildAgentToolCatalog(candidateTools)
       const tools = addToolEnvelopeBoundary(filtered.tools)

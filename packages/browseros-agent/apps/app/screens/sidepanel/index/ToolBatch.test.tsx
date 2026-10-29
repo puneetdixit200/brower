@@ -24,6 +24,7 @@ function renderPendingApproval() {
       isLastMessage: true,
       isStreaming: false,
       onToolApprovalResponse: () => {},
+      onResumeHumanWait: async () => false,
     }),
   )
 }
@@ -62,5 +63,33 @@ describe('ToolBatch approval controls', () => {
     )
 
     expect(responses).toEqual([{ id: 'approval-1', approved: false }])
+  })
+})
+
+describe('ToolBatch human wait control', () => {
+  it('shows a fixed, secret-free resume action for the suspended wait tool', () => {
+    const html = renderToStaticMarkup(
+      createElement(ToolBatch, {
+        tools: [
+          {
+            state: 'input-available',
+            toolCallId: 'opaque-request-id',
+            toolName: 'wait_for_human',
+            input: {},
+            output: undefined,
+          },
+        ],
+        isLastBatch: true,
+        isLastMessage: true,
+        isStreaming: true,
+        onToolApprovalResponse: () => {},
+        onResumeHumanWait: async () => true,
+      }),
+    )
+
+    expect(html).toContain('Your browser needs you')
+    expect(html).toContain('Complete the browser step yourself.')
+    expect(html).toContain('I’m done, continue')
+    expect(html).not.toContain('opaque-request-id')
   })
 })

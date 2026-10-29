@@ -220,6 +220,22 @@ export class ChatService {
     return await this.conversationRuns.stop(conversationId)
   }
 
+  resumeAfterHumanIntervention(
+    conversationId: string,
+    runId: string,
+    requestId: string,
+  ): boolean {
+    return this.conversationRuns.resumeAfterHumanIntervention(
+      conversationId,
+      runId,
+      requestId,
+    )
+  }
+
+  requestHumanIntervention(conversationId: string, runId: string) {
+    return this.conversationRuns.requestHumanIntervention(conversationId, runId)
+  }
+
   subscribePanelAssignments() {
     return this.conversationRuns.subscribePanelAssignments()
   }
@@ -1033,6 +1049,17 @@ export class ChatService {
         aiSdkDevtoolsEnabled: this.deps.aiSdkDevtoolsEnabled,
         outputFileAccess,
         resourcesDir: this.deps.resourcesDir,
+        waitForHuman: async (runId, requestId) => {
+          const wait = this.conversationRuns.requestHumanIntervention(
+            agentConfig.conversationId,
+            runId,
+            requestId,
+          )
+          if (!wait) {
+            throw new Error('Human wait is no longer available for this run')
+          }
+          await wait.continuation
+        },
       })
       return { agent, browserToolLease }
     } catch (error) {

@@ -17,8 +17,27 @@ function sentinel(payload: Record<string, unknown>) {
   }
 }
 
-export function buildNudgeToolSet(): ToolSet {
+export function buildNudgeToolSet(options?: {
+  waitForHuman?: (runId: string, requestId: string) => Promise<void>
+}): ToolSet {
   return {
+    ...(options?.waitForHuman && {
+      wait_for_human: tool({
+        description:
+          'Use only when a human must complete an interactive browser step before this task can continue. This tool suspends this exact run until the user explicitly resumes it. Never request, read, repeat, or send passwords, one-time codes, or other secrets. Do not include page text or challenge details in the tool input.',
+        inputSchema: z.object({}),
+        execute: async (_input, { context, toolCallId }) => {
+          const runId = (context as { taskId: string }).taskId
+          await options.waitForHuman?.(runId, toolCallId)
+          return {
+            content: [
+              { type: 'text' as const, text: 'User resumed the task.' },
+            ],
+            isError: false,
+          }
+        },
+      }),
+    }),
     suggest_schedule: tool({
       description:
         'Call this to suggest scheduling a task. Use in two cases: (1) MANDATORY after completing a task that could run on a recurring schedule (news, monitoring, reports, price tracking, data gathering). (2) Immediately when the user explicitly asks to schedule, automate, or repeat the current task - do NOT ask for clarification, infer all parameters from context. Do NOT call if the task requires real-time user interaction.',

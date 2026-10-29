@@ -20,6 +20,101 @@ const secondChunk: UIMessageChunk = {
 }
 
 describe('ConversationRuns', () => {
+  it('holds the live stream factory until the exact run-scoped human wait resumes', async () => {
+    const runs = new ConversationRuns()
+    const conversationId = crypto.randomUUID()
+    let runId = ''
+    let wait: ReturnType<ConversationRuns['requestHumanIntervention']>
+    let factoryFinished = false
+    const starting = runs.start({
+      conversationId,
+      messages: [],
+      createStream: async (_signal, id) => {
+        runId = id
+        wait = runs.requestHumanIntervention(conversationId, id)
+        if (!wait) throw new Error('failed to create human wait')
+        await wait.continuation
+        factoryFinished = true
+        return new ReadableStream<UIMessageChunk>({
+          start(controller) {
+            controller.enqueue({ type: 'text-start', id: 'answer' })
+            controller.close()
+          },
+        })
+      },
+    })
+
+    for (let attempt = 0; attempt < 20 && !wait; attempt += 1) {
+      await Promise.resolve()
+    }
+    expect(wait).toBeDefined()
+    expect(factoryFinished).toBe(false)
+    expect(runs.getSnapshot(conversationId)?.status).toBe('running')
+    expect(runs.getSnapshot(conversationId)?.humanIntervention?.requestId).toBe(
+      wait?.requestId,
+    )
+    expect(
+      runs.resumeAfterHumanIntervention(
+        conversationId,
+        'stale-run',
+        wait?.requestId ?? '',
+      ),
+    ).toBe(false)
+    expect(
+      runs.resumeAfterHumanIntervention(conversationId, runId, 'stale-request'),
+    ).toBe(false)
+    expect(factoryFinished).toBe(false)
+    expect(
+      runs.resumeAfterHumanIntervention(
+        conversationId,
+        runId,
+        wait?.requestId ?? '',
+      ),
+    ).toBe(true)
+    const started = await starting
+    expect(started.runId).toBe(runId)
+    expect(factoryFinished).toBe(true)
+    await collect(runs.subscribe(conversationId, runId))
+    expect(runs.getSnapshot(conversationId)?.status).toBe('completed')
+    expect(
+      runs.resumeAfterHumanIntervention(
+        conversationId,
+        runId,
+        wait?.requestId ?? '',
+      ),
+    ).toBe(false)
+  })
+
+  it('rejects an outstanding human wait when that run is stopped', async () => {
+    const runs = new ConversationRuns()
+    const conversationId = crypto.randomUUID()
+    let runId = ''
+    let requestId = ''
+    const starting = runs.start({
+      conversationId,
+      messages: [],
+      createStream: async (_signal, id) => {
+        runId = id
+        const wait = runs.requestHumanIntervention(conversationId, id)
+        if (!wait) throw new Error('failed to create human wait')
+        requestId = wait.requestId
+        await wait.continuation
+        return new ReadableStream<UIMessageChunk>()
+      },
+    })
+
+    for (let attempt = 0; attempt < 20 && !requestId; attempt += 1) {
+      await Promise.resolve()
+    }
+    expect(requestId).not.toBe('')
+    expect(await runs.stop(conversationId)).toBe(true)
+    await expect(starting).rejects.toThrow()
+    expect(runs.getSnapshot(conversationId)?.status).toBe('aborted')
+    expect(
+      runs.resumeAfterHumanIntervention(conversationId, runId, requestId),
+    ).toBe(false)
+  })
+
   it('generates validated, redacted task and tool trace events from the live stream', async () => {
     const source = controlledSource()
     const runs = new ConversationRuns()

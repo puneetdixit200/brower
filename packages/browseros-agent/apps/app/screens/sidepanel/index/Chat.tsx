@@ -22,6 +22,7 @@ import {
 import { track } from '@/lib/metrics/track'
 import { useChatSessionContext } from '@/modules/chat/chat-session-context'
 import type { ChatMode } from '@/modules/chat/chat-types'
+import { resumeHumanIntervention } from '@/modules/chat/human-intervention-client'
 import { useJtbdPopup } from '@/modules/jtbd-popup/jtbd-popup.hooks'
 import { buildChatErrorProps } from './Chat.helpers'
 import { ChatEmptyState } from './ChatEmptyState'
@@ -71,6 +72,8 @@ export const Chat = () => {
     hasAnyTarget,
     isSettled,
     sendBlocked,
+    conversationId,
+    serverRunId,
   } = useChatSessionContext()
 
   const {
@@ -357,6 +360,15 @@ export const Chat = () => {
     retryLastTurn,
   })
 
+  const resumeHumanWait = (requestId: string) =>
+    serverRunId
+      ? resumeHumanIntervention({
+          conversationId,
+          runId: serverRunId,
+          requestId,
+        })
+      : Promise.resolve(false)
+
   return (
     <>
       <main className="mt-4 flex h-full flex-1 flex-col space-y-4 overflow-y-auto">
@@ -380,6 +392,7 @@ export const Chat = () => {
             disliked={disliked}
             onClickDislike={onClickDislike}
             onToolApprovalResponse={respondToToolApproval}
+            onResumeHumanWait={resumeHumanWait}
             showJtbdPopup={popupVisible}
             showDontShowAgain={showDontShowAgain}
             onTakeSurvey={onTakeSurvey}

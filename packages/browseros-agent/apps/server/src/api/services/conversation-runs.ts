@@ -37,6 +37,8 @@ export interface ConversationRunSnapshot {
   traceEvents?: AgentTaskTraceEvent[]
   /** True when trace storage failed; execution and tool results remain usable. */
   tracePersistenceDegraded?: true
+  /** Safe, opaque indication that an in-memory continuation awaits the user. */
+  humanIntervention?: { requestId: string }
 }
 
 export interface ConversationTabGroupPresentation {
@@ -112,6 +114,17 @@ interface ConversationRunRecord {
   tracePersistenceDegraded: boolean
   toolTraceIds: Map<string, { traceId: string; toolName: string }>
   approvalToolCalls: Map<string, string>
+  humanWait?: {
+    requestId: string
+    resolve: () => void
+    reject: (error: Error) => void
+    abort: () => void
+  }
+}
+
+export interface HumanInterventionWait {
+  requestId: string
+  continuation: Promise<void>
 }
 
 interface PanelAssignmentsSubscriber {
@@ -336,6 +349,73 @@ export class ConversationRuns {
     }
   }
 
+  /**
+   * Suspends the caller's live stream producer on an opaque, run-scoped gate.
+   * The promise lives only in memory and rejects on stop/replacement; no page
+   * data or user-entered content is accepted or retained by this mechanism.
+   */
+  requestHumanIntervention(
+    conversationId: string,
+    runId: string,
+    requestId: string = crypto.randomUUID(),
+  ): HumanInterventionWait | undefined {
+    const record = this.runs.get(conversationId)
+    if (
+      !record ||
+      record.runId !== runId ||
+      record.status !== 'running' ||
+      record.deleting ||
+      record.abortController.signal.aborted ||
+      record.humanWait ||
+      !requestId ||
+      requestId.length > 200
+    )
+      return undefined
+
+    let resolve!: () => void
+    let reject!: (error: Error) => void
+    const continuation = new Promise<void>((res, rej) => {
+      resolve = res
+      reject = rej
+    })
+    const abort = () => {
+      if (record.humanWait?.requestId !== requestId) return
+      record.humanWait = undefined
+      reject(
+        new DOMException('Run ended while waiting for the user', 'AbortError'),
+      )
+    }
+    record.humanWait = { requestId, resolve, reject, abort }
+    record.abortController.signal.addEventListener('abort', abort, {
+      once: true,
+    })
+    return { requestId, continuation }
+  }
+
+  /** Only the exact live run and its one outstanding request may continue. */
+  resumeAfterHumanIntervention(
+    conversationId: string,
+    runId: string,
+    requestId: string,
+  ): boolean {
+    const record = this.runs.get(conversationId)
+    const wait = record?.humanWait
+    if (
+      !record ||
+      record.runId !== runId ||
+      record.status !== 'running' ||
+      record.deleting ||
+      record.abortController.signal.aborted ||
+      !wait ||
+      wait.requestId !== requestId
+    )
+      return false
+    record.abortController.signal.removeEventListener('abort', wait.abort)
+    record.humanWait = undefined
+    wait.resolve()
+    return true
+  }
+
   async stop(conversationId: string): Promise<boolean> {
     const record = this.runs.get(conversationId)
     if (record?.status !== 'running') return false
@@ -516,6 +596,9 @@ export class ConversationRuns {
       startedAt: record.startedAt,
       finishedAt: record.finishedAt,
       traceEvents: [...record.traceEvents],
+      ...(record.humanWait && {
+        humanIntervention: { requestId: record.humanWait.requestId },
+      }),
       ...(record.tracePersistenceDegraded && {
         tracePersistenceDegraded: true as const,
       }),
@@ -682,6 +765,7 @@ export class ConversationRuns {
     record.ended = true
     record.status = status
     record.finishedAt = Date.now()
+    record.humanWait?.abort()
     this.finishTaskTrace(record, status)
     // Setup failures have no stream-return point, but panel hydration must still
     // resolve to the visible failed/aborted state instead of hanging forever.

@@ -243,6 +243,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   const [liked, setLiked] = useState<Record<string, boolean>>({})
   const [disliked, setDisliked] = useState<Record<string, boolean>>({})
   const [conversationId, setConversationId] = useState(crypto.randomUUID())
+  const [serverRunId, setServerRunId] = useState<string | undefined>()
   const conversationIdRef = useRef(conversationId)
   const optionsRef = useRef(options)
   const panelTabRef = useRef<Promise<number | undefined> | undefined>(undefined)
@@ -345,9 +346,10 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   const transportRef = useRef<DefaultChatTransport<UIMessage> | null>(null)
   if (!transportRef.current) {
     transportRef.current = new DefaultChatTransport<UIMessage>({
-      fetch: createExecutionHistoryFetch((runId) =>
-        associateServerRunIdRef.current(runId),
-      ),
+      fetch: createExecutionHistoryFetch(async (runId) => {
+        setServerRunId(runId)
+        await associateServerRunIdRef.current(runId)
+      }),
       prepareReconnectToStreamRequest: async ({ body }) => {
         const serverUrl = await resolveAgentServerUrl()
         return {
@@ -487,6 +489,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
       if (!localStreamConversationRef.current) attachmentRef.current?.retry()
     },
     onFinish: async ({ message, messages, isAbort, isError, finishReason }) => {
+      setServerRunId(undefined)
       const nextMessages = addContentFilterNotice(
         messages,
         message,
@@ -586,6 +589,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
         conversationIdRef.current = id
         messagesRef.current = messages
         setConversationId(id)
+        setServerRunId(state.status === 'running' ? state.runId : undefined)
         setMessages(messages)
         setSearchParamsRef.current({}, { replace: true })
         if (state.status === 'running') {
@@ -606,6 +610,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
           messagesRef.current = []
           setMessages([])
           setConversationId(nextId)
+          setServerRunId(undefined)
         })
       },
       reportError: (error) =>
@@ -689,6 +694,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
         conversationIdRef.current = id
         messagesRef.current = conversation.messages
         setConversationId(id)
+        setServerRunId(undefined)
         setMessages(conversation.messages)
         if (options?.origin === 'newtab' && !target)
           setRestoreError(
@@ -1087,5 +1093,6 @@ export const useChatSession = (options?: ChatSessionOptions) => {
     disliked,
     onClickDislike,
     conversationId,
+    serverRunId,
   }
 }

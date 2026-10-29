@@ -275,6 +275,39 @@ export function createChatRoutes(deps: ChatRouteDeps): Hono<Env> {
       return c.json({ stopped: await service.stop(conversationId) })
     },
   )
+  app.post('/:conversationId/intervention/:requestId/resume', async (c) => {
+    if (!isTrustedAppRequest(c) || !c.req.header('origin')) {
+      return c.json({ error: 'Forbidden' }, 403)
+    }
+    const parsedConversation = ConversationIdParamSchema.safeParse({
+      conversationId: c.req.param('conversationId'),
+    })
+    const requestId = z
+      .string()
+      .min(1)
+      .max(200)
+      .safeParse(c.req.param('requestId'))
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid request' }, 400)
+    }
+    const parsedBody = z.object({ runId: z.string().uuid() }).safeParse(body)
+    if (
+      !parsedConversation.success ||
+      !requestId.success ||
+      !parsedBody.success
+    ) {
+      return c.json({ error: 'Invalid request' }, 400)
+    }
+    const resumed = service.resumeAfterHumanIntervention(
+      parsedConversation.data.conversationId,
+      parsedBody.data.runId,
+      requestId.data,
+    )
+    return c.json({ resumed }, resumed ? 200 : 409)
+  })
   app.delete(
     '/:conversationId',
     zValidator('param', ConversationIdParamSchema),

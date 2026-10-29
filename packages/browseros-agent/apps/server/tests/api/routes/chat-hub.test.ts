@@ -19,6 +19,89 @@ const localServer = {
 } as never
 
 describe('/chat server-owned run routes', () => {
+  it('requires a trusted origin and exact live run/request identity to resume', async () => {
+    const conversationId = crypto.randomUUID()
+    const runs = new ConversationRuns()
+    const requestId = 'opaque-provider-call-id'
+    let runId = ''
+    let gateReady = false
+    const starting = runs.start({
+      conversationId,
+      messages: [],
+      createStream: async (_signal, activeRunId) => {
+        runId = activeRunId
+        const wait = runs.requestHumanIntervention(
+          conversationId,
+          activeRunId,
+          requestId,
+        )
+        if (!wait) throw new Error('failed to create human wait')
+        gateReady = true
+        await wait.continuation
+        return new ReadableStream<UIMessageChunk>({
+          start(controller) {
+            controller.close()
+          },
+        })
+      },
+    })
+    await eventually(() => expect(gateReady).toBe(true))
+    const app = route(runs)
+    const path = `/${conversationId}/intervention/${requestId}/resume`
+
+    const unauthorized = await app.request(
+      path,
+      {
+        method: 'POST',
+        headers: { Host: 'localhost', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ runId }),
+      },
+      localServer,
+    )
+    expect(unauthorized.status).toBe(403)
+
+    const malformed = await requestFromExtension(app, path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ runId: 'not-a-uuid' }),
+    })
+    expect(malformed.status).toBe(400)
+
+    const wrongRun = await requestFromExtension(app, path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ runId: crypto.randomUUID() }),
+    })
+    expect(wrongRun.status).toBe(409)
+
+    const wrongRequest = await requestFromExtension(
+      app,
+      `/${conversationId}/intervention/wrong-request/resume`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ runId }),
+      },
+    )
+    expect(wrongRequest.status).toBe(409)
+
+    const accepted = await requestFromExtension(app, path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ runId }),
+    })
+    expect(accepted.status).toBe(200)
+    await expect(accepted.json()).resolves.toEqual({ resumed: true })
+    await starting
+
+    const replay = await requestFromExtension(app, path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ runId }),
+    })
+    expect(replay.status).toBe(409)
+  })
+
   it('requires a trusted app origin and a live conversation capability for artifact reads', async () => {
     const conversationId = crypto.randomUUID()
     const artifactId = crypto.randomUUID()

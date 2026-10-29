@@ -132,9 +132,11 @@ describe('AiSdkAgent workspace pin lifecycle', () => {
     expect(execute).toHaveBeenCalledTimes(2)
     expect(agent.getToolRunContexts(firstTaskId).envelope_probe).toEqual({
       taskId: firstTaskId,
+      assessResearchSupport: false,
     })
     expect(agent.getToolRunContexts(secondTaskId).envelope_probe).toEqual({
       taskId: secondTaskId,
+      assessResearchSupport: false,
     })
     await agent.dispose()
   })

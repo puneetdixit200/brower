@@ -39,6 +39,7 @@ export interface ChatMessagesProps {
   disliked: Record<string, boolean>
   onClickDislike: (messageId: string, comment?: string) => void
   onToolApprovalResponse: (input: { id: string; approved: boolean }) => void
+  onResumeHumanWait: (requestId: string) => Promise<boolean>
   showJtbdPopup: boolean
   showDontShowAgain: boolean
   onTakeSurvey: (opts?: { dontShowAgain?: boolean }) => void
@@ -54,6 +55,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   onClickLike,
   onClickDislike,
   onToolApprovalResponse,
+  onResumeHumanWait,
   showJtbdPopup,
   showDontShowAgain,
   onTakeSurvey,
@@ -137,6 +139,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
                                 isLastMessage={isLastMessage}
                                 isStreaming={isStreaming}
                                 onToolApprovalResponse={onToolApprovalResponse}
+                                onResumeHumanWait={onResumeHumanWait}
                               />
                             )
                           case 'nudge':

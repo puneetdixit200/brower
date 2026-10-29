@@ -28,6 +28,7 @@ export interface ToolBatchProps {
   isLastMessage: boolean
   isStreaming: boolean
   onToolApprovalResponse: (input: { id: string; approved: boolean }) => void
+  onResumeHumanWait: (requestId: string) => Promise<boolean>
 }
 
 export function sendToolApprovalResponse(
@@ -45,14 +46,25 @@ export const ToolBatch: FC<ToolBatchProps> = ({
   isLastMessage,
   isStreaming,
   onToolApprovalResponse,
+  onResumeHumanWait,
 }) => {
   const hasPendingApproval = tools.some(
     (tool) => tool.state === 'approval-requested',
   )
+  const hasPendingHumanWait = tools.some(
+    (tool) =>
+      tool.toolName === 'wait_for_human' &&
+      tool.state !== 'output-available' &&
+      tool.state !== 'output-error',
+  )
   const shouldBeOpen =
-    hasPendingApproval || (isLastMessage && isLastBatch && isStreaming)
+    hasPendingApproval ||
+    hasPendingHumanWait ||
+    (isLastMessage && isLastBatch && isStreaming)
   const [isOpen, setIsOpen] = useState(shouldBeOpen)
   const [hasUserInteracted, setHasUserInteracted] = useState(false)
+  const [resumingRequestId, setResumingRequestId] = useState<string>()
+  const [resumeFailedRequestId, setResumeFailedRequestId] = useState<string>()
 
   useEffect(() => {
     if (hasPendingApproval) {
@@ -113,6 +125,38 @@ export const ToolBatch: FC<ToolBatchProps> = ({
               <ToolStatusIcon state={tool.state} />
               <span className="flex-1">{formatToolName(tool.toolName)}</span>
             </TaskItem>
+            {tool.toolName === 'wait_for_human' &&
+              tool.state !== 'output-available' &&
+              tool.state !== 'output-error' && (
+                <div className="mt-2 ml-6 rounded-lg border border-border/60 bg-muted/30 p-3">
+                  <p className="font-medium text-sm">Your browser needs you</p>
+                  <p className="mt-1 text-muted-foreground text-xs">
+                    Complete the browser step yourself. Do not enter passwords
+                    or one-time codes here.
+                  </p>
+                  <Button
+                    className="mt-3"
+                    size="sm"
+                    disabled={resumingRequestId === tool.toolCallId}
+                    onClick={async () => {
+                      setResumingRequestId(tool.toolCallId)
+                      setResumeFailedRequestId(undefined)
+                      const resumed = await onResumeHumanWait(tool.toolCallId)
+                      if (!resumed) setResumeFailedRequestId(tool.toolCallId)
+                      setResumingRequestId(undefined)
+                    }}
+                  >
+                    {resumingRequestId === tool.toolCallId
+                      ? 'Resuming…'
+                      : 'I’m done, continue'}
+                  </Button>
+                  {resumeFailedRequestId === tool.toolCallId && (
+                    <p className="mt-2 text-destructive text-xs" role="status">
+                      This run is no longer waiting. Start a new turn if needed.
+                    </p>
+                  )}
+                </div>
+              )}
             {tool.state === 'approval-requested' && tool.approval?.id && (
               <fieldset
                 aria-describedby={`${approvalLabelId}-${tool.toolCallId}-description`}
