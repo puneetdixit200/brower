@@ -1,0 +1,32 @@
+{"level":30,"time":1793307188804,"pid":2438982,"hostname":"omarchy","msg":"Starting BrowserOS Server v0.0.168"}
+{"level":30,"time":1793307188824,"pid":2438982,"hostname":"omarchy","browserosId":"1cd98ef0-b7b","durable":true,"msg":"BrowserOS ID initialized"}
+{"level":30,"time":1793307188825,"pid":2438982,"hostname":"omarchy","msg":"Telemetry disabled: user consent is off"}
+{"level":30,"time":1793307188827,"pid":2438982,"hostname":"omarchy","msg":"Connected to CDP on port 43327"}
+{"level":30,"time":1793307188834,"pid":2438982,"hostname":"omarchy","port":44215,"host":"127.0.0.1","msg":"Consolidated HTTP Server started"}
+{"level":30,"time":1793307188837,"pid":2438982,"hostname":"omarchy","msg":"HTTP server listening on http://127.0.0.1:44215"}
+{"level":30,"time":1793307188837,"pid":2438982,"hostname":"omarchy","msg":"Health endpoint: http://127.0.0.1:44215/system/health"}
+{"level":30,"time":1793307188837,"pid":2438982,"hostname":"omarchy","msg":""}
+{"level":30,"time":1793307188837,"pid":2438982,"hostname":"omarchy","msg":"Services running:"}
+{"level":30,"time":1793307188837,"pid":2438982,"hostname":"omarchy","msg":"  HTTP Server: http://127.0.0.1:44215"}
+{"level":30,"time":1793307188838,"pid":2438982,"hostname":"omarchy","msg":""}
+{"level":30,"time":1793307188928,"pid":2438982,"hostname":"omarchy","conversationId":"e60cd17c-831b-4b02-8b8c-5debcf3b620e","provider":"openai-compatible","model":"fixture-model","msg":"Chat request received"}
+{"level":30,"time":1793307188957,"pid":2438982,"hostname":"omarchy","count":15,"toolNames":["tabs","tab_groups","history","navigate","snapshot","diff","act","download","upload","read","grep","screenshot","pdf","wait","windows"],"source":"chat","msg":"Registered browser MCP tools"}
+{"level":40,"time":1793307189039,"pid":2438982,"hostname":"omarchy","count":2,"toolNames":["act","wait_for_human"],"msg":"Restricted tools excluded from agent catalog"}
+{"level":30,"time":1793307189039,"pid":2438982,"hostname":"omarchy","contextWindow":200000,"threshold":180000,"overhead":12000,"keepRecentMessages":6,"msg":"Compaction configured"}
+{"level":30,"time":1793307189040,"pid":2438982,"hostname":"omarchy","conversationId":"e60cd17c-831b-4b02-8b8c-5debcf3b620e","provider":"openai-compatible","model":"fixture-model","toolCount":19,"msg":"Agent session created (v2)"}
+{"level":30,"time":1793307189040,"pid":2438982,"hostname":"omarchy","conversationId":"e60cd17c-831b-4b02-8b8c-5debcf3b620e","totalSessions":1,"msg":"Session added to store"}
+{"level":30,"time":1793307189080,"pid":2438982,"hostname":"omarchy","conversationId":"e60cd17c-831b-4b02-8b8c-5debcf3b620e","totalMessages":2,"turnCompleted":true,"msg":"Agent execution complete"}
+{"level":30,"time":1793307189084,"pid":2438982,"hostname":"omarchy","conversationId":"e60cd17c-831b-4b02-8b8c-5debcf3b620e","provider":"openai-compatible","model":"fixture-model","msg":"Chat request received"}
+{"level":30,"time":1793307189087,"pid":2438982,"hostname":"omarchy","conversationId":"e60cd17c-831b-4b02-8b8c-5debcf3b620e","toolName":"send_message","approved":true,"msg":"Tool approval response received"}
+{"level":30,"time":1793307189118,"pid":2438982,"hostname":"omarchy","conversationId":"e60cd17c-831b-4b02-8b8c-5debcf3b620e","totalMessages":2,"turnCompleted":true,"msg":"Agent execution complete"}
+{"level":30,"time":1793307189121,"pid":2438982,"hostname":"omarchy","conversationId":"e60cd17c-831b-4b02-8b8c-5debcf3b620e","provider":"openai-compatible","model":"fixture-model","msg":"Chat request received"}
+{"level":30,"time":1793307189125,"pid":2438982,"hostname":"omarchy","conversationId":"8a7c5df7-a438-4284-ab9b-02e6cb5ecf8b","provider":"openai-compatible","model":"fixture-model","msg":"Chat request received"}
+{"level":40,"time":1793307189155,"pid":2438982,"hostname":"omarchy","count":2,"toolNames":["act","wait_for_human"],"msg":"Restricted tools excluded from agent catalog"}
+{"level":30,"time":1793307189156,"pid":2438982,"hostname":"omarchy","contextWindow":200000,"threshold":180000,"overhead":12000,"keepRecentMessages":6,"msg":"Compaction configured"}
+{"level":30,"time":1793307189156,"pid":2438982,"hostname":"omarchy","conversationId":"8a7c5df7-a438-4284-ab9b-02e6cb5ecf8b","provider":"openai-compatible","model":"fixture-model","toolCount":19,"msg":"Agent session created (v2)"}
+{"level":30,"time":1793307189156,"pid":2438982,"hostname":"omarchy","conversationId":"8a7c5df7-a438-4284-ab9b-02e6cb5ecf8b","totalSessions":2,"msg":"Session added to store"}
+{"level":30,"time":1793307189164,"pid":2438982,"hostname":"omarchy","conversationId":"8a7c5df7-a438-4284-ab9b-02e6cb5ecf8b","totalMessages":2,"turnCompleted":true,"msg":"Agent execution complete"}
+{"level":30,"time":1793307189166,"pid":2438982,"hostname":"omarchy","conversationId":"8a7c5df7-a438-4284-ab9b-02e6cb5ecf8b","provider":"openai-compatible","model":"fixture-model","msg":"Chat request received"}
+{"level":30,"time":1793307189167,"pid":2438982,"hostname":"omarchy","conversationId":"8a7c5df7-a438-4284-ab9b-02e6cb5ecf8b","toolName":"send_message","approved":false,"msg":"Tool approval response received"}
+{"level":30,"time":1793307189177,"pid":2438982,"hostname":"omarchy","conversationId":"8a7c5df7-a438-4284-ab9b-02e6cb5ecf8b","totalMessages":2,"turnCompleted":true,"msg":"Agent execution complete"}
+{"level":30,"time":1793307189337,"pid":2438982,"hostname":"omarchy","reason":"SIGTERM","msg":"Shutting down server..."}

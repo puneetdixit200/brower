@@ -1,0 +1,501 @@
+{
+  "status": "failed",
+  "error": "Model did not select the advertised navigate tool",
+  "ports": {
+    "server": 41527,
+    "cdp": 35765,
+    "model": 43213,
+    "mcp": 36713,
+    "page": 46877
+  },
+  "config": {
+    "ports": {
+      "server": 41527,
+      "cdp": 35765
+    },
+    "directories": {
+      "resources": "/home/puneet/Projects/aster-browser/upstream-browseros/packages/browseros-agent/dist/prod/aster-server/linux-x64/resources",
+      "execution": "/tmp/aster-chat-process-jIwfZZ/execution"
+    },
+    "flags": {
+      "allow_remote_in_mcp": false
+    },
+    "instance": {
+      "client_id": "process-approval-fixture",
+      "install_id": "process-approval-fixture",
+      "browseros_version": "integration-fixture",
+      "chromium_version": "system-chromium"
+    }
+  },
+  "requestCount": 6,
+  "modelMessages": [
+    {
+      "requestIndex": 0,
+      "messages": [
+        {
+          "role": "user",
+          "content": "<USER_QUERY>\nSend the fixture message.\n</USER_QUERY>"
+        }
+      ]
+    },
+    {
+      "requestIndex": 1,
+      "messages": [
+        {
+          "role": "user",
+          "content": "Send the fixture message."
+        },
+        {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "fixture-call-chatcmpl-process-fixture-1",
+              "type": "function",
+              "function": {
+                "name": "send_message",
+                "arguments": "{\"destination\":\"sink@example.test\",\"body\":\"fixture body\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "fixture accepted",
+          "tool_call_id": "fixture-call-chatcmpl-process-fixture-1"
+        }
+      ]
+    },
+    {
+      "requestIndex": 2,
+      "messages": [
+        {
+          "role": "user",
+          "content": "<USER_QUERY>\nSend the fixture message.\n</USER_QUERY>"
+        }
+      ]
+    },
+    {
+      "requestIndex": 3,
+      "messages": [
+        {
+          "role": "user",
+          "content": "Send the fixture message."
+        },
+        {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "fixture-call-chatcmpl-process-fixture-3",
+              "type": "function",
+              "function": {
+                "name": "send_message",
+                "arguments": "{\"destination\":\"sink@example.test\",\"body\":\"fixture body\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "Tool call execution denied.",
+          "tool_call_id": "fixture-call-chatcmpl-process-fixture-3"
+        }
+      ]
+    },
+    {
+      "requestIndex": 4,
+      "messages": [
+        {
+          "role": "user",
+          "content": "<USER_QUERY>\nASTER_BROWSER_FIXTURE_NAVIGATE: navigate a browser tab to http://127.0.0.1:46877/fixture and report its title and sentinel.\n</USER_QUERY>"
+        }
+      ]
+    },
+    {
+      "requestIndex": 5,
+      "messages": [
+        {
+          "role": "user",
+          "content": "<USER_QUERY>\nASTER_BROWSER_FIXTURE_NAVIGATE: navigate a browser tab to http://127.0.0.1:46877/fixture and report its title and sentinel.\n</USER_QUERY>"
+        },
+        {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "fixture-call-chatcmpl-process-fixture-5",
+              "type": "function",
+              "function": {
+                "name": "tabs",
+                "arguments": "{\"action\":\"list\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "tabs failed: CDP error: 'Browser.getTabs' wasn't found",
+          "tool_call_id": "fixture-call-chatcmpl-process-fixture-5"
+        }
+      ]
+    }
+  ],
+  "advertisedToolNames": [
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ],
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ],
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ],
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ],
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ],
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ]
+  ],
+  "syntheticModelResponses": [
+    {
+      "id": "chatcmpl-process-fixture-1",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "index": 0,
+                "id": "fixture-call-chatcmpl-process-fixture-1",
+                "type": "function",
+                "function": {
+                  "name": "send_message",
+                  "arguments": "{\"destination\":\"sink@example.test\",\"body\":\"fixture body\"}"
+                }
+              }
+            ]
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-1",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "tool_calls"
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-2",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "content": "Fixture turn complete."
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-2",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "stop"
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-3",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "index": 0,
+                "id": "fixture-call-chatcmpl-process-fixture-3",
+                "type": "function",
+                "function": {
+                  "name": "send_message",
+                  "arguments": "{\"destination\":\"sink@example.test\",\"body\":\"fixture body\"}"
+                }
+              }
+            ]
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-3",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "tool_calls"
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-4",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "content": "Fixture turn complete."
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-4",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "stop"
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-5",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "index": 0,
+                "id": "fixture-call-chatcmpl-process-fixture-5",
+                "type": "function",
+                "function": {
+                  "name": "tabs",
+                  "arguments": "{\"action\":\"list\"}"
+                }
+              }
+            ]
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-5",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "tool_calls"
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-6",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "content": "Browser tabs tool did not return a usable page ID."
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-6",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "stop"
+        }
+      ]
+    }
+  ],
+  "browserToolSteps": [
+    {
+      "toolName": "tabs",
+      "input": {
+        "action": "list"
+      },
+      "observedToolResults": []
+    },
+    {
+      "toolName": null,
+      "observedToolResults": [
+        "\"tabs failed: CDP error: 'Browser.getTabs' wasn't found\""
+      ]
+    }
+  ],
+  "browserPageRequests": [],
+  "browserResponseSse": "data: {\"type\":\"start\"}\n\ndata: {\"type\":\"start-step\"}\n\ndata: {\"type\":\"tool-input-start\",\"toolCallId\":\"fixture-call-chatcmpl-process-fixture-5\",\"toolName\":\"tabs\",\"toolMetadata\":{\"clientName\":\"ai-sdk-mcp-client\",\"toolName\":\"tabs\",\"title\":\"Manage tabs\",\"annotations\":{\"title\":\"Manage tabs\",\"destructiveHint\":true,\"openWorldHint\":true}},\"dynamic\":true,\"title\":\"Manage tabs\"}\n\ndata: {\"type\":\"tool-input-delta\",\"toolCallId\":\"fixture-call-chatcmpl-process-fixture-5\",\"inputTextDelta\":\"{\\\"action\\\":\\\"list\\\"}\"}\n\ndata: {\"type\":\"tool-input-available\",\"toolCallId\":\"fixture-call-chatcmpl-process-fixture-5\",\"toolName\":\"tabs\",\"input\":{\"action\":\"list\"},\"toolMetadata\":{\"clientName\":\"ai-sdk-mcp-client\",\"toolName\":\"tabs\",\"title\":\"Manage tabs\",\"annotations\":{\"title\":\"Manage tabs\",\"destructiveHint\":true,\"openWorldHint\":true}},\"dynamic\":true,\"title\":\"Manage tabs\"}\n\ndata: {\"type\":\"tool-output-available\",\"toolCallId\":\"fixture-call-chatcmpl-process-fixture-5\",\"output\":{\"_meta\":{\"io.modelcontextprotocol/serverInfo\":{\"name\":\"browseros_mcp\",\"title\":\"BrowserOS MCP server\",\"version\":\"0.0.168\"}},\"resultType\":\"complete\",\"content\":[{\"type\":\"text\",\"text\":\"tabs failed: CDP error: 'Browser.getTabs' wasn't found\"}],\"isError\":true},\"toolMetadata\":{\"clientName\":\"ai-sdk-mcp-client\",\"toolName\":\"tabs\",\"title\":\"Manage tabs\",\"annotations\":{\"title\":\"Manage tabs\",\"destructiveHint\":true,\"openWorldHint\":true}},\"dynamic\":true}\n\ndata: {\"type\":\"finish-step\"}\n\ndata: {\"type\":\"start-step\"}\n\ndata: {\"type\":\"text-start\",\"id\":\"txt-0\"}\n\ndata: {\"type\":\"text-delta\",\"id\":\"txt-0\",\"delta\":\"Browser tabs tool did not return a usable page ID.\"}\n\ndata: {\"type\":\"text-end\",\"id\":\"txt-0\"}\n\ndata: {\"type\":\"finish-step\"}\n\ndata: {\"type\":\"finish\",\"finishReason\":\"stop\"}\n\ndata: [DONE]\n\n",
+  "dispatches": [
+    {
+      "destination": "sink@example.test",
+      "body": "fixture body"
+    }
+  ]
+}

@@ -1,0 +1,395 @@
+{
+  "status": "failed",
+  "error": "Model did not select the advertised navigate tool",
+  "ports": {
+    "server": 36427,
+    "cdp": 41481,
+    "model": 42741,
+    "mcp": 33051,
+    "page": 36569
+  },
+  "config": {
+    "ports": {
+      "server": 36427,
+      "cdp": 41481
+    },
+    "directories": {
+      "resources": "/home/puneet/Projects/aster-browser/upstream-browseros/packages/browseros-agent/dist/prod/aster-server/linux-x64/resources",
+      "execution": "/tmp/aster-chat-process-b0MZGN/execution"
+    },
+    "flags": {
+      "allow_remote_in_mcp": false
+    },
+    "instance": {
+      "client_id": "process-approval-fixture",
+      "install_id": "process-approval-fixture",
+      "browseros_version": "integration-fixture",
+      "chromium_version": "system-chromium"
+    }
+  },
+  "requestCount": 8,
+  "advertisedToolNames": [
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ],
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ],
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ],
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ],
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ],
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ],
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ],
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ]
+  ],
+  "syntheticModelResponses": [
+    {
+      "id": "chatcmpl-process-fixture-1",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "index": 0,
+                "id": "fixture-call-chatcmpl-process-fixture-1",
+                "type": "function",
+                "function": {
+                  "name": "send_message",
+                  "arguments": "{\"destination\":\"sink@example.test\",\"body\":\"fixture body\"}"
+                }
+              }
+            ]
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-1",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "tool_calls"
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-2",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "content": "Fixture turn complete."
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-2",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "stop"
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-3",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "index": 0,
+                "id": "fixture-call-chatcmpl-process-fixture-3",
+                "type": "function",
+                "function": {
+                  "name": "send_message",
+                  "arguments": "{\"destination\":\"sink@example.test\",\"body\":\"fixture body\"}"
+                }
+              }
+            ]
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-3",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "tool_calls"
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-4",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "content": "Fixture turn complete."
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-4",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "stop"
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-5",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "index": 0,
+                "id": "fixture-call-chatcmpl-process-fixture-5",
+                "type": "function",
+                "function": {
+                  "name": "tabs",
+                  "arguments": "{\"action\":\"list\"}"
+                }
+              }
+            ]
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-5",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "tool_calls"
+        }
+      ]
+    }
+  ],
+  "browserToolSteps": [
+    {
+      "toolName": "tabs",
+      "input": {
+        "action": "list"
+      },
+      "observedToolResults": []
+    }
+  ],
+  "browserPageRequests": [],
+  "browserResponseSse": "data: {\"type\":\"start\"}\n\ndata: {\"type\":\"start-step\"}\n\ndata: {\"type\":\"tool-input-start\",\"toolCallId\":\"fixture-call-chatcmpl-process-fixture-5\",\"toolName\":\"tabs\",\"toolMetadata\":{\"clientName\":\"ai-sdk-mcp-client\",\"toolName\":\"tabs\",\"title\":\"Manage tabs\",\"annotations\":{\"title\":\"Manage tabs\",\"destructiveHint\":true,\"openWorldHint\":true}},\"dynamic\":true,\"title\":\"Manage tabs\"}\n\ndata: {\"type\":\"tool-input-delta\",\"toolCallId\":\"fixture-call-chatcmpl-process-fixture-5\",\"inputTextDelta\":\"{\\\"action\\\":\\\"list\\\"}\"}\n\ndata: {\"type\":\"tool-input-available\",\"toolCallId\":\"fixture-call-chatcmpl-process-fixture-5\",\"toolName\":\"tabs\",\"input\":{\"action\":\"list\"},\"toolMetadata\":{\"clientName\":\"ai-sdk-mcp-client\",\"toolName\":\"tabs\",\"title\":\"Manage tabs\",\"annotations\":{\"title\":\"Manage tabs\",\"destructiveHint\":true,\"openWorldHint\":true}},\"dynamic\":true,\"title\":\"Manage tabs\"}\n\ndata: {\"type\":\"tool-output-available\",\"toolCallId\":\"fixture-call-chatcmpl-process-fixture-5\",\"output\":{\"_meta\":{\"io.modelcontextprotocol/serverInfo\":{\"name\":\"browseros_mcp\",\"title\":\"BrowserOS MCP server\",\"version\":\"0.0.168\"}},\"resultType\":\"complete\",\"content\":[{\"type\":\"text\",\"text\":\"tabs failed: CDP error: 'Browser.getTabs' wasn't found\"}],\"isError\":true},\"toolMetadata\":{\"clientName\":\"ai-sdk-mcp-client\",\"toolName\":\"tabs\",\"title\":\"Manage tabs\",\"annotations\":{\"title\":\"Manage tabs\",\"destructiveHint\":true,\"openWorldHint\":true}},\"dynamic\":true}\n\ndata: {\"type\":\"finish-step\"}\n\ndata: {\"type\":\"error\",\"errorText\":\"{\\\"error\\\":{\\\"provider\\\":\\\"openai-compatible\\\",\\\"statusCode\\\":500,\\\"details\\\":\\\"<!doctype html>\\\\n<html lang=\\\\\\\"en\\\\\\\">\\\\n  <head>\\\\n    <meta charset=\\\\\\\"utf-8\\\\\\\" />\\\\n    <meta name=\\\\\\\"viewport\\\\\\\" content=\\\\\\\"width=device-width, initial-scale=1.0\\\\\\\" />\\\\n    <title>Internal Server Error</title>\\\\n  </head>\\\\n  <body>\\\\n    <!-- The bracketed placeholders below are filled in by DevErrorPage.rs; keep prettier away from them. -->\\\\n    <!-- prettier-ignore -->\\\\n    <script id=\\\\\\\"__bunfallback\\\\\\\" type=\\\\\\\"application/json\\\\\\\">{\\\\\\\"message\\\\\\\":\\\\\\\"POST - http://127.0.0.1:42741/v1/chat/completions failed\\\\\\\",\\\\\\\"cwd\\\\\\\":\\\\\\\"/home/puneet/Projects/aster-browser/upstream-browseros/packages/browseros-agent\\\\\\\",\\\\\\\"problems\\\\\\\":{\\\\\\\"exceptions\\\\\\\":[{\\\\\\\"name\\\\\\\":\\\\\\\"Error\\\\\\\",\\\\\\\"message\\\\\\\":\\\\\\\"tabs list did not return a usable about:blank page id\\\\\\\",\\\\\\\"runtime_type\\\\\\\":0,\\\\\\\"code\\\\\\\":0,\\\\\\\"stack\\\\\\\":{\\\\\\\"frames\\\\\\\":[{\\\\\\\"function_name\\\\\\\":\\\\\\\"assert\\\\\\\",\\\\\\\"file\\\\\\\":\\\\\\\"/home/puneet/Projects/aster-browser/upstream-browseros/packages/browseros-agent/apps/server/tests/integration/process-approval-fixture.ts\\\\\\\",\\\\\\\"scope\\\\\\\":3,\\\\\\\"position\\\\\\\":{\\\\\\\"line\\\\\\\":47,\\\\\\\"column\\\\\\\":29}},{\\\\\\\"function_name\\\\\\\":\\\\\\\"pageIdFromToolResults\\\\\\\",\\\\\\\"file\\\\\\\":\\\\\\\"/home/puneet/Projects/aster-browser/upstream-browseros/packages/browseros-agent/apps/server/tests/integration/process-approval-fixture.ts\\\\\\\",\\\\\\\"scope\\\\\\\":3,\\\\\\\"position\\\\\\\":{\\\\\\\"line\\\\\\\":84,\\\\\\\"column\\\\\\\":3}},{\\\\\\\"function_name\\\\\\\":\\\\\\\"selectModelStep\\\\\\\",\\\\\\\"file\\\\\\\":\\\\\\\"/home/puneet/Projects/aster-browser/upstream-browseros/packages/browseros-agent/apps/server/tests/integration/process-approval-fixture.ts\\\\\\\",\\\\\\\"scope\\\\\\\":3,\\\\\\\"position\\\\\\\":{\\\\\\\"line\\\\\\\":159,\\\\\\\"column\\\\\\\":26}},{\\\\\\\"function_name\\\\\\\":\\\\\\\"fetch\\\\\\\",\\\\\\\"file\\\\\\\":\\\\\\\"/home/puneet/Projects/aster-browser/upstream-browseros/packages/browseros-agent/apps/server/tests/integration/process-approval-fixture.ts\\\\\\\",\\\\\\\"scope\\\\\\\":3,\\\\\\\"position\\\\\\\":{\\\\\\\"line\\\\\\\":535,\\\\\\\"column\\\\\\\":27}}],\\\\\\\"source_lines\\\\\\\":[{\\\\\\\"line\\\\\\\":42,\\\\\\\"text\\\\\\\":\\\\\\\"  targetPageId?: number\\\\\\\"},{\\\\\\\"line\\\\\\\":43,\\\\\\\"text\\\\\\\":\\\\\\\"  observedToolResults: string[]\\\\\\\"},{\\\\\\\"line\\\\\\\":44,\\\\\\\"text\\\\\\\":\\\\\\\"}\\\\\\\"},{\\\\\\\"line\\\\\\\":45,\\\\\\\"text\\\\\\\":\\\\\\\"\\\\\\\"},{\\\\\\\"line\\\\\\\":46,\\\\\\\"text\\\\\\\":\\\\\\\"function assert(condition: unknown, message: string): asserts condition {\\\\\\\"},{\\\\\\\"line\\\\\\\":47,\\\\\\\"text\\\\\\\":\\\\\\\"  if (!condition) throw new Error(message)\\\\\\\"}]}}],\\\\\\\"build\\\\\\\":{\\\\\\\"errors\\\\\\\":0,\\\\\\\"warnings\\\\\\\":0,\\\\\\\"msgs\\\\\\\":[]}}}</script>\\\\n\\\\n    <!-- prettier-ignore -->\\\\n    <style data-has-bun-fallback-style>:host{--bun-error-color: #e33737;--bun-error-monospace: ui-monospace, Menlo, Monaco, \\\\\\\"Cascadia Mono\\\\\\\", \\\\\\\"Segoe UI Mono\\\\\\\", \\\\\\\"Roboto Mono\\\\\\\", \\\\\\\"Oxygen Mono\\\\\\\", \\\\\\\"Ubuntu Monospace\\\\\\\", \\\\\\\"Source Code Pro\\\\\\\", \\\\\\\"Fira Mono\\\\\\\", \\\\\\\"Droid Sans Mono\\\\\\\", \\\\\\\"Courier New\\\\\\\", monospace;--bun-error-width: 512px}:host a{color:inherit;text-decoration:none}:host a:hover{text-decoration:underline}#BunErrorOverlay-container{box-shadow:0 16px 24px #0000000f,0 2px 6px #0000001a,0 0 1px #0000000a;backdrop-filter:blur(42px);backface-visibility:visible;border:inset 1px solid rgba(0,0,0,.2);border-radius:17px;background-color:#ffffffeb;width:var(--bun-error-width);position:fixed;top:120px;right:48px;z-index:999999;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif,\\\\\\\"Apple Color Emoji\\\\\\\",\\\\\\\"Segoe UI Emoji\\\\\\\",Segoe UI Symbol}.BunErrorRoot--FullPage #BunErrorOverlay-container{position:static;top:unset;right:unset;margin:60px auto}.BunError-error-message--quoted{color:#192e09}:host a{color:inherit}.BunError-Summary-ErrorIcon{content:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACIAAAAgCAYAAAB3j6rJAAAACXBIWXMAABYlAAAWJQFJUiTwAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAJiSURBVHgBzZdLUttAEIa7RwpVeKUD4Ip8hFSB7V3kG8AJgBPgG+CcAG4QcwPfIFpiigU5gRWcqmy1AVwVaTo9Y+yyiEeakc3jX7j0GEmfe7r/6QH4IELYUJNuN/LyPMwRU2g04lYcp1BDtUEYIPSJvvNhtHI5QcTB3vX1FThKQE0xxI8XEEohEQ2n+/sROKoWyP3BwYn6qHGA553DW4CgEFUfin6328fwmiDTbldBhFXjiHNlEkUBWMoJRCUoSNm3HB6Kx0fbsW4gnpQDQLT/l4hntlGxBlHR4NJ0mndW4D08WCWuNYgv5YXhVsJmNASi0bqbnNj9P2pKtwGiyxXxcM2tJNvd/bI3Hp82b26OJOK3dc9nc+PbHMRUrhyJgqV7QowMr4iqTK4SpNK8VvRXSnNiVphcKYhO0BLzIkvAZ5WaXCmID6AeDGFLYpO7NJWzEUSbF9EAHKTagYohgcnkjCDavKoVgqNMJrcWpKZ5AQlh46LBp6enCysQ36LuFy8tnBFZ2Tkn+cnLcv6vQ1PlypViC6I+PsiEUB3ZomMLLZ+Mm+Nxzwgy7XQmsMVKKVWe95q3t7E6LEyNi3ktRZSWrTWl8rxl5JcgVeZlUJI1Gq3FWsM+cQpuCn91Ov0CiEd0Bo7RkERXq2tNPps5R4UBzlU5axAdDQDrbmr5EsSvhQs7OxG4S5ucTtb7dntYxzeeNWLzi3MhWpwnxy4d3IpSX/0yxGeor0OGmPcqWHu/FixypNY2cZvSINxZ/YT3VTIHmc0u1Qm8k9R+WYO07u7SDLHH+1bnzfNGYjPkhfJIbdr/AfAS02LsKGiuAAAAAElFTkSuQmCC);width:20px;height:19px;margin-right:6px;display:block}.BunError-Summary-CloseIcon{content:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACYAAAAmCAYAAACoPemuAAAACXBIWXMAABYlAAAWJQFJUiTwAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAKKSURBVHgBxZjpTsMwEISnaTmLKLf4AX94/7fiFlRcJaUKl6exK8e1k7XTY6QVUbDjj/V4bdNBe2Uquio2nPdfKn6RqA7StKuir2JHxXZNO4LlKkb65zeWBLavYxdpelMxhABQCkaQI6QDuRrqCEoCdqjiFItXoeIagex1Gzqfo8zUMsSxByo+Vfz4fokaqH0sVx09xhxcCOwY5RSuQgbuHVZ58YGx0RlWK8LtoYT74wsXjEXyHM3eW4Y4JgFZ76ZV2xancAPrE+3T44MNRiCp2bnd5MK29A0rfyFsP7VRz3pxLOxoF8ctFZeYz7wRPfOgn/mHX6B5Rui1zP7gDmQaWc8TlEXytwGKKpy+dRoYMG41Um+52fHBuVBG0jH6ZpAtyMVV20MYLgRFq+xBpm1TFrjtbAo7dfUAI1SzxMr9ocF8UFIPUx2TsQxx4pTQ9G7migVAVYBiwagQnK0kKBsotdITblDz7eRDgAH7QZrop9CBj/67gbywVmTAxGdxVKEeGtoQKgkusz4QoxDUbK+zZOCibkzGW/yYtMawTNx73tPkJ/CXEj7zMEjPSY7zRWYNJtUwAGVWX2i1sgi/QabcgJn7X4p8JSEEJ139467TqS/oxAvup34+QrhOmR1ijHLV89uS2xY9+WjPN7N3hbRiu0hNj1U2BKfzGesVs/XCBzc7r0j32iLEbE1Xs2/aHtHivzQtxEzNTia+VUIoGnaA1Yl3iEptDC1fblGcb2nRbSNC3cGZpbq6MtGdCJf6f7Qm0c+38BwiJANKbzexeoJegT7FZOIA5SbdFjDXUJO6RrFTRChe82Jv7PQPbcFyMJZ0aOMd3qx47SMoyw5B6VnjF2aECyjXMFEl6B+GYop4atKAigAAAABJRU5ErkJggg==);width:22px;height:22px;border-radius:50%;cursor:pointer}.BunError-Summary-CloseIcon:hover{transform:scale(1.2);background-color:#fff}.BunError-Summary{display:grid;grid-template-columns:min-content auto min-content min-content;grid-template-rows:46px;align-items:center;padding:0 18px;border-bottom:1px solid rgb(220,220,220)}.BunError-footer{display:flex;border-top:1px solid rgb(220,220,220);align-items:center;grid-template-columns:auto auto;justify-content:space-between}.BunError-footerItem{padding:12px 18px}.BunError-Summary-Title{font-weight:500;letter-spacing:.36px}.BunError-ErrorTag,.BunError-error-code{color:#a5a5a5;font-weight:500;font-size:12pt}.BunError-ErrorTag{font-size:14px;text-transform:uppercase;font-weight:300}.BunError-error-header{display:flex;align-items:center;gap:.5ch}.BunError-error-message{color:var(--bun-error-color);font-size:16pt;font-weight:700}.BunError-list{margin-top:14px;gap:14px}.BunError-error-subtitle,.BunError-error-header,.BunError-error-message{padding-left:18px;padding-right:18px}.BunError-error-subtitle{font-size:500}.BunError-NativeStackTrace{margin-top:0;width:100%}.BunError-NativeStackTrace-filename{padding:8px 18px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;font-weight:500;letter-spacing:.36px;margin-bottom:8px;display:block}.BunError-NativeStackTrace-filename:hover{text-decoration:underline}.BunError-SourceLines-lines a{text-decoration:none}.BunError-SourceLine-text::selection,.BunError-SourceLine-text *::selection{background-color:#6437e3;color:#fff}.BunError-SourceLine-text:active:before{width:61px;z-index:-1;pointer-events:none}.BunError-SourceLine{display:grid;grid-template-columns:min-content auto}.BunError-SourceLines{font-size:14px;align-items:center;overflow-x:auto}.BunError-CopyButton{font-weight:500;font-size:1em;vertical-align:middle;display:flex;align-content:center;align-items:center;border-right:1px solid #ccc;background:#fcfcfc;border-bottom-left-radius:12px;color:#333;cursor:pointer;user-select:none;-webkit-user-select:none;transition:transform .1s linear}.BunError-CopyButton,#BunError-poweredBy{padding:12px}.BunError-Summary-help{display:flex;white-space:nowrap;gap:9px;margin-right:18px;border-right:1px solid rgb(220,220,220);height:100%;align-items:center;padding-right:18px;text-decoration:none;cursor:pointer}.BunError-Summary-help svg{opacity:.5}#BunErrorOverlay-container .BunError-Summary-help{color:#999}#BunErrorOverlay-container .BunError-Summary-help:hover{color:#5865f2}#BunErrorOverlay-container .BunError-Summary-help:hover svg{opacity:1}.BunError-CopyButton svg{width:18px;margin-right:.7em;opacity:.75;margin-left:6px;fill:currentColor;stroke:currentColor}.BunError-CopyButton:hover{background:#6437e3;color:#fff;border-right-color:#6437e3}.BunError-CopyButton:active{transform:scale(1.03);transform-origin:center center}.BunError-SourceLine-text{white-space:pre;cursor:text;display:block;position:relative;font-family:var(--bun-error-monospace)}.BunError-SourceLine-number{font-variant:tabular-nums;display:block;border-left:4px solid transparent;margin-left:-1px;cursor:pointer;padding-left:14px;padding-right:12px;text-align:right;text-decoration:none;position:relative}.BunError-SourceLine-number,.BunError-SourceLine-number *{user-select:none;-webkit-user-select:none}.BunError-SourceLine-number:active+.BunError-SourceLine-text{background-color:#6437e3;color:#fff}.BunError-SourceLine-number:hover{background-color:#7443fa;color:#fff}.BunError-SourceLine:hover .BunError-SourceLine-number{border-left-color:#7443fa}.BunError-SourceLine-number--empty{color:#a5a5a5}.BunError-SourceLine-number,.BunError-SourceLine-text{height:18px}.BunError-SourceLines-highlighter--0,.BunError-SourceLines-highlighter--1,.BunError-SourceLines-highlighter--2,.BunError-SourceLines-highlighter--3,.BunError-SourceLines-highlighter--4,.BunError-SourceLines-highlighter--5{position:absolute}#BunErrorOverlay-container .BunError-SourceLine-text--highlight{color:#e33737}#BunError-poweredBy{height:16px;content:url(data:image/png;base64,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)}#BunError-SourceLine-text-highlightExpression{font-weight:700;text-decoration-style:wavy}.BunError-JSException--TypeError #BunError-SourceLine-text-highlightExpression{border:1px solid rgba(0,0,0,.2)}.BunError-Indented{display:inline-block;user-select:none;-webkit-user-select:none}.BunError-divet{vertical-align:bottom;user-select:none;-webkit-user-select:none}.BunError-error-typename{font-family:var(--bun-error-monospace);color:#e39437;font-weight:700}.BunError-error-muted{font-weight:400;user-select:none;-webkit-user-select:none}.BunError-error-muted,.BunError-StackFrame--muted{color:#a5a5a5}.BunError-NativeStackTrace .BunError-error-typename{user-select:none;-webkit-user-select:none}.BunError-StackFrame-link{text-align:right}.BunError-StackFrame-link-content{display:flex;justify-content:flex-end;text-align:right;gap:.25ch;white-space:nowrap}.BunError-StackFrame{display:table-row}.BunError-StackFrame:hover{border-left-color:#5865f2}.BunError-StackFrame-identifier{padding-right:18px;font-size:.8em;font-family:var(--bun-error-monospace);letter-spacing:.49px;width:var(--max-length, auto);max-width:48ch;white-space:nowrap;text-overflow:clip;overflow:hidden}.BunError-error-message--mono{font-family:var(--bun-error-monospace)}.BunError-StackFrame-identifier,.BunError-StackFrame-link{display:table-cell;font-weight:500}.BunError-BuildError{padding-bottom:18px}.BunError-StackFrame-link-content{font-size:.8em}.BunError-StackFrames{display:table;table-layout:auto;width:100%;box-sizing:border-box;margin:0 auto;border-radius:4px;line-height:1.2;border-collapse:separate;border-spacing:12px 6px;background-color:#f4f4f4}.BunError-StackFrames-container{overflow-x:auto;max-width:var(--bun-error-width)}\\\\n</style>\\\\n\\\\n    <!-- prettier-ignore -->\\\\n    <script type=\\\\\\\"module\\\\\\\">\\\\n      globalThis.__BUN_DATA__ = JSON.parse(document.getElementById(\\\\\\\"__bunfallback\\\\\\\").textContent);\\\\n      document.getElementById(\\\\\\\"__bunfallback\\\\\\\").remove();\\\\n      var K,b,Te,lt,$,Se,Le,$e,Me,_e,ae,le,Ie,R={},Fe=[],ct=/acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord|itera/i,Q=Array.isArray;function N(e,t){for(var r in t)e[r]=t[r];return e}function fe(e){e&&e.parentNode&&e.parentNode.removeChild(e)}function ut(e,t,r){var n,o,i,a={};for(i in t)i==\\\\\\\"key\\\\\\\"?n=t[i]:i==\\\\\\\"ref\\\\\\\"?o=t[i]:a[i]=t[i];if(arguments.length>2&&(a.children=arguments.length>3?K.call(arguments,2):r),typeof e==\\\\\\\"function\\\\\\\"&&e.defaultProps!=null)for(i in e.defaultProps)a[i]===void 0&&(a[i]=e.defaultProps[i]);return G(e,a,n,o,null)}function G(e,t,r,n,o){var i={type:e,props:t,key:r,ref:n,__k:null,__:null,__b:0,__e:null,__c:null,constructor:void 0,__v:o??++Te,__i:-1,__u:0};return o==null&&b.vnode!=null&&b.vnode(i),i}function T(e){return e.children}function Z(e,t){this.props=e,this.context=t}function F(e,t){if(t==null)return e.__?F(e.__,e.__i+1):null;for(var r;t<e.__k.length;t++)if((r=e.__k[t])!=null&&r.__e!=null)return r.__e;return typeof e.type==\\\\\\\"function\\\\\\\"?F(e):null}function Pe(e){var t,r;if((e=e.__)!=null&&e.__c!=null){for(e.__e=e.__c.base=null,t=0;t<e.__k.length;t++)if((r=e.__k[t])!=null&&r.__e!=null){e.__e=e.__c.base=r.__e;break}return Pe(e)}}function ce(e){(!e.__d&&(e.__d=!0)&&$.push(e)&&!X.__r++||Se!=b.debounceRendering)&&((Se=b.debounceRendering)||Le)(X)}function X(){for(var e,t,r,n,o,i,a,_=1;$.length;)$.length>_&&$.sort($e),e=$.shift(),_=$.length,e.__d&&(r=void 0,n=void 0,o=(n=(t=e).__v).__e,i=[],a=[],t.__P&&((r=N({},n)).__v=n.__v+1,b.vnode&&b.vnode(r),de(t.__P,r,n,t.__n,t.__P.namespaceURI,32&n.__u?[o]:null,i,o??F(n),!!(32&n.__u),a),r.__v=n.__v,r.__.__k[r.__i]=r,He(i,r,a),n.__e=n.__=null,r.__e!=o&&Pe(r)));X.__r=0}function Ue(e,t,r,n,o,i,a,_,c,u,h){var s,f,d,v,y,m,p,g=n&&n.__k||Fe,E=t.length;for(c=_t(r,t,g,c,E),s=0;s<E;s++)(d=r.__k[s])!=null&&(f=d.__i==-1?R:g[d.__i]||R,d.__i=s,m=de(e,d,f,o,i,a,_,c,u,h),v=d.__e,d.ref&&f.ref!=d.ref&&(f.ref&&me(f.ref,null,d),h.push(d.ref,d.__c||v,d)),y==null&&v!=null&&(y=v),(p=!!(4&d.__u))||f.__k===d.__k?c=Ae(d,c,e,p):typeof d.type==\\\\\\\"function\\\\\\\"&&m!==void 0?c=m:v&&(c=v.nextSibling),d.__u&=-7);return r.__e=y,c}function _t(e,t,r,n,o){var i,a,_,c,u,h=r.length,s=h,f=0;for(e.__k=new Array(o),i=0;i<o;i++)(a=t[i])!=null&&typeof a!=\\\\\\\"boolean\\\\\\\"&&typeof a!=\\\\\\\"function\\\\\\\"?(c=i+f,(a=e.__k[i]=typeof a==\\\\\\\"string\\\\\\\"||typeof a==\\\\\\\"number\\\\\\\"||typeof a==\\\\\\\"bigint\\\\\\\"||a.constructor==String?G(null,a,null,null,null):Q(a)?G(T,{children:a},null,null,null):a.constructor==null&&a.__b>0?G(a.type,a.props,a.key,a.ref?a.ref:null,a.__v):a).__=e,a.__b=e.__b+1,_=null,(u=a.__i=ft(a,r,c,s))!=-1&&(s--,(_=r[u])&&(_.__u|=2)),_==null||_.__v==null?(u==-1&&(o>h?f--:o<h&&f++),typeof a.type!=\\\\\\\"function\\\\\\\"&&(a.__u|=4)):u!=c&&(u==c-1?f--:u==c+1?f++:(u>c?f--:f++,a.__u|=4))):e.__k[i]=null;if(s)for(i=0;i<h;i++)(_=r[i])!=null&&!(2&_.__u)&&(_.__e==n&&(n=F(_)),Re(_,_));return n}function Ae(e,t,r,n){var o,i;if(typeof e.type==\\\\\\\"function\\\\\\\"){for(o=e.__k,i=0;o&&i<o.length;i++)o[i]&&(o[i].__=e,t=Ae(o[i],t,r,n));return t}e.__e!=t&&(n&&(t&&e.type&&!t.parentNode&&(t=F(e)),r.insertBefore(e.__e,t||null)),t=e.__e);do t=t&&t.nextSibling;while(t!=null&&t.nodeType==8);return t}function ft(e,t,r,n){var o,i,a,_=e.key,c=e.type,u=t[r],h=u!=null&&(2&u.__u)==0;if(u===null&&e.key==null||h&&_==u.key&&c==u.type)return r;if(n>(h?1:0)){for(o=r-1,i=r+1;o>=0||i<t.length;)if((u=t[a=o>=0?o--:i++])!=null&&!(2&u.__u)&&_==u.key&&c==u.type)return a}return-1}function Ne(e,t,r){t[0]==\\\\\\\"-\\\\\\\"?e.setProperty(t,r??\\\\\\\"\\\\\\\"):e[t]=r==null?\\\\\\\"\\\\\\\":typeof r!=\\\\\\\"number\\\\\\\"||ct.test(t)?r:r+\\\\\\\"px\\\\\\\"}function q(e,t,r,n,o){var i,a;e:if(t==\\\\\\\"style\\\\\\\")if(typeof r==\\\\\\\"string\\\\\\\")e.style.cssText=r;else{if(typeof n==\\\\\\\"string\\\\\\\"&&(e.style.cssText=n=\\\\\\\"\\\\\\\"),n)for(t in n)r&&t in r||Ne(e.style,t,\\\\\\\"\\\\\\\");if(r)for(t in r)n&&r[t]==n[t]||Ne(e.style,t,r[t])}else if(t[0]==\\\\\\\"o\\\\\\\"&&t[1]==\\\\\\\"n\\\\\\\")i=t!=(t=t.replace(Me,\\\\\\\"$1\\\\\\\")),a=t.toLowerCase(),t=a in e||t==\\\\\\\"onFocusOut\\\\\\\"||t==\\\\\\\"onFocusIn\\\\\\\"?a.slice(2):t.slice(2),e.l||(e.l={}),e.l[t+i]=r,r?n?r.u=n.u:(r.u=_e,e.addEventListener(t,i?le:ae,i)):e.removeEventListener(t,i?le:ae,i);else{if(o==\\\\\\\"http://www.w3.org/2000/svg\\\\\\\")t=t.replace(/xlink(H|:h)/,\\\\\\\"h\\\\\\\").replace(/sName$/,\\\\\\\"s\\\\\\\");else if(t!=\\\\\\\"width\\\\\\\"&&t!=\\\\\\\"height\\\\\\\"&&t!=\\\\\\\"href\\\\\\\"&&t!=\\\\\\\"list\\\\\\\"&&t!=\\\\\\\"form\\\\\\\"&&t!=\\\\\\\"tabIndex\\\\\\\"&&t!=\\\\\\\"download\\\\\\\"&&t!=\\\\\\\"rowSpan\\\\\\\"&&t!=\\\\\\\"colSpan\\\\\\\"&&t!=\\\\\\\"role\\\\\\\"&&t!=\\\\\\\"popover\\\\\\\"&&t in e)try{e[t]=r??\\\\\\\"\\\\\\\";break e}catch{}typeof r==\\\\\\\"function\\\\\\\"||(r==null||r===!1&&t[4]!=\\\\\\\"-\\\\\\\"?e.removeAttribute(t):e.setAttribute(t,t==\\\\\\\"popover\\\\\\\"&&r==1?\\\\\\\"\\\\\\\":r))}}function Be(e){return function(t){if(this.l){var r=this.l[t.type+e];if(t.t==null)t.t=_e++;else if(t.t<r.u)return;return r(b.event?b.event(t):t)}}}function de(e,t,r,n,o,i,a,_,c,u){var h,s,f,d,v,y,m,p,g,E,w,B,H,Ce,V,O,se,S=t.type;if(t.constr…\\\",\\\"code\\\":\\\"provider_unavailable\\\",\\\"title\\\":\\\"Provider unavailable\\\",\\\"message\\\":\\\"Internal Server Error\\\",\\\"retryable\\\":true}}\"}\n\ndata: [DONE]\n\n",
+  "dispatches": [
+    {
+      "destination": "sink@example.test",
+      "body": "fixture body"
+    }
+  ]
+}

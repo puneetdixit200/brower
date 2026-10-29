@@ -1,0 +1,348 @@
+{
+  "status": "passed",
+  "mode": "approval-only",
+  "serverBinary": "/home/puneet/Projects/aster-browser/upstream-browseros/packages/browseros-agent/dist/prod/aster-server/linux-x64/resources/bin/aster_server",
+  "serverSha256": "13f239a16c47eef9955f37f4988206ab50cfc5e185c2c1212810ef38a32522af",
+  "config": {
+    "ports": {
+      "server": 43711,
+      "cdp": 34145
+    },
+    "directories": {
+      "resources": "/home/puneet/Projects/aster-browser/upstream-browseros/packages/browseros-agent/dist/prod/aster-server/linux-x64/resources",
+      "execution": "/tmp/aster-chat-process-DpJbSE/execution"
+    },
+    "flags": {
+      "allow_remote_in_mcp": false
+    },
+    "instance": {
+      "client_id": "process-approval-fixture",
+      "install_id": "process-approval-fixture",
+      "browseros_version": "integration-fixture",
+      "chromium_version": "system-chromium"
+    }
+  },
+  "ports": {
+    "server": 43711,
+    "cdp": 34145,
+    "model": 38787,
+    "mcp": 45601,
+    "page": 35117
+  },
+  "requestCount": 4,
+  "modelMessages": [
+    {
+      "requestIndex": 0,
+      "messages": [
+        {
+          "role": "user",
+          "content": "<USER_QUERY>\nSend the fixture message.\n</USER_QUERY>"
+        }
+      ]
+    },
+    {
+      "requestIndex": 1,
+      "messages": [
+        {
+          "role": "user",
+          "content": "Send the fixture message."
+        },
+        {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "fixture-call-chatcmpl-process-fixture-1",
+              "type": "function",
+              "function": {
+                "name": "send_message",
+                "arguments": "{\"destination\":\"sink@example.test\",\"body\":\"fixture body\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "fixture accepted",
+          "tool_call_id": "fixture-call-chatcmpl-process-fixture-1"
+        }
+      ]
+    },
+    {
+      "requestIndex": 2,
+      "messages": [
+        {
+          "role": "user",
+          "content": "<USER_QUERY>\nSend the fixture message.\n</USER_QUERY>"
+        }
+      ]
+    },
+    {
+      "requestIndex": 3,
+      "messages": [
+        {
+          "role": "user",
+          "content": "Send the fixture message."
+        },
+        {
+          "role": "assistant",
+          "content": null,
+          "tool_calls": [
+            {
+              "id": "fixture-call-chatcmpl-process-fixture-3",
+              "type": "function",
+              "function": {
+                "name": "send_message",
+                "arguments": "{\"destination\":\"sink@example.test\",\"body\":\"fixture body\"}"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "Tool call execution denied.",
+          "tool_call_id": "fixture-call-chatcmpl-process-fixture-3"
+        }
+      ]
+    }
+  ],
+  "advertisedToolNames": [
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ],
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ],
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ],
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ]
+  ],
+  "syntheticModelResponses": [
+    {
+      "id": "chatcmpl-process-fixture-1",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "index": 0,
+                "id": "fixture-call-chatcmpl-process-fixture-1",
+                "type": "function",
+                "function": {
+                  "name": "send_message",
+                  "arguments": "{\"destination\":\"sink@example.test\",\"body\":\"fixture body\"}"
+                }
+              }
+            ]
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-1",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "tool_calls"
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-2",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "content": "Fixture turn complete."
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-2",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "stop"
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-3",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "index": 0,
+                "id": "fixture-call-chatcmpl-process-fixture-3",
+                "type": "function",
+                "function": {
+                  "name": "send_message",
+                  "arguments": "{\"destination\":\"sink@example.test\",\"body\":\"fixture body\"}"
+                }
+              }
+            ]
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-3",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "tool_calls"
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-4",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "content": "Fixture turn complete."
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-4",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "stop"
+        }
+      ]
+    }
+  ],
+  "browserToolSteps": [],
+  "browserPageRequests": [],
+  "browserResponseSse": "",
+  "localPageTitle": "Aster Local Fixture",
+  "localPageSentinel": "ASTER_LOCAL_PAGE_SENTINEL_71C4",
+  "approvedApprovalObserved": true,
+  "deniedApprovalObserved": true,
+  "approvedDispatches": [
+    {
+      "destination": "sink@example.test",
+      "body": "fixture body"
+    }
+  ],
+  "deniedAdditionalDispatches": 0,
+  "evidencePath": "/tmp/aster-chat-process-DpJbSE/evidence.json"
+}

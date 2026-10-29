@@ -1,5 +1,13 @@
 # Progress
 
+Allowance checkpoint — 2026-10-30: actual short-window usage reached 95% (5% remaining); weekly usage was 77%. New work stopped under the user quota rule. Reviewed work and evidence are committed/pushed; full goal remains incomplete. Resume with the executable next steps below after allowance/user direction permits.
+
+### T19/T30 compiled-sidecar transport fixture — 2026-10-30
+
+The built Aster sidecar, disposable SQLite/state, real loopback OpenAI-compatible endpoint and real MCP message sink verify pending approval, one approved dispatch, repeated approval HTTP409 and zero extra dispatch on denial. [Retained evidence](evidence/aster-process-approval-2026-10-30/final-approval-pass/evidence.json). The first launch harness failed on Bun stream stdio; numeric file descriptors fix that compatibility issue. Final command `bun tests/integration/process-approval-fixture.ts --execute` passes against the final approval-only harness; `--browser` opts into the separately blocked browser scenario. Targeted Biome, standalone TypeScript and dry-run plans pass; independent Luna review covers protocol/config/cleanup. This is actual-process server/MCP fixture evidence, not live-provider, UI or Aster-native acceptance.
+
+Two browser-scenario attempts correctly fail before navigation: stock `/usr/bin/chromium` lacks BrowserOS-specific `Browser.getTabs`, invoked by `packages/browser-core/src/core/pages.ts`. [Exact tool error and inbound synthetic messages](evidence/aster-process-approval-2026-10-30/browser-diagnostic/evidence.json). Do not retry this prerequisite unchanged. Use a compatible BrowserOS/Aster build, then verify returned tab targeting, local navigation and title/sentinel; restart/stop/expired or altered-grant acceptance remains open. A06/R02 remain PARTIAL.
+
 ### T14.3 / A13 refused-send draft preservation — 2026-10-30
 
 Home now explicitly refuses Send when the provider/target is unavailable or routing is waiting. The composer awaits acceptance, preserves text/attachments/context on refusal or failure, shows a safe error for failures, and blocks duplicate submission. A revision guard preserves edits made during the await. App `bun run compile` (WXT prepare + TypeScript), targeted Biome and independent Luna review pass. No DOM interaction test or headed missing-provider acceptance ran; A13 remains PARTIAL.

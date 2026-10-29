@@ -1,5 +1,7 @@
 # Aster next steps
 
+Allowance checkpoint — 2026-10-30: actual short-window usage reached 95% (5% remaining); weekly usage was 77%. New work stopped under the user quota rule. Reviewed work and evidence are committed/pushed; full goal remains incomplete. Resume with the executable next steps below after allowance/user direction permits.
+
 T14.3 / A13 source checkpoint (2026-10-30): refused or failed Home sends now preserve drafts/context, including edits while async acceptance is pending. Typecheck/lint/review pass; next verify missing-provider Send, delayed handoff and duplicate submission in a reliable headed runtime. No UI interaction test is claimed.
 
 Latest B05 source checkpoint (2026-10-30): Pause/Resume/Cancel and fresh privacy/item checks pass 12 focused tests plus typecheck/review. The sandboxed headed fixture reached the real in-progress row but stalled before verifying actions; retained evidence is under `docs/evidence/aster-b05-controls-2026-10-30/`. The corrected run localized the stall to Puppeteer click dispatch (five-second timeout), with confirmed cleanup. Two focused attempts hit the headed automation dependency: defer further retries and use a supported native/reliable click path when available; native/package acceptance stays open. The current compiled sidecar resources have retained provenance; next exercise real HTTP chat/provider/MCP approval transport in disposable state.
@@ -12,7 +14,7 @@ Checkpoint: 2026-10-29, branch `feat/aster-linux-ui`. This repository contains t
 
 ## Next execution order
 
-- **T19/T30 integration follow-up (2026-10-30):** the real ChatService → ToolLoopAgent → SQLite approval/claim → controlled tool callback now proves approve-once, deny and repeated-approval rejection (29/29 affected server tests). Next extend the same fixture boundary to controlled stop and service-process restart without mutation replay, then use actual browser/MCP transport in disposable state. Keep A06/R02 PARTIAL.
+- **T19/T30 actual-process follow-up (2026-10-30):** compiled-sidecar HTTP → deterministic local model → actual MCP message sink verifies approve-once, denial and replay HTTP409. `apps/server/tests/integration/process-approval-fixture.ts` retains an opt-in browser scenario. Stock Chromium cannot run production browser tools: `Browser.getTabs` is missing. Use a compatible BrowserOS/Aster binary before retrying `--browser`; preserve this prerequisite instead of weakening/replacing production tools. Next test actual stop/killed-sidecar restart and stale/altered grant rejection in disposable state without mutation replay. A06/R02 remain PARTIAL.
 
 - **T20a build-tool follow-up (2026-10-30):** an explicit validated `BROWSEROS_NINJA_BINARY` can select the pinned in-tree executable; individual-target builds now retain the depot_tools environment (23 command-construction tests pass). This does not recover `.ninja_log` or authorize a broad rebuild. The current B03 source now passes a temp-only pinned clang syntax check with current generated API and histogram headers. Next recover authentic incremental-state provenance or provision a suitable clean build host, align current extension/server resource artifacts, then compile/link; preserve the 319-path native worktree. Native launch remains blocked.
 

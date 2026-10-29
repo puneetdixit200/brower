@@ -1,0 +1,33 @@
+{
+  "status": "failed",
+  "error": "Passing a stream.Readable without an underlying file descriptor as stdio[1] is not yet implemented in Bun",
+  "ports": {
+    "server": 38591,
+    "cdp": 40741,
+    "model": 34309,
+    "mcp": 37043
+  },
+  "config": {
+    "ports": {
+      "server": 38591,
+      "cdp": 40741
+    },
+    "directories": {
+      "resources": "/home/puneet/Projects/aster-browser/upstream-browseros/packages/browseros-agent/dist/prod/aster-server/linux-x64/resources",
+      "execution": "/tmp/aster-chat-process-pTh8Qj/execution"
+    },
+    "flags": {
+      "allow_remote_in_mcp": false
+    },
+    "instance": {
+      "client_id": "process-approval-fixture",
+      "install_id": "process-approval-fixture",
+      "browseros_version": "integration-fixture",
+      "chromium_version": "system-chromium"
+    }
+  },
+  "requestCount": 0,
+  "advertisedToolNames": [],
+  "syntheticModelResponses": [],
+  "dispatches": []
+}
