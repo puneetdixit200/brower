@@ -1,5 +1,9 @@
 # Progress
 
+### B08 credential and login-handoff source verification — 2026-10-29
+
+Verified the existing human-login handoff suite (10/10, 44 assertions), model-facing credential catalog fixture (1/1, 11 assertions), and credential-filter tests (2/2, 5 assertions). These source tests show that credential-export tools and internal raw page-code tools are excluded from the model catalog and that login continuation is human-mediated without replaying a tool call. They do not exercise Chromium's real saved-password autofill, extension interoperability or dummy-account sentinel behavior in an Aster package. Keep B08 and P01 PARTIAL; next run T07.1/T07.2 in a disposable headed Aster profile with fixture credentials only.
+
 ### B07 incognito durable-read gate — 2026-10-29
 
 The chat hook now waits for the hosting window classification before attaching a side-panel tab to saved run state or restoring a conversation from a URL. Incognito skips those durable reads and removes the conversation query parameter. A second audit found the ACP server path read and wrote display-history records without consulting `persist`; both now use `shouldPersist(request)`. When persistence is disabled, ACP falls back to supplied transient history and does not access ConversationStore; scheduled tasks retain the existing explicit-persistence requirement. The window probe fails closed on error and client message persistence remains disabled in incognito. Focused checks pass: chat persistence 10/10 (13 assertions), server persistence mode 8/8 (13), ACP service 12/12 (55), recent tasks 2/2 (4), and Sentry/incognito 1/1 (15); app/server typechecks, targeted Biome and diff check pass. Independent Luna reviews found no remaining issue. This is source evidence only; headed Aster profile isolation and end-to-end tool, memory, screenshot, download and telemetry checks remain open. Keep B07 PARTIAL and matrix accounting at 2/72 PASS (2.8%).
