@@ -51,6 +51,7 @@ import {
 import { useChatRefs } from './chat-refs.hooks'
 import { decideChatSend, drainPendingSends } from './chat-send-decision'
 import {
+  canAccessPersistedConversation,
   didStreamingTurnFinish,
   getPersistableMessages,
   shouldPersistHistory,
@@ -186,10 +187,14 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   // false for a side panel in spanning mode). This settles long before any turn
   // ends, so the turn-end save always sees the correct value.
   const [isIncognito, setIsIncognito] = useState(true)
+  const [incognitoResolved, setIncognitoResolved] = useState(false)
   useEffect(() => {
     let cancelled = false
     isIncognitoWindow().then((incognito) => {
-      if (!cancelled) setIsIncognito(incognito)
+      if (!cancelled) {
+        setIsIncognito(incognito)
+        setIncognitoResolved(true)
+      }
     })
     return () => {
       cancelled = true
@@ -726,7 +731,11 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   }, [detachView])
 
   useEffect(() => {
-    if (optionsRef.current?.origin === 'newtab') return
+    if (
+      optionsRef.current?.origin === 'newtab' ||
+      !canAccessPersistedConversation(isIncognito, incognitoResolved)
+    )
+      return
     let cancelled = false
     let tabId: number | undefined
     let latestViews:
@@ -814,7 +823,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
       unwatch()
       void detachView()
     }
-  }, [detachView, resumeStream, setMessages])
+  }, [detachView, incognitoResolved, isIncognito, resumeStream, setMessages])
 
   // Two cleanups once a turn is no longer streaming: drop messages with
   // empty parts (interrupted responses trip AI SDK validation on the next
@@ -837,6 +846,13 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   useEffect(() => {
     if (!conversationIdParam) return
     if (restoredConversationId === conversationIdParam) return
+
+    if (!incognitoResolved) return
+    if (isIncognito) {
+      setRestoredConversationId(conversationIdParam)
+      setSearchParams({}, { replace: true })
+      return
+    }
 
     if (isLoadingProviders || isLoadingAgentUrl) return
     let cancelled = false
@@ -899,6 +915,8 @@ export const useChatSession = (options?: ChatSessionOptions) => {
     }
   }, [
     conversationIdParam,
+    incognitoResolved,
+    isIncognito,
     isLoadingProviders,
     isLoadingAgentUrl,
     restoreAttempt,

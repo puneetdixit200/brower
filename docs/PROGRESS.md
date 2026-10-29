@@ -1,5 +1,9 @@
 # Progress
 
+### B07 incognito durable-read gate — 2026-10-29
+
+The chat hook now waits for the hosting window classification before attaching a side-panel tab to saved run state or restoring a conversation from a URL. Incognito skips those durable reads and removes the conversation query parameter. The window probe already fails closed on error; message persistence remains disabled in incognito. Focused checks pass: chat persistence 10/10 (13 assertions), server persistence mode 8/8 (13), recent tasks 2/2 (4), and Sentry/incognito 1/1 (15); app typecheck and targeted Biome pass. Independent Luna review found no remaining issue in the changed paths. This is source evidence only; headed Aster profile isolation and end-to-end tool, memory, screenshot, download, telemetry and server persistence checks remain open. Keep B07 PARTIAL and matrix accounting at 2/72 PASS (2.8%).
+
 ### B06 recent history source slice — 2026-10-29
 
 Recent history selection now validates HTTP(S) URLs, fills at most eight rows from a bounded backward search (32 results per page, eight pages maximum), deduplicates IDs and falls back to the URL for missing titles. The private-window check remains before history access. Five focused selector/paging tests pass (7 assertions); existing bookmark-data tests pass 6/6 (21 assertions) and history-context tests pass 4/4 (10 assertions). App typecheck, targeted Biome and `git diff --check` pass. The search can return fewer than eight rows when the bounded history window contains too few eligible URLs or page-boundary timestamps prevent further progress. Headed UI, native import/export, restart and profile acceptance remain open; keep B06 PARTIAL and matrix accounting at 2/72 PASS (2.8%).

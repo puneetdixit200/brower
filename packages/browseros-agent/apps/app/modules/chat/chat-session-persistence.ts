@@ -27,3 +27,11 @@ export function shouldPersistHistory(
 ): boolean {
   return !isIncognito && !isTemporaryChat
 }
+
+/** Wait until the owning window is known before reading durable conversations. */
+export function canAccessPersistedConversation(
+  isIncognito: boolean,
+  incognitoResolved: boolean,
+): boolean {
+  return incognitoResolved && !isIncognito
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import type { ChatStatus, UIMessage } from 'ai'
 import {
+  canAccessPersistedConversation,
   didStreamingTurnFinish,
   getPersistableMessages,
   shouldPersistHistory,
@@ -18,6 +19,20 @@ describe('shouldPersistHistory', () => {
 
   it('does not persist a temporary chat even in a normal context', () => {
     expect(shouldPersistHistory(false, true)).toBe(false)
+  })
+})
+
+describe('canAccessPersistedConversation', () => {
+  it('waits until the owning window is known', () => {
+    expect(canAccessPersistedConversation(true, false)).toBe(false)
+  })
+
+  it('denies durable conversation reads in incognito', () => {
+    expect(canAccessPersistedConversation(true, true)).toBe(false)
+  })
+
+  it('allows durable conversation reads in a confirmed regular window', () => {
+    expect(canAccessPersistedConversation(false, true)).toBe(true)
   })
 })
 
