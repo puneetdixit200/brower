@@ -1,5 +1,9 @@
 # Progress
 
+### B03 pinned native syntax check — 2026-10-30
+
+The current API source/header/IDL plus histogram enum passed a temp-only pinned Chromium API-generator and clang syntax check. The first attempt exposed a missing staged enum, corrected in the second attempt; no native source defect was found. The adjacent checkout's HEAD/status fingerprint was unchanged. [Raw argv, staging script and hashes](evidence/aster-b03-syntax-2026-10-30.json) distinguish this from object compilation, linking or native runtime acceptance. B03/T20a remain PARTIAL.
+
 ### T19/T30 production approval-to-dispatch server fixture — 2026-10-30
 
 The deterministic fixture now uses real ChatService, AiSdkAgent, ToolLoopAgent, SQLite approval grants and execution claims, and an in-memory tool callback. Pending approval prevents dispatch; explicit approval dispatches once; repeating the approval returns 409; denial adds no dispatch. Root verification: `bun test tests/api/services/chat-service.test.ts tests/agent/tool-execution-claim.test.ts tests/agent/stale-approval-execution.test.ts` passes 29/29 (128 assertions). Server typecheck, targeted Biome and independent Luna review pass. This is a server integration fixture, not external MCP/browser transport, live-provider, process-restart or Aster-native evidence. A06/R02 remain PARTIAL.
