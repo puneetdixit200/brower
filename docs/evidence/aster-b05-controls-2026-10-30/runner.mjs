@@ -1,17 +1,31 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import http from 'node:http'
+import os from 'node:os'
 import path from 'node:path'
-import puppeteer from '/home/puneet/Projects/aster-browser/upstream-browseros/packages/browseros-agent/node_modules/.bun/puppeteer-core@25.12.0+a7296ceb8571f923/node_modules/puppeteer-core/lib/puppeteer/puppeteer-core.js'
+import { createRequire } from 'node:module'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
-const extensionDir =
-  '/home/puneet/Projects/aster-browser/upstream-browseros/packages/browseros-agent/apps/app/dist/chrome-mv3-dev'
-const profileDir = '/tmp/aster-b05-profile-cubyqgiy'
+const evidenceRoot = path.dirname(fileURLToPath(import.meta.url))
+const repoRoot = path.resolve(evidenceRoot, '../../..')
+const require = createRequire(path.join(repoRoot, 'packages/browseros-agent/package.json'))
+let puppeteer
+try {
+  puppeteer = require('puppeteer-core')
+} catch {
+  const bunStore = path.join(repoRoot, 'packages/browseros-agent/node_modules/.bun')
+  const packageDir = fs.readdirSync(bunStore).find((entry) => entry.startsWith('puppeteer-core@'))
+  if (!packageDir) throw new Error('Could not resolve puppeteer-core from the workspace')
+  const entry = path.join(bunStore, packageDir, 'node_modules/puppeteer-core/lib/puppeteer/puppeteer-core.js')
+  puppeteer = (await import(pathToFileURL(entry).href)).default
+}
+const extensionDir = path.join(repoRoot, 'packages/browseros-agent/apps/app/dist/chrome-mv3-dev')
+const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aster-b05-profile-'))
 const downloadsDir = path.join(profileDir, 'Downloads')
-const evidenceDir = '/tmp/aster-b05-evidence-20261030'
+const evidenceDir = path.join(evidenceRoot, `run-${Date.now()}-${process.pid}`)
 const logPath = path.join(evidenceDir, 'smoke.log')
 const jsonPath = path.join(evidenceDir, 'result.json')
-const fixtureFilename = 'aster-b05-verified.bin'
+const fixtureFilename = `aster-b05-${process.pid}-${Date.now()}.bin`
 const fixtureSize = 24 * 1024 * 1024
 const fixtureBlock = Buffer.from(Array.from({ length: 65536 }, (_, i) => i % 251))
 const sourceHashes = {
@@ -23,20 +37,175 @@ const sourceHashes = {
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const events = []
 let browser
+let browserLaunchPromise
+let lateBrowserClosePromise
 let server
 let appPage
 let downloadId
 let completion = 'not_started'
+let cleanupPromise
+let signalReceived = false
+let cleanupStarted = false
 
 fs.mkdirSync(evidenceDir, { recursive: true })
 fs.mkdirSync(downloadsDir, { recursive: true })
-fs.writeFileSync(logPath, '')
 
 function record(event, data = {}) {
   const entry = { at: new Date().toISOString(), event, ...data }
   events.push(entry)
   fs.appendFileSync(logPath, `${JSON.stringify(entry)}\n`)
   process.stdout.write(`${JSON.stringify(entry)}\n`)
+}
+
+function ownedChromePids() {
+  return fs.readdirSync('/proc')
+    .filter((entry) => /^\d+$/.test(entry))
+    .map(Number)
+    .filter((pid) => {
+      try {
+        return fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8')
+          .includes(`--user-data-dir=${profileDir}`)
+      } catch {
+        return false
+      }
+    })
+}
+
+async function terminateOwnedChromeProcesses() {
+  for (const pid of ownedChromePids()) {
+    record('owned_chrome_process_cleanup', { pid, signal: 'SIGTERM' })
+    try {
+      process.kill(pid, 'SIGTERM')
+    } catch {}
+  }
+  const terminateDeadline = Date.now() + 2500
+  while (Date.now() < terminateDeadline && ownedChromePids().length > 0) await wait(100)
+  for (const pid of ownedChromePids()) {
+    record('owned_chrome_process_cleanup', { pid, signal: 'SIGKILL' })
+    try {
+      if (ownedChromePids().includes(pid)) process.kill(pid, 'SIGKILL')
+    } catch {}
+  }
+  const killDeadline = Date.now() + 3000
+  while (Date.now() < killDeadline && ownedChromePids().length > 0) await wait(100)
+  const remainingPids = ownedChromePids()
+  if (remainingPids.length > 0) {
+    record('owned_chrome_processes_remain', { pids: remainingPids, profileDir })
+    return false
+  }
+  return true
+}
+
+async function cleanupResources() {
+  if (cleanupPromise) return cleanupPromise
+  cleanupStarted = true
+  cleanupPromise = (async () => {
+    if (browserLaunchPromise && !browser) {
+      try {
+        await bounded(
+          'browser_launch_settle_during_cleanup',
+          () => browserLaunchPromise.then((launchedBrowser) => {
+            browser = launchedBrowser
+          }),
+          21000,
+        )
+      } catch (error) {
+        record('browser_launch_cleanup_note', { message: String(error) })
+      }
+    }
+    if (lateBrowserClosePromise) {
+      try {
+        await bounded('late_browser_close_wait', () => lateBrowserClosePromise, 5500)
+      } catch (error) {
+        record('late_browser_close_wait_note', { message: String(error) })
+      }
+    }
+    if (browser && downloadId !== undefined && appPage) {
+      try {
+        const items = await bounded(
+          'cleanup_search_task_download',
+          () => appPage.evaluate((id) => chrome.downloads.search({ id }), downloadId),
+          3000,
+        )
+        const current = items[0]
+        if (current?.state === 'in_progress') {
+          await bounded(
+            'cleanup_cancel_task_download',
+            () => appPage.evaluate((id) => chrome.downloads.cancel(id), downloadId),
+            3000,
+          )
+        }
+        if (current?.state === 'complete') {
+          await bounded(
+            'cleanup_remove_task_download',
+            () => appPage.evaluate((id) => chrome.downloads.removeFile(id), downloadId),
+            3000,
+          )
+        }
+      } catch (error) {
+        record('fixture_cleanup_note', { message: error?.stack || String(error) })
+      }
+    }
+
+    if (browser) {
+      try {
+        await bounded('browser_close', () => browser.close(), 5000)
+      } catch (error) {
+        record('browser_close_note', { message: String(error) })
+      }
+    }
+    const chromeStopped = await terminateOwnedChromeProcesses()
+
+    if (server) {
+      try {
+        await bounded('fixture_server_close', () => new Promise((resolve) => server.close(resolve)), 4000)
+      } catch (error) {
+        record('fixture_server_close_note', { message: String(error) })
+      }
+    }
+    if (chromeStopped) {
+      fs.rmSync(profileDir, { recursive: true, force: true })
+    } else {
+      record('profile_preserved_for_live_owned_process', { profileDir })
+    }
+    record('cleanup_complete', { profileDir, evidenceDir, completion, chromeStopped })
+    fs.writeFileSync(jsonPath, JSON.stringify({ completion, events }, null, 2))
+  })()
+  return cleanupPromise
+}
+
+for (const [signal, exitCode] of [['SIGTERM', 143], ['SIGINT', 130]]) {
+  process.once(signal, () => {
+    signalReceived = true
+    completion = 'terminated'
+    record('signal_received', { signal })
+    void cleanupResources()
+      .catch((error) => record('signal_cleanup_error', { message: String(error) }))
+      .finally(() => process.exit(exitCode))
+  })
+}
+
+async function bounded(label, operation, timeoutMs = 5000) {
+  record('stage_start', { label, timeoutMs })
+  let timer
+  try {
+    const result = await Promise.race([
+      Promise.resolve().then(operation),
+      new Promise((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`${label} exceeded ${timeoutMs}ms`)),
+          timeoutMs,
+        )
+      }),
+    ])
+    record('stage_complete', { label })
+    return result
+  } catch (error) {
+    record('stage_failed', { label, message: error?.stack || String(error) })
+    throw error
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 function extensionId() {
@@ -95,16 +264,16 @@ const serverPromise = new Promise((resolve, reject) => {
 })
 
 async function currentDownload() {
-  return appPage.evaluate(async (name) => {
+  return bounded('download_search', () => appPage.evaluate(async (name) => {
     const items = await chrome.downloads.search({ orderBy: ['-startTime'] })
     return items.find((item) => item.filename.endsWith(name)) || null
-  }, fixtureFilename)
+  }, fixtureFilename), 4000)
 }
 
 async function waitFor(predicate, label, timeoutMs = 8000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    const value = await predicate()
+    const value = await bounded(`${label}_poll`, predicate, Math.max(1, deadline - Date.now()))
     if (value) return value
     await wait(100)
   }
@@ -112,26 +281,26 @@ async function waitFor(predicate, label, timeoutMs = 8000) {
 }
 
 async function capture(label, item) {
-  await appPage.$eval('ul[aria-label="Recent downloads"]', (node) =>
+  await bounded(`${label}_scroll`, () => appPage.$eval('ul[aria-label="Recent downloads"]', (node) =>
     node.scrollIntoView({ block: 'center' }),
-  )
+  ))
   const screenshotPath = path.join(evidenceDir, `${label}.png`)
-  await appPage.screenshot({ path: screenshotPath })
+  await bounded(`${label}_screenshot`, () => appPage.screenshot({ path: screenshotPath }), 8000)
   record('ui_snapshot', {
     label,
     item,
-    visibleRows: await appPage.$eval(
+    visibleRows: await bounded(`${label}_read_rows`, () => appPage.$eval(
       'ul[aria-label="Recent downloads"]',
       (node) => node.innerText,
-    ),
+    )),
     screenshotPath,
   })
 }
 
 try {
-  const port = await serverPromise
+  const port = await bounded('fixture_server_listen', () => serverPromise, 5000)
   const id = extensionId()
-  browser = await puppeteer.launch({
+  browserLaunchPromise = puppeteer.launch({
     executablePath: '/usr/bin/chromium',
     headless: false,
     userDataDir: profileDir,
@@ -149,13 +318,22 @@ try {
       `--disable-extensions-except=${extensionDir}`,
     ],
   })
+  browserLaunchPromise.then((lateBrowser) => {
+    if (!cleanupStarted && completion !== 'failed' && !signalReceived) return
+    browser = lateBrowser
+    lateBrowserClosePromise = bounded('late_browser_close', () => lateBrowser.close(), 5000)
+      .catch((error) => {
+        record('late_browser_close_note', { message: String(error) })
+      })
+  }, () => {})
+  browser = await bounded('browser_launch', () => browserLaunchPromise, 25000)
   const spawnArgs = browser.process().spawnargs
   if (spawnArgs.some((arg) => arg.includes('no-sandbox') || arg.includes('disable-setuid-sandbox'))) {
     throw new Error('Sandbox flag audit rejected the Chromium argv')
   }
   record('browser_started', {
     executable: '/usr/bin/chromium',
-    version: (await browser.version()),
+    version: await bounded('browser_version', () => browser.version()),
     argv: spawnArgs,
     profileDir,
     downloadsDir,
@@ -166,41 +344,54 @@ try {
     sourceHashes,
   })
 
-  const sandboxPage = await browser.newPage()
-  await sandboxPage.goto('chrome://sandbox')
+  const sandboxPage = await bounded('sandbox_page_create', () => browser.newPage())
+  await bounded('sandbox_page_goto', () => sandboxPage.goto('chrome://sandbox'))
+  const sandboxText = await bounded('sandbox_status_read', () => sandboxPage.$eval('body', (node) => node.innerText))
+  const requiredSandboxEvidence = [
+    'PID namespaces\tYes',
+    'Network namespaces\tYes',
+    'Seccomp-BPF sandbox\tYes',
+    'You are adequately sandboxed.',
+  ]
+  const missingSandboxEvidence = requiredSandboxEvidence.filter((entry) => !sandboxText.includes(entry))
   record('sandbox_status', {
     url: sandboxPage.url(),
-    text: await sandboxPage.$eval('body', (node) => node.innerText),
+    text: sandboxText,
+    passed: missingSandboxEvidence.length === 0,
+    missing: missingSandboxEvidence,
   })
-  await sandboxPage.close()
+  if (missingSandboxEvidence.length > 0) {
+    throw new Error(`Chromium sandbox status missing required evidence: ${missingSandboxEvidence.join(', ')}`)
+  }
+  await bounded('sandbox_page_close', () => sandboxPage.close())
 
-  const browserCdp = await browser.target().createCDPSession()
-  await browserCdp.send('Browser.setDownloadBehavior', {
+  const browserCdp = await bounded('cdp_session_create', () => browser.target().createCDPSession())
+  await bounded('download_path_set', () => browserCdp.send('Browser.setDownloadBehavior', {
     behavior: 'allow',
     downloadPath: downloadsDir,
     eventsEnabled: true,
-  })
+  }))
   record('download_path_set', { downloadsDir })
 
-  appPage = await browser.newPage()
+  appPage = await bounded('app_page_create', () => browser.newPage())
   appPage.on('pageerror', (error) => record('page_error', { message: error.message }))
-  await appPage.goto(`chrome-extension://${id}/app.html#/home`)
-  await appPage.waitForSelector('button[aria-label="Downloads"]', { timeout: 15000 })
-  await appPage.evaluate(() => {
+  await bounded('app_page_goto', () => appPage.goto(`chrome-extension://${id}/app.html#/home`), 15000)
+  await bounded('downloads_control_wait', () => appPage.waitForSelector('button[aria-label="Downloads"]', { timeout: 12000 }), 13000)
+  await bounded('open_downloads_ui', () => appPage.evaluate(() => {
     const title = [...document.querySelectorAll('*')].find(
       (node) => node.childElementCount === 0 && node.textContent === 'Import your data',
     )
     title?.parentElement?.parentElement?.querySelector('button')?.click()
     document.querySelector('button[aria-label="Downloads"]')?.click()
-  })
+  }))
 
-  const trigger = await browser.newPage()
-  await trigger
+  const trigger = await bounded('fixture_page_create', () => browser.newPage())
+  await bounded('fixture_download_navigation', () => trigger
     .goto(`http://127.0.0.1:${port}/slow.bin`, {
       waitUntil: 'domcontentloaded',
       timeout: 10000,
     })
-    .catch((error) => record('download_navigation', { result: error.message.split('\n')[0] }))
+    .catch((error) => record('download_navigation', { result: error.message.split('\n')[0] })), 11000)
 
   let item = await waitFor(async () => {
     const value = await currentDownload()
@@ -210,9 +401,9 @@ try {
   record('download_started', { item })
   await capture('in-progress', item)
 
-  const pauseButton = await appPage.$(`button[aria-label="Pause ${fixtureFilename}"]`)
+  const pauseButton = await bounded('pause_button_lookup', () => appPage.$(`button[aria-label="Pause ${fixtureFilename}"]`))
   if (!pauseButton) throw new Error('Pause control was not rendered')
-  await pauseButton.click()
+  await bounded('pause_button_click', () => pauseButton.click(), 5000)
   item = await waitFor(async () => {
     const value = await currentDownload()
     return value?.paused ? value : null
@@ -221,9 +412,9 @@ try {
   record('download_paused', { item })
   await capture('paused', item)
 
-  const resumeButton = await appPage.$(`button[aria-label="Resume ${fixtureFilename}"]`)
+  const resumeButton = await bounded('resume_button_lookup', () => appPage.$(`button[aria-label="Resume ${fixtureFilename}"]`))
   if (!resumeButton) throw new Error('Resume control was not rendered')
-  await resumeButton.click()
+  await bounded('resume_button_click', () => resumeButton.click(), 5000)
   item = await waitFor(async () => {
     const value = await currentDownload()
     return value && !value.paused && value.bytesReceived > pausedBytes ? value : null
@@ -231,9 +422,9 @@ try {
   record('download_resumed', { item, bytesAtPause: pausedBytes })
   await capture('resumed', item)
 
-  const cancelButton = await appPage.$(`button[aria-label="Cancel ${fixtureFilename}"]`)
+  const cancelButton = await bounded('cancel_button_lookup', () => appPage.$(`button[aria-label="Cancel ${fixtureFilename}"]`))
   if (!cancelButton) throw new Error('Cancel control was not rendered')
-  await cancelButton.click()
+  await bounded('cancel_button_click', () => cancelButton.click(), 5000)
   item = await waitFor(async () => {
     const value = await currentDownload()
     return value && value.state === 'interrupted' && value.error === 'USER_CANCELED'
@@ -244,24 +435,10 @@ try {
   await capture('canceled', item)
   completion = 'passed'
 } catch (error) {
-  completion = 'failed'
+  completion = signalReceived ? 'terminated' : 'failed'
   record('smoke_error', { message: error?.stack || String(error) })
 } finally {
-  if (browser && downloadId !== undefined && appPage) {
-    try {
-      const item = await appPage.evaluate((id) => chrome.downloads.search({ id }), downloadId)
-      const current = item[0]
-      if (current?.state === 'in_progress') await appPage.evaluate((id) => chrome.downloads.cancel(id), downloadId)
-      if (current?.state === 'complete') await appPage.evaluate((id) => chrome.downloads.removeFile(id), downloadId)
-    } catch (error) {
-      record('fixture_cleanup_note', { message: String(error) })
-    }
-  }
-  if (browser) await browser.close().catch(() => {})
-  if (server) await new Promise((resolve) => server.close(resolve))
-  fs.rmSync(profileDir, { recursive: true, force: true })
-  record('cleanup_complete', { profileDir, evidenceDir, completion })
-  fs.writeFileSync(jsonPath, JSON.stringify({ completion, events }, null, 2))
+  await cleanupResources()
 }
 
 if (completion !== 'passed') process.exitCode = 1
