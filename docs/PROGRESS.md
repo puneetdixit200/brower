@@ -1,5 +1,9 @@
 # Progress
 
+### B05 live download progress source slice — 2026-10-29
+
+`BrowserQuickControls` now subscribes to download-created and download-changed events only while its recent-download panel is open in a non-private window. The panel merges event updates with the initial eight-item snapshot, coalesces and caps pending startup updates by download ID, applies received-byte deltas directly, refreshes changed items for other fields, and removes listeners on close or unmount. Filenames are reduced to basenames before they enter rendered state. Six focused helper tests pass (21 assertions), along with app typecheck, targeted Biome and `git diff --check`; independent Luna review found no remaining issue. This does not verify headed/native progress, files on disk, resume or packaged runtime. Keep B05 PARTIAL and matrix accounting at 2/72 PASS (2.8%).
+
 ## Current phase: Phase 7 — local memory and history retrieval
 
 **Status: PARTIAL.** Phase 0 is complete against the upstream BrowserOS baseline. Phase 1 dependency installation, static checks, and the development extension build are complete; the full upstream test run has failures. Phase 2's Linux supervisor flow is verified end-to-end. Phase 3 has an Aster home visual foundation and a headed Search/Ask smoke. No Aster-branded browser binary or release package exists.

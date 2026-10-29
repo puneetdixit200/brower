@@ -13,16 +13,17 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { navigateSelectedWebTab } from './browser-navigation-actions'
+import {
+  createPendingDownloadUpdates,
+  type DownloadProgressRow,
+  type DownloadProgressUpdate,
+  downloadRowFromItem,
+  downloadUpdateFromDelta,
+  mergeDownloadSnapshot,
+  mergeDownloadUpdate,
+} from './downloads-progress'
 import { resolveHomeSearchUrl } from './home-search'
 import { captureVisibleTabContext } from './screenshot-context'
-
-type DownloadRow = {
-  id: number
-  filename: string
-  state: string
-  receivedBytes: number
-  totalBytes: number
-}
 
 export function BrowserQuickControls({
   onScreenshotContext,
@@ -34,7 +35,7 @@ export function BrowserQuickControls({
   const [address, setAddress] = useState('')
   const [webTabs, setWebTabs] = useState<{ id: number; title: string }[]>([])
   const [selectedTabId, setSelectedTabId] = useState<number | null>(null)
-  const [downloads, setDownloads] = useState<DownloadRow[]>([])
+  const [downloads, setDownloads] = useState<DownloadProgressRow[]>([])
   const [history, setHistory] = useState<
     { id: string; title: string; url: string }[]
   >([])
@@ -155,29 +156,67 @@ export function BrowserQuickControls({
   }
 
   const listDownloads = () => {
-    void action(async () => {
-      if (privateWindow) throw new Error('Private window')
-      const recent = await chrome.downloads.search({
-        limit: 8,
-        orderBy: ['-startTime'],
-      })
-      setDownloads(
-        recent.map((item) => ({
-          id: item.id,
-          filename:
-            item.filename
-              .split(String.fromCharCode(92))
-              .pop()
-              ?.split('/')
-              .pop() || 'Download',
-          state: item.state,
-          receivedBytes: item.bytesReceived,
-          totalBytes: item.totalBytes,
-        })),
-      )
-      setShowDownloads(true)
-    })
+    if (privateWindow) return
+    setError(null)
+    setShowDownloads(true)
   }
+
+  useEffect(() => {
+    if (!showDownloads || privateWindow) return
+    let active = true
+    const pendingUpdates = createPendingDownloadUpdates()
+    const latestRefreshById = new Map<number, number>()
+    let refreshSequence = 0
+    const applyUpdate = (update: DownloadProgressUpdate) => {
+      pendingUpdates.add(update)
+      setDownloads((current) => mergeDownloadUpdate(current, update))
+    }
+    const onCreated = (item: chrome.downloads.DownloadItem) => {
+      applyUpdate(downloadRowFromItem(item))
+    }
+    const onChanged = (delta: chrome.downloads.DownloadDelta) => {
+      const update = downloadUpdateFromDelta(
+        delta as chrome.downloads.DownloadDelta & {
+          bytesReceived?: { current: number }
+        },
+      )
+      applyUpdate(update)
+      const sequence = ++refreshSequence
+      latestRefreshById.set(delta.id, sequence)
+      void chrome.downloads
+        .search({ id: delta.id })
+        .then((items) => {
+          if (!active || latestRefreshById.get(delta.id) !== sequence) return
+          const item = items[0]
+          if (item) applyUpdate(downloadRowFromItem(item))
+        })
+        .catch(() => undefined)
+    }
+    chrome.downloads.onCreated.addListener(onCreated)
+    chrome.downloads.onChanged.addListener(onChanged)
+    void chrome.downloads
+      .search({ limit: 8, orderBy: ['-startTime'] })
+      .then((recent) => {
+        if (!active) return
+        setDownloads(
+          mergeDownloadSnapshot(
+            recent.map(downloadRowFromItem),
+            pendingUpdates.settle(),
+          ),
+        )
+      })
+      .catch(() => {
+        if (active) {
+          pendingUpdates.settle()
+          setError('Could not load recent downloads.')
+        }
+      })
+    return () => {
+      active = false
+      chrome.downloads.onCreated.removeListener(onCreated)
+      chrome.downloads.onChanged.removeListener(onChanged)
+    }
+  }, [privateWindow, showDownloads])
 
   const screenshot = () => {
     void action(async () => {
@@ -413,7 +452,12 @@ export function BrowserQuickControls({
           { name: 'Reload selected webpage', Icon: RotateCw, run: reload },
           { name: 'Reopen closed tab', Icon: History, run: restoreClosed },
           { name: 'Recent history', Icon: History, run: showRecentHistory },
-          { name: 'Downloads', Icon: Download, run: listDownloads },
+          {
+            name: showDownloads ? 'Close downloads' : 'Downloads',
+            Icon: Download,
+            run: () =>
+              showDownloads ? setShowDownloads(false) : listDownloads(),
+          },
           { name: 'Screenshot', Icon: Camera, run: screenshot },
           {
             name: 'Select screenshot context',
@@ -444,6 +488,7 @@ export function BrowserQuickControls({
               (privateWindow &&
                 [
                   'Downloads',
+                  'Close downloads',
                   'Screenshot',
                   'Select screenshot context',
                   'Reopen closed tab',
