@@ -20,6 +20,7 @@ import {
   wrapLanguageModel,
 } from 'ai'
 import { z } from 'zod'
+import { claimToolExecution } from '../lib/conversations/tool-operation-claim-store'
 import { logger } from '../lib/logger'
 import { metrics } from '../lib/metrics'
 import { buildFilesystemToolSet } from '../tools/filesystem/build-toolset'
@@ -206,9 +207,38 @@ export function buildAgentToolRunContexts(
   )
 }
 
+function claimSideEffectToolCall(
+  claimExecution: typeof claimToolExecution | undefined,
+  taskId: string,
+  toolCallId: unknown,
+  toolName: string,
+  input: unknown,
+  description: unknown,
+): void {
+  if (
+    !claimExecution ||
+    !decideToolApproval({
+      toolName,
+      input,
+      description: typeof description === 'string' ? description : undefined,
+    }).required
+  ) {
+    return
+  }
+  if (typeof toolCallId !== 'string') {
+    throw new Error('Missing provider tool-call identity for side effect')
+  }
+  if (!claimExecution(taskId, toolCallId)) {
+    throw new Error('Tool call already claimed; refusing replay')
+  }
+}
+
 /** Add a per-call task identity to each tool's execution context and validate
  * the versioned transport envelope at the actual dispatch/result boundary. */
-export function addToolEnvelopeBoundary(tools: ToolSet): ToolSet {
+export function addToolEnvelopeBoundary(
+  tools: ToolSet,
+  claimExecution?: typeof claimToolExecution,
+): ToolSet {
   const wrapped: ToolSet = {}
   for (const [toolName, tool] of Object.entries(tools)) {
     if (!tool.execute) {
@@ -237,6 +267,14 @@ export function addToolEnvelopeBoundary(tools: ToolSet): ToolSet {
         })
         let output: unknown
         try {
+          claimSideEffectToolCall(
+            claimExecution,
+            call.taskId,
+            options.toolCallId,
+            toolName,
+            input,
+            tool.description,
+          )
           // The envelope is validated here but its payload remains byte-for-
           // byte/identity equivalent to the input the tool normally receives.
           output = await execute(call.input, {
@@ -500,7 +538,7 @@ export class AiSdkAgent {
         ...buildNudgeToolSet({ waitForHuman: config.waitForHuman }),
       }
       const filtered = buildAgentToolCatalog(candidateTools)
-      const tools = addToolEnvelopeBoundary(filtered.tools)
+      const tools = addToolEnvelopeBoundary(filtered.tools, claimToolExecution)
       const blockedToolNames = [
         ...new Set([...restrictedInternalMcp.blocked, ...filtered.blocked]),
       ]
