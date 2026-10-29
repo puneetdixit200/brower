@@ -208,6 +208,7 @@ describe('ChatService ACP dispatch', () => {
       new AbortController().signal,
     )
 
+    expect(fixture.conversationStore.get).toHaveBeenCalledTimes(1)
     expect(fixture.conversationStore.save).toHaveBeenCalledTimes(1)
     const saved = fixture.conversationStore.save.mock.calls.at(-1)?.[0] as
       | {
@@ -225,6 +226,58 @@ describe('ChatService ACP dispatch', () => {
         (message) => message.role === 'assistant',
       ),
     ).toBe(true)
+  })
+
+  it('keeps a non-persisted ACP turn transient', async () => {
+    const fixture = deps()
+    const conversationId = crypto.randomUUID()
+    const response = await fixture.service.processMessage(
+      {
+        target: { type: 'claude', agentId: AGENT_ID },
+        conversationId,
+        message: 'continue privately',
+        previousConversation: [
+          { role: 'user', content: 'prior private question' },
+          { role: 'assistant', content: 'prior private answer' },
+        ],
+        persist: false,
+        isScheduledTask: false,
+        mode: 'agent',
+        origin: 'sidepanel',
+      },
+      new AbortController().signal,
+    )
+
+    expect(response.status).toBe(200)
+    expect(fixture.conversationStore.get).not.toHaveBeenCalled()
+    expect(fixture.conversationStore.save).not.toHaveBeenCalled()
+    expect(fixture.calls[0]?.messages.map((message) => message.role)).toEqual([
+      'user',
+      'assistant',
+      'user',
+    ])
+    expect(JSON.stringify(fixture.calls[0]?.messages)).toContain(
+      'prior private question',
+    )
+  })
+
+  it('does not persist an ACP turn when scheduled-task policy denies it', async () => {
+    const fixture = deps()
+    const response = await fixture.service.processMessage(
+      {
+        target: { type: 'claude', agentId: AGENT_ID },
+        conversationId: crypto.randomUUID(),
+        message: 'scheduled continuation',
+        isScheduledTask: true,
+        mode: 'agent',
+        origin: 'sidepanel',
+      },
+      new AbortController().signal,
+    )
+
+    expect(response.status).toBe(200)
+    expect(fixture.conversationStore.get).not.toHaveBeenCalled()
+    expect(fixture.conversationStore.save).not.toHaveBeenCalled()
   })
 
   it('ignores a stored display copy that belongs to a different agent', async () => {

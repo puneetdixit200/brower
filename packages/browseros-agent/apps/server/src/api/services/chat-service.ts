@@ -866,16 +866,18 @@ export class ChatService {
           ...messages.filter((message) => !existingIds.has(message.id)),
         )
         updateMessages(history)
-        await this.persistConversation(
-          {
-            id: request.conversationId,
-            messages: history,
-            targetType: agent.type,
-            origin: request.origin,
-            agentId: agent.id,
-          },
-          { required: request.persistScheduledTask },
-        )
+        if (shouldPersist(request)) {
+          await this.persistConversation(
+            {
+              id: request.conversationId,
+              messages: history,
+              targetType: agent.type,
+              origin: request.origin,
+              agentId: agent.id,
+            },
+            { required: request.persistScheduledTask },
+          )
+        }
       },
     }
     // The run already authorizes this conversation before ACP stream setup;
@@ -990,20 +992,22 @@ export class ChatService {
     agentId: string,
     request: AcpChatRequest,
   ): Promise<UIMessage[]> {
-    try {
-      const stored = await this.getConversationStore().get(
-        request.conversationId,
-      )
-      // Only reuse the display copy when it belongs to this agent; the in-memory
-      // key is agent-scoped, so a shared conversationId must not cross agents.
-      if (stored?.messages.length && stored.agentId === agentId) {
-        return stored.messages
+    if (shouldPersist(request)) {
+      try {
+        const stored = await this.getConversationStore().get(
+          request.conversationId,
+        )
+        // Only reuse the display copy when it belongs to this agent; the in-memory
+        // key is agent-scoped, so a shared conversationId must not cross agents.
+        if (stored?.messages.length && stored.agentId === agentId) {
+          return stored.messages
+        }
+      } catch (error) {
+        logger.warn('Failed to load ACP display history', {
+          conversationId: request.conversationId,
+          error: error instanceof Error ? error.message : String(error),
+        })
       }
-    } catch (error) {
-      logger.warn('Failed to load ACP display history', {
-        conversationId: request.conversationId,
-        error: error instanceof Error ? error.message : String(error),
-      })
     }
     return (request.previousConversation ?? []).map((message) => ({
       id: crypto.randomUUID(),
