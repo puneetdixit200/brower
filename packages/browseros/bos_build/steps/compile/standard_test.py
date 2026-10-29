@@ -114,6 +114,40 @@ class AutoninjaCommandTest(unittest.TestCase):
             cmd = standard.autoninja_command("out/Default_arm64", ["chrome"], {})
         self.assertEqual(cmd, ["autoninja", "-C", "out/Default_arm64", "chrome"])
 
+    def test_explicit_ninja_binary_is_used_as_one_argv_item(self):
+        with TemporaryDirectory() as tmp:
+            binary = Path(tmp) / "ninja"
+            binary.write_text("#!/bin/sh\nexit 0\n")
+            binary.chmod(0o755)
+            with mock.patch.object(standard, "IS_WINDOWS", return_value=False):
+                cmd = standard.autoninja_command(
+                    "out/Default_x64",
+                    ["chrome"],
+                    {"BROWSEROS_NINJA_BINARY": str(binary), "BROWSEROS_NINJA_JOBS": "2"},
+                )
+        self.assertEqual(
+            cmd, [str(binary), "-C", "out/Default_x64", "-j", "2", "chrome"]
+        )
+
+    def test_invalid_explicit_ninja_binary_fails_closed(self):
+        with mock.patch.object(standard, "IS_WINDOWS", return_value=False):
+            for override in ("relative/ninja", "/missing/ninja"):
+                with self.subTest(override=override), self.assertRaisesRegex(
+                    ValueError, "BROWSEROS_NINJA_BINARY"
+                ):
+                    standard.autoninja_command(
+                        "out/Default_x64", ["chrome"], {"BROWSEROS_NINJA_BINARY": override}
+                    )
+            with TemporaryDirectory() as tmp:
+                binary = Path(tmp) / "ninja"
+                binary.write_text("not executable")
+                with self.assertRaisesRegex(ValueError, "must be executable"):
+                    standard.autoninja_command(
+                        "out/Default_x64",
+                        ["chrome"],
+                        {"BROWSEROS_NINJA_BINARY": str(binary)},
+                    )
+
     def test_windows_uses_bat_and_memory_capped_jobs(self):
         with (
             mock.patch.object(standard, "IS_WINDOWS", return_value=True),
@@ -276,6 +310,26 @@ class BuildTargetTest(unittest.TestCase):
             ["autoninja", "-C", "out/Default_x64", "mini_installer"],
         )
         self.assertEqual(run_cmd.call_args.kwargs["cwd"], ctx.chromium_src)
+
+    def test_build_target_passes_depot_tools_environment(self):
+        with TemporaryDirectory() as tmp:
+            chromium_src = Path(tmp) / "src"
+            chromium_src.mkdir()
+            depot_tools = Path(tmp) / "depot_tools"
+            depot_tools.mkdir()
+            ctx = cast(
+                Context,
+                SimpleNamespace(out_dir="out/Default_x64", chromium_src=chromium_src),
+            )
+            with (
+                mock.patch.object(standard, "run_command") as run_cmd,
+                mock.patch.object(standard, "IS_WINDOWS", return_value=False),
+                mock.patch.dict("os.environ", {"PATH": "/usr/bin"}, clear=True),
+            ):
+                standard.build_target(ctx, "chrome")
+            environment = run_cmd.call_args.kwargs["env"]
+            self.assertEqual(environment["PATH"].split(os.pathsep)[0], str(depot_tools))
+            self.assertEqual(environment["DEPOT_TOOLS_UPDATE"], "0")
 
     def test_build_target_respects_jobs_override(self):
         ctx = cast(

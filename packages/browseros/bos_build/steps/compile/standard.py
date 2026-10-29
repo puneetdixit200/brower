@@ -2,9 +2,10 @@
 """Standard single-architecture build module for BrowserOS"""
 
 import os
+import shutil
+import stat
 import sys
 import tempfile
-import shutil
 from pathlib import Path
 from typing import List, Mapping, Optional
 from ...core.step import Step, ValidationError, step
@@ -94,8 +95,33 @@ def compute_ninja_jobs(env: Optional[Mapping[str, str]] = None) -> Optional[int]
 def autoninja_command(
     out_dir: str, targets: List[str], env: Optional[Mapping[str, str]] = None
 ) -> List[str]:
-    """Assemble the autoninja argv with the resolved -j parallelism applied."""
-    cmd = ["autoninja.bat" if IS_WINDOWS() else "autoninja", "-C", out_dir]
+    """Assemble the build argv, optionally using an explicit Ninja executable.
+
+    BROWSEROS_NINJA_BINARY is a recovery escape hatch for checkouts where the
+    depot_tools autoninja wrapper cannot bootstrap. The override is an argv
+    executable path, not a shell command; the normal autoninja path stays the
+    default so Chromium's usual tool selection is unchanged.
+    """
+    if env is None:
+        env = os.environ
+    ninja_binary = env.get("BROWSEROS_NINJA_BINARY")
+    if ninja_binary:
+        binary_path = Path(ninja_binary)
+        if not binary_path.is_absolute():
+            raise ValueError("BROWSEROS_NINJA_BINARY must be an absolute path")
+        try:
+            binary_mode = binary_path.stat().st_mode
+        except OSError as error:
+            raise ValueError(
+                f"BROWSEROS_NINJA_BINARY is not an accessible file: {binary_path}"
+            ) from error
+        if not stat.S_ISREG(binary_mode):
+            raise ValueError("BROWSEROS_NINJA_BINARY must name a regular file")
+        if not os.access(binary_path, os.X_OK):
+            raise ValueError("BROWSEROS_NINJA_BINARY must be executable")
+        cmd = [str(binary_path), "-C", out_dir]
+    else:
+        cmd = ["autoninja.bat" if IS_WINDOWS() else "autoninja", "-C", out_dir]
     jobs = compute_ninja_jobs(env)
     if jobs is not None:
         cmd += ["-j", str(jobs)]
@@ -173,7 +199,11 @@ def build_target(ctx: Context, target: str) -> bool:
     """Build a specific target (e.g., mini_installer)"""
     log_info(f"\n🔨 Building target: {target}")
 
-    run_command(autoninja_command(ctx.out_dir, [target]), cwd=ctx.chromium_src)
+    run_command(
+        autoninja_command(ctx.out_dir, [target]),
+        cwd=ctx.chromium_src,
+        env=depot_tools_environment(ctx.chromium_src),
+    )
 
     log_success(f"Target {target} built successfully")
     return True

@@ -1,5 +1,9 @@
 # Progress
 
+### T20a explicit native build-tool selection — 2026-10-30
+
+`bos_build/steps/compile/standard.py` accepts a validated absolute `BROWSEROS_NINJA_BINARY` argv executable and supplies the depot_tools environment for individual targets. The default remains autoninja. Root verification with the existing `work/aster-native-venv/bin/python -m bos_build.steps.compile.standard_test` passes 23/23; independent Luna review passes. This fixes selection around the broken depot_tools wrapper only. Read-only inspection preserves all 319 native changes and confirms no build log or linked browser; no build, GN regeneration or graph dry-run ran. T20a/B01 remain PARTIAL pending safe incremental-state/provenance recovery, adequate resources and native launch.
+
 ### B02 Aster keyword address-bar entry source slice — 2026-10-29
 
 The extension manifest now registers the Chromium keyword `aster`. One background `omnibox.onInputEntered` listener uses the same pure URL/search resolver as `BrowserQuickControls` and honors Chromium's current-tab, foreground-tab and background-tab dispositions; no suggestion path or default-search setting is changed. Focused tests cover URL/search routing, unsafe schemes falling back to search, blank input and all three Enter dispositions. App typecheck, targeted Biome and `git diff --check` pass. The production WXT build passes and emits the keyword and background listener. Headed Aster keyword and omnibox acceptance remain open. Keep B02 PARTIAL.
