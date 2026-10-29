@@ -815,3 +815,10 @@ A focused source integration test creates a real signed pending `tabs.new` appro
 ### Aster unpacked-extension staging validation — 2026-10-29
 
 The shared Aster unpacked-development-tree validator now rejects relative filenames outside the conservative GN-list-safe character set before returning a prepared bundle. This prevents unsafe names from passing resource preparation and failing only when Chromium staging interpolates them into generated GN source. Regression tests reject quotes, `$`, spaces, and newlines while retaining the WXT font path `geist-mono/GeistMono-Italic[wght].woff2`. The focused `aster_unpacked_dev`, prepared-resource, and `bundled_extensions` suites pass 27/27 with the task Python environment; `git diff --check` passes, and independent Luna review found no actionable issue. This is source-level staging validation only: no native build, package build, or feature acceptance changed. S05 remains PARTIAL / BLOCKED, and the acceptance matrix remains 2/72 PASS (2.8%); the overall goal remains incomplete.
+
+
+### T27.3 / M03 bounded memory revision history — 2026-10-29
+
+Explicit note edits now keep a bounded local history (20 snapshots per note, 500 total). The Memory page can show prior versions and invoke one-step undo; undo consumes the restored snapshot rather than adding history. Revisions preserve task provenance and source links, do not enter FTS or the Markdown mirror, and are deleted permanently when the note is deleted or expires. Restored values pass current size, credential, provenance and URL checks. Existing trusted-origin and incognito route guards cover revision reads and undo.
+
+Focused verification passes: revision, existing memory-store and memory-route suites, 14/14 tests (97 assertions); server and app typechecks; targeted Biome; and `git diff --check`. No headed test of the new UI or packaged Aster runtime was run. M03 remains PARTIAL pending headed UI/runtime acceptance; delete/restore is intentionally unsupported.

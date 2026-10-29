@@ -392,6 +392,11 @@ const currentMigrationHistory = [
     hash: '9b66cd59bef82437923c4b5a7af8e23db09332380756aba3032a4f82f01d37d9',
     createdAt: 1793923200000,
   },
+  {
+    tag: '0029_add_memory_revisions',
+    hash: '1aeaa0a5260dc07422f9de72a66a10491083541ec172b0cd00b2c176287e2224',
+    createdAt: 1794009600000,
+  },
 ]
 
 // TODO(nikhil): Remove this fallback once Windows/Linux packaging always includes Drizzle migrations.
@@ -590,6 +595,8 @@ const currentSchemaStatements = [
   `CREATE TRIGGER IF NOT EXISTS memories_fts_delete AFTER DELETE ON memories BEGIN DELETE FROM memories_fts WHERE memory_id = old.id; END`,
   `CREATE TABLE IF NOT EXISTS tool_operation_claims (claim_key text PRIMARY KEY NOT NULL, expires_at integer NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS tool_operation_claims_expires_at_idx ON tool_operation_claims (expires_at)`,
+  `CREATE TABLE IF NOT EXISTS memory_revisions (sequence integer PRIMARY KEY AUTOINCREMENT NOT NULL, memory_id text NOT NULL, content text NOT NULL, source text NOT NULL, source_url text, source_id text, source_title text, updated_at integer NOT NULL)`,
+  `CREATE INDEX IF NOT EXISTS memory_revisions_memory_sequence_idx ON memory_revisions (memory_id, sequence)`,
   `
     CREATE TABLE IF NOT EXISTS __drizzle_migrations (
       id SERIAL PRIMARY KEY,

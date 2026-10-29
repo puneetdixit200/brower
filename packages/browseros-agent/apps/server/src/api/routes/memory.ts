@@ -44,6 +44,25 @@ export function createMemoryRoutes(
     .post('/search', zValidator('json', SearchSchema), (c) =>
       c.json({ memories: store.search(c.req.valid('json').query) }),
     )
+    .get('/:memoryId/revisions', zValidator('param', IdSchema), (c) =>
+      c.json({ revisions: store.history(c.req.valid('param').memoryId) }),
+    )
+    .post('/:memoryId/undo', zValidator('param', IdSchema), (c) => {
+      try {
+        const memory = store.undo(c.req.valid('param').memoryId)
+        return memory
+          ? c.json({ memory })
+          : c.json({ error: 'No previous note revision is available' }, 404)
+      } catch (error) {
+        return c.json(
+          {
+            error:
+              error instanceof Error ? error.message : 'Memory undo failed',
+          },
+          400,
+        )
+      }
+    })
     .post('/', zValidator('json', SaveSchema), (c) => {
       try {
         const input = c.req.valid('json')

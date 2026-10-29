@@ -19,6 +19,16 @@ interface MemoryEntry {
   expiresAt: number | null
 }
 
+interface MemoryRevision {
+  sequence: number
+  content: string
+  source: 'user' | 'task'
+  sourceUrl: string | null
+  sourceId: string | null
+  sourceTitle: string | null
+  updatedAt: number
+}
+
 interface MemorySettings {
   enabled: boolean
   retentionDays: 30 | 90 | null
@@ -64,6 +74,12 @@ export const MemoryPage: FC = () => {
     [],
   )
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(
+    null,
+  )
+  const [revisionHistory, setRevisionHistory] = useState<
+    Record<string, MemoryRevision[]>
+  >({})
   const [search, setSearch] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -179,6 +195,53 @@ export const MemoryPage: FC = () => {
     }
   }
 
+  const toggleHistory = async (id: string) => {
+    if (expandedHistoryId === id) {
+      setExpandedHistoryId(null)
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const result = await request<{ revisions: MemoryRevision[] }>(
+        `/${id}/revisions`,
+        incognito,
+      )
+      setRevisionHistory((current) => ({ ...current, [id]: result.revisions }))
+      setExpandedHistoryId(id)
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : 'Could not load note history',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const undoLastEdit = async (id: string) => {
+    setBusy(true)
+    setError(null)
+    try {
+      await request<{ memory: MemoryEntry }>(`/${id}/undo`, incognito, {
+        method: 'POST',
+      })
+      await refresh()
+      const result = await request<{ revisions: MemoryRevision[] }>(
+        `/${id}/revisions`,
+        incognito,
+      )
+      setRevisionHistory((current) => ({ ...current, [id]: result.revisions }))
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : 'Could not undo note edit',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const find = async () => {
     setBusy(true)
     setError(null)
@@ -276,7 +339,10 @@ export const MemoryPage: FC = () => {
         </section>
       )}
 
-      <SiteRecipesPanel enabled={settings?.enabled ?? false} incognito={incognito} />
+      <SiteRecipesPanel
+        enabled={settings?.enabled ?? false}
+        incognito={incognito}
+      />
 
       {settings?.enabled && completedTasks.length > 0 && (
         <section className="space-y-3 rounded-lg border p-4">
@@ -464,7 +530,72 @@ export const MemoryPage: FC = () => {
                 >
                   Delete
                 </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy}
+                  aria-expanded={expandedHistoryId === memory.id}
+                  aria-controls={`memory-history-${memory.id}`}
+                  onClick={() => void toggleHistory(memory.id)}
+                >
+                  {expandedHistoryId === memory.id ? 'Hide history' : 'History'}
+                </Button>
               </div>
+              {expandedHistoryId === memory.id && (
+                <section
+                  id={`memory-history-${memory.id}`}
+                  aria-label="Previous note versions"
+                  className="space-y-3 border-t pt-3"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="font-medium text-sm">Edit history</h3>
+                    {revisionHistory[memory.id]?.length ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={busy}
+                        onClick={() => void undoLastEdit(memory.id)}
+                      >
+                        Undo last edit
+                      </Button>
+                    ) : null}
+                  </div>
+                  {revisionHistory[memory.id]?.length ? (
+                    <ol className="space-y-2">
+                      {revisionHistory[memory.id].map((revision) => (
+                        <li
+                          key={revision.sequence}
+                          className="rounded-md bg-muted/40 p-3"
+                        >
+                          <p className="text-muted-foreground text-xs">
+                            Previous version ·{' '}
+                            {new Date(revision.updatedAt).toLocaleString()}
+                          </p>
+                          <p className="mt-2 whitespace-pre-wrap text-sm">
+                            {revision.content}
+                          </p>
+                          {revision.source === 'task' && revision.sourceId && (
+                            <p className="mt-2 text-muted-foreground text-xs">
+                              From task{' '}
+                              {revision.sourceTitle ?? 'Completed task'} · ID:{' '}
+                              <code className="break-all">
+                                {revision.sourceId}
+                              </code>
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">
+                      No previous edits. Deleting a note permanently removes its
+                      history.
+                    </p>
+                  )}
+                </section>
+              )}
             </article>
           ))}
           {memories.length === 0 && (

@@ -117,6 +117,78 @@ describe('memory API', () => {
     const { memory } = (await savedResponse.json()) as {
       memory: { id: string }
     }
+    const editedResponse = await app.request(
+      `http://localhost/memory/${memory.id}`,
+      {
+        method: 'PUT',
+        headers: { ...origin, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: 'Changed local route history detail' }),
+      },
+      localServer,
+    )
+    expect(editedResponse.status).toBe(200)
+
+    const blockedHistory = await app.request(
+      `http://localhost/memory/${memory.id}/revisions`,
+      {},
+      localServer,
+    )
+    expect(blockedHistory.status).toBe(403)
+    const privateHistory = await app.request(
+      `http://localhost/memory/${memory.id}/revisions`,
+      { headers: { ...origin, 'X-Aster-Incognito': 'true' } },
+      localServer,
+    )
+    expect(privateHistory.status).toBe(403)
+    const malformedId = await app.request(
+      'http://localhost/memory/not-a-uuid/revisions',
+      { headers: origin },
+      localServer,
+    )
+    expect(malformedId.status).toBe(400)
+    const historyResponse = await app.request(
+      `http://localhost/memory/${memory.id}/revisions`,
+      { headers: origin },
+      localServer,
+    )
+    expect(historyResponse.status).toBe(200)
+    expect(
+      (await historyResponse.json()).revisions.map(
+        (row: { content: string }) => row.content,
+      ),
+    ).toEqual(['Save the local API provenance note'])
+
+    const blockedUndo = await app.request(
+      `http://localhost/memory/${memory.id}/undo`,
+      { method: 'POST' },
+      localServer,
+    )
+    expect(blockedUndo.status).toBe(403)
+    const privateUndo = await app.request(
+      `http://localhost/memory/${memory.id}/undo`,
+      {
+        method: 'POST',
+        headers: { ...origin, 'X-Aster-Incognito': 'true' },
+      },
+      localServer,
+    )
+    expect(privateUndo.status).toBe(403)
+
+    const undoResponse = await app.request(
+      `http://localhost/memory/${memory.id}/undo`,
+      { method: 'POST', headers: origin },
+      localServer,
+    )
+    expect(undoResponse.status).toBe(200)
+    expect((await undoResponse.json()).memory.content).toBe(
+      'Save the local API provenance note',
+    )
+    const undoAgain = await app.request(
+      `http://localhost/memory/${memory.id}/undo`,
+      { method: 'POST', headers: origin },
+      localServer,
+    )
+    expect(undoAgain.status).toBe(404)
 
     const resultsResponse = await app.request(
       'http://localhost/memory/search',
@@ -136,6 +208,18 @@ describe('memory API', () => {
       localServer,
     )
     expect(deleted.status).toBe(200)
+    const deletedHistory = await app.request(
+      `http://localhost/memory/${memory.id}/revisions`,
+      { headers: origin },
+      localServer,
+    )
+    expect((await deletedHistory.json()).revisions).toEqual([])
+    const undoDeleted = await app.request(
+      `http://localhost/memory/${memory.id}/undo`,
+      { method: 'POST', headers: origin },
+      localServer,
+    )
+    expect(undoDeleted.status).toBe(404)
     expect(
       (
         await app.request(

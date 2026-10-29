@@ -18,6 +18,8 @@ import { getDbHandle } from '../db'
 const MAX_CONTENT_CHARS = 20_000
 const MAX_SEARCH_CHARS = 300
 const RETENTION_OPTIONS = [30, 90, null] as const
+const MAX_REVISIONS_PER_MEMORY = 20
+const MAX_MEMORY_REVISIONS = 500
 
 export interface MemoryEntry {
   id: string
@@ -37,6 +39,17 @@ export interface MemorySettings {
   updatedAt: number
 }
 
+export interface MemoryRevision {
+  sequence: number
+  memoryId: string
+  content: string
+  source: 'user' | 'task'
+  sourceUrl: string | null
+  sourceId: string | null
+  sourceTitle: string | null
+  updatedAt: number
+}
+
 interface MemoryRow {
   id: string
   content: string
@@ -47,6 +60,105 @@ interface MemoryRow {
   created_at: number
   updated_at: number
   expires_at: number | null
+}
+
+interface MemoryRevisionRow {
+  sequence: number
+  memory_id: string
+  content: string
+  source: string
+  source_url: string | null
+  source_id: string | null
+  source_title: string | null
+  updated_at: number
+}
+
+function mapRevision(row: MemoryRevisionRow): MemoryRevision {
+  return {
+    sequence: row.sequence,
+    memoryId: row.memory_id,
+    content: row.content,
+    source: row.source === 'task' ? 'task' : 'user',
+    sourceUrl: row.source_url,
+    sourceId: row.source_id,
+    sourceTitle: row.source_title,
+    updatedAt: row.updated_at,
+  }
+}
+
+function recordRevision(entry: MemoryRow): void {
+  const sqlite = getDbHandle().sqlite
+  sqlite
+    .prepare(
+      `INSERT INTO memory_revisions (memory_id, content, source, source_url, source_id, source_title, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      entry.id,
+      entry.content,
+      entry.source,
+      entry.source_url,
+      entry.source_id,
+      entry.source_title,
+      entry.updated_at,
+    )
+  sqlite
+    .prepare(
+      `DELETE FROM memory_revisions WHERE memory_id = ? AND sequence NOT IN
+       (SELECT sequence FROM memory_revisions WHERE memory_id = ? ORDER BY sequence DESC LIMIT ?)`,
+    )
+    .run(entry.id, entry.id, MAX_REVISIONS_PER_MEMORY)
+  sqlite
+    .prepare(
+      `DELETE FROM memory_revisions WHERE sequence NOT IN
+     (SELECT sequence FROM memory_revisions ORDER BY sequence DESC LIMIT ?)`,
+    )
+    .run(MAX_MEMORY_REVISIONS)
+}
+
+function validateRestoredRevision(revision: MemoryRevisionRow): void {
+  const content = revision.content.trim()
+  if (!content || content.length > MAX_CONTENT_CHARS) {
+    throw new Error('Previous memory content is invalid and cannot be restored')
+  }
+  if (containsCredentialShapedText(content)) {
+    throw new Error(
+      'Previous memory looks like it contains a credential and cannot be restored',
+    )
+  }
+  if (Boolean(revision.source_id) !== Boolean(revision.source_title)) {
+    throw new Error(
+      'Previous memory provenance is invalid and cannot be restored',
+    )
+  }
+  if (revision.source_id && !/^[0-9a-f-]{36}$/i.test(revision.source_id)) {
+    throw new Error(
+      'Previous memory provenance is invalid and cannot be restored',
+    )
+  }
+  if (
+    revision.source_title &&
+    containsCredentialShapedText(revision.source_title)
+  ) {
+    throw new Error(
+      'Previous memory provenance contains a credential and cannot be restored',
+    )
+  }
+  if (revision.source_url) {
+    const parsed = new URL(revision.source_url)
+    if (
+      !['http:', 'https:'].includes(parsed.protocol) ||
+      parsed.username ||
+      parsed.password ||
+      [...parsed.searchParams.keys()].some((key) =>
+        /token|key|secret|password|auth|signature/i.test(key),
+      )
+    ) {
+      throw new Error(
+        'Previous memory source URL is invalid and cannot be restored',
+      )
+    }
+  }
 }
 
 function mapRow(row: MemoryRow): MemoryEntry {
@@ -294,11 +406,18 @@ function reconcileMarkdownMirror(): void {
   const sqlite = getDbHandle().sqlite
   sqlite.exec('BEGIN IMMEDIATE')
   try {
+    const select = sqlite.query<MemoryRow, [string]>(
+      'SELECT id, content, source, source_url, source_id, source_title, created_at, updated_at, expires_at FROM memories WHERE id = ?',
+    )
     const update = sqlite.prepare(
       'UPDATE memories SET content = ?, updated_at = ? WHERE id = ?',
     )
     const now = Date.now()
-    for (const change of changes) update.run(change.content, now, change.id)
+    for (const change of changes) {
+      const previous = select.get(change.id)
+      if (previous) recordRevision(previous)
+      update.run(change.content, now, change.id)
+    }
     sqlite.exec('COMMIT')
   } catch (error) {
     sqlite.exec('ROLLBACK')
@@ -308,12 +427,28 @@ function reconcileMarkdownMirror(): void {
 }
 
 function pruneExpired(now = Date.now()): void {
-  const result = getDbHandle()
-    .sqlite.prepare(
-      'DELETE FROM memories WHERE expires_at IS NOT NULL AND expires_at <= ?',
-    )
-    .run(now)
-  if (result.changes > 0) writeMarkdownMirror()
+  const sqlite = getDbHandle().sqlite
+  sqlite.exec('BEGIN IMMEDIATE')
+  let removedCount = 0
+  try {
+    sqlite
+      .prepare(
+        `DELETE FROM memory_revisions WHERE memory_id IN
+       (SELECT id FROM memories WHERE expires_at IS NOT NULL AND expires_at <= ?)`,
+      )
+      .run(now)
+    const result = sqlite
+      .prepare(
+        'DELETE FROM memories WHERE expires_at IS NOT NULL AND expires_at <= ?',
+      )
+      .run(now)
+    removedCount = result.changes
+    sqlite.exec('COMMIT')
+  } catch (error) {
+    sqlite.exec('ROLLBACK')
+    throw error
+  }
+  if (removedCount > 0) writeMarkdownMirror()
 }
 
 export class DbMemoryStore {
@@ -332,6 +467,18 @@ export class DbMemoryStore {
     reconcileMarkdownMirror()
     pruneExpired()
     return getSettingsRow()
+  }
+
+  history(id: string): MemoryRevision[] {
+    reconcileMarkdownMirror()
+    pruneExpired()
+    return getDbHandle()
+      .sqlite.query<MemoryRevisionRow, [string, number]>(
+        `SELECT sequence, memory_id, content, source, source_url, source_id, source_title, updated_at
+         FROM memory_revisions WHERE memory_id = ? ORDER BY sequence DESC LIMIT ?`,
+      )
+      .all(id, MAX_REVISIONS_PER_MEMORY)
+      .map(mapRevision)
   }
 
   updateSettings(input: {
@@ -414,16 +561,8 @@ export class DbMemoryStore {
     const id = input.id ?? crypto.randomUUID()
     const existing = input.id
       ? getDbHandle()
-          .sqlite.query<
-            {
-              created_at: number
-              source: string
-              source_id: string | null
-              source_title: string | null
-            },
-            [string]
-          >(
-            'SELECT created_at, source, source_id, source_title FROM memories WHERE id = ?',
+          .sqlite.query<MemoryRow, [string]>(
+            'SELECT id, content, source, source_url, source_id, source_title, created_at, updated_at, expires_at FROM memories WHERE id = ?',
           )
           .get(input.id)
       : null
@@ -432,23 +571,40 @@ export class DbMemoryStore {
     const savedSourceTitle = sourceTitle ?? existing?.source_title ?? null
     const source =
       savedSourceId || existing?.source === 'task' ? 'task' : 'user'
-    getDbHandle()
-      .sqlite.prepare(
-        `INSERT INTO memories (id, content, source, source_url, source_id, source_title, created_at, updated_at, expires_at)
+    const changed = Boolean(
+      existing &&
+        (existing.content !== content ||
+          existing.source !== source ||
+          existing.source_url !== sourceUrl ||
+          existing.source_id !== savedSourceId ||
+          existing.source_title !== savedSourceTitle),
+    )
+    const sqlite = getDbHandle().sqlite
+    sqlite.exec('BEGIN IMMEDIATE')
+    try {
+      if (changed && existing) recordRevision(existing)
+      sqlite
+        .prepare(
+          `INSERT INTO memories (id, content, source, source_url, source_id, source_title, created_at, updated_at, expires_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET content = excluded.content, source = excluded.source, source_url = excluded.source_url, source_id = excluded.source_id, source_title = excluded.source_title, updated_at = excluded.updated_at, expires_at = excluded.expires_at`,
-      )
-      .run(
-        id,
-        content,
-        source,
-        sourceUrl,
-        savedSourceId,
-        savedSourceTitle,
-        createdAt,
-        now,
-        calculateExpiry(createdAt, settings.retentionDays),
-      )
+        )
+        .run(
+          id,
+          content,
+          source,
+          sourceUrl,
+          savedSourceId,
+          savedSourceTitle,
+          createdAt,
+          now,
+          calculateExpiry(createdAt, settings.retentionDays),
+        )
+      sqlite.exec('COMMIT')
+    } catch (error) {
+      sqlite.exec('ROLLBACK')
+      throw error
+    }
     writeMarkdownMirror()
     const row = getDbHandle()
       .sqlite.query<MemoryRow, [string]>(
@@ -461,11 +617,78 @@ export class DbMemoryStore {
 
   remove(id: string): boolean {
     reconcileMarkdownMirror()
-    const result = getDbHandle()
-      .sqlite.prepare('DELETE FROM memories WHERE id = ?')
-      .run(id)
-    if (result.changes > 0) writeMarkdownMirror()
-    return result.changes > 0
+    const sqlite = getDbHandle().sqlite
+    sqlite.exec('BEGIN IMMEDIATE')
+    let removedCount = 0
+    try {
+      sqlite.prepare('DELETE FROM memory_revisions WHERE memory_id = ?').run(id)
+      removedCount = sqlite
+        .prepare('DELETE FROM memories WHERE id = ?')
+        .run(id).changes
+      sqlite.exec('COMMIT')
+    } catch (error) {
+      sqlite.exec('ROLLBACK')
+      throw error
+    }
+    if (removedCount > 0) writeMarkdownMirror()
+    return removedCount > 0
+  }
+
+  undo(id: string): MemoryEntry | null {
+    reconcileMarkdownMirror()
+    pruneExpired()
+    const sqlite = getDbHandle().sqlite
+    sqlite.exec('BEGIN IMMEDIATE')
+    try {
+      const current = sqlite
+        .query<MemoryRow, [string]>(
+          'SELECT id, content, source, source_url, source_id, source_title, created_at, updated_at, expires_at FROM memories WHERE id = ?',
+        )
+        .get(id)
+      const previous = sqlite
+        .query<MemoryRevisionRow, [string]>(
+          `SELECT sequence, memory_id, content, source, source_url, source_id, source_title, updated_at
+           FROM memory_revisions WHERE memory_id = ? ORDER BY sequence DESC LIMIT 1`,
+        )
+        .get(id)
+      if (!current || !previous) {
+        sqlite.exec('COMMIT')
+        return null
+      }
+      validateRestoredRevision(previous)
+      const settings = getSettingsRow()
+      const now = Date.now()
+      sqlite
+        .prepare(
+          `UPDATE memories SET content = ?, source = ?, source_url = ?, source_id = ?, source_title = ?, updated_at = ?, expires_at = ? WHERE id = ?`,
+        )
+        .run(
+          previous.content,
+          previous.source,
+          previous.source_url,
+          previous.source_id,
+          previous.source_title,
+          now,
+          calculateExpiry(current.created_at, settings.retentionDays),
+          id,
+        )
+      // Consume the snapshot. Undoing never appends a revision, so repeated
+      // user actions walk back only through the bounded edits that existed.
+      sqlite
+        .prepare('DELETE FROM memory_revisions WHERE sequence = ?')
+        .run(previous.sequence)
+      sqlite.exec('COMMIT')
+    } catch (error) {
+      sqlite.exec('ROLLBACK')
+      throw error
+    }
+    writeMarkdownMirror()
+    const restored = sqlite
+      .query<MemoryRow, [string]>(
+        'SELECT id, content, source, source_url, source_id, source_title, created_at, updated_at, expires_at FROM memories WHERE id = ?',
+      )
+      .get(id)
+    return restored ? mapRow(restored) : null
   }
 
   search(query: string, limit = 8): MemoryEntry[] {
