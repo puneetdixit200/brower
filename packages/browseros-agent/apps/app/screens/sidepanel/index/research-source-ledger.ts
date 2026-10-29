@@ -264,7 +264,13 @@ export function getResearchSourceLedger(
   const answerText = textOf(answer, MAX_ANSWER_SCAN_CHARS)
   const citations = [...new Set(extractUrls(answerText))]
   const seeds = getSeeds(messages[requestIndex])
-  const candidates = [...new Set([...citations, ...seeds])]
+  const candidateKeys = new Set<string>()
+  const candidates = [...citations, ...seeds].filter((url) => {
+    const key = normalizeResearchEvidenceUrl(url) ?? url
+    if (candidateKeys.has(key)) return false
+    candidateKeys.add(key)
+    return true
+  })
   const observed = observedToolEvidence(turn)
   const visitedUrls = observed.map(({ url }) => url)
   let remainingReadChars = MAX_READ_TEXT_SCAN_CHARS

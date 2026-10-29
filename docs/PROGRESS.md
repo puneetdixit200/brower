@@ -678,4 +678,10 @@ Implemented (1) an owner-aware stale scheduled-run predicate that does not fail 
 - [40786688768](https://github.com/puneetdixit200/brower/actions/runs/40786688768): Aster app TypeScript, 22 research tests, pinned Biome and whitespace pass.
 - Earlier 14-test [scheduler batch](https://github.com/puneetdixit200/brower/actions/runs/40786302159) also passed before the server-liveness follow-up.
 
+### Local follow-up working tree based on fetched commit — 2026-10-29
+
+Fetched 29 commits and fast-forwarded from `9ee82a38f` to `7c32461df`. The verified working tree based on that fetched commit includes local review fixes: capped scheduler cleanup prioritizes orphan records without a conversation ID while keeping each pass bounded, and the A11 research ledger deduplicates fragment variants by canonical evidence URL. Checks on this working tree pass: scheduler suite 20 tests/60 assertions; research suite 22 tests/56 assertions; `@browseros/app` typecheck; targeted Biome and `git diff --check`.
+
+These are focused source checks only. R02/R03 remain PARTIAL: bounded cleanup has no cross-process runtime proof, and restart with a live provider/sidecar, native package behavior, and semantic replay prevention remain unverified. A11 remains PARTIAL: canonical URL deduplication and quote presence do not establish semantic claim support or truth; live-provider verification remains open. Native/package, live-provider, restart and semantic-support gates are still unverified. Matrix remains **2/72 PASS (2.8%)**.
+
 **Unverified:** packaged Aster execution, service-worker restart while a live model/provider tool runs, server/tool liveness races, original source quote semantic support, native Wayland/Chromium UI and all release signing/update conditions. Aster remains **2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, 1 NOT_STARTED** in the 72-feature acceptance matrix. No full-project completion claim. See [source/evidence report](evidence/aster-github-continuation-2026-10-29.md).

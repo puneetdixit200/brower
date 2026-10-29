@@ -293,9 +293,14 @@ describe('research source URL ledger', () => {
       false,
     )
     expect(ledger?.unattributedQuoteCount).toBe(0)
-    expect(ledger?.entries[0].quoteChecks).toMatchObject([
+    const sourceEntries = ledger?.entries.filter(({ url }) =>
+      url.startsWith('https://source.example/article'),
+    )
+    expect(sourceEntries).toHaveLength(1)
+    expect(sourceEntries?.[0].quoteChecks).toMatchObject([
       { quote: 'Quoted finding.', found: true },
     ])
+    expect(sourceEntries?.[0].quoteChecks).toHaveLength(1)
   })
 
   it('caps attempted quote attribution on maliciously long answer text', () => {

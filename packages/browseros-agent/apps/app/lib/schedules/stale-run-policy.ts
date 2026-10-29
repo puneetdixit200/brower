@@ -29,3 +29,20 @@ export function shouldFailStaleScheduledRun(input: {
   }
   return nowMs - startedMs > timeoutMs
 }
+
+/**
+ * Prefer stale records that do not need a conversation liveness request. This
+ * keeps live or unreachable heartbeat conversations from occupying the whole
+ * bounded cleanup batch and starving ordinary orphaned runs.
+ */
+export function selectStaleScheduledRunBatch<
+  T extends { id: string; conversationId?: string },
+>(staleRuns: readonly T[], limit: number): T[] {
+  const boundedLimit = Math.max(0, Math.floor(limit))
+  return [...staleRuns]
+    .sort(
+      (a, b) =>
+        Number(Boolean(a.conversationId)) - Number(Boolean(b.conversationId)),
+    )
+    .slice(0, boundedLimit)
+}

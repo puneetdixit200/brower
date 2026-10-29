@@ -223,3 +223,11 @@ The branch has new, focused source changes for R02/R03 and A11. GitHub Actions [
 5. Check the user's **actual account allowance** at batch boundaries using an authorized account meter when available; the current toolset provides no such meter, so no 5%-remaining claim can be made. No Luna subagent execution tool was exposed; do not substitute other models. No local Chromium/test processes or agents were started in this session.
 
 **Status: not complete.** Do not mark more feature rows PASS based on these source-level fixtures.
+
+### Local working-tree checkpoint based on `7c32461df` — 2026-10-29
+
+Fetched 29 commits and fast-forwarded from `9ee82a38f` to `7c32461df`. The checks below cover the local working tree based on that fetched commit, including review fixes: scheduler 20 tests/60 assertions, research 22 tests/56 assertions, `@browseros/app` typecheck, targeted Biome and `git diff --check`. Scheduler cleanup prioritizes orphan candidates without a conversation ID within its capped pass; A11 deduplicates fragment variants by canonical evidence URL. See [local follow-up evidence](evidence/aster-local-followup-2026-10-29.md).
+
+Keep R02/R03 and A11 PARTIAL. The cleanup remains bounded and has no cross-process runtime proof; native/package behavior, forced restart while a provider/sidecar run is active, and semantic claim-to-source support have not been verified. Continue with a disposable packaged Aster restart/overlap fixture, then live-provider claim-support validation. Keep native build/runtime, restart, live-provider, and semantic-support gates open.
+
+At batch boundaries, refresh the account allowance using the available meter. Luna medium subagents are available, up to a maximum of five; use Luna-only delegation for future parallel reviews or implementation batches.

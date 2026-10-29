@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'bun:test'
-import { shouldFailStaleScheduledRun } from './stale-run-policy'
+import {
+  selectStaleScheduledRunBatch,
+  shouldFailStaleScheduledRun,
+} from './stale-run-policy'
 
 const now = Date.parse('2026-10-29T05:00:00.000Z')
 const timeoutMs = 10 * 60 * 1000
@@ -48,5 +51,21 @@ describe('stale scheduled job cleanup', () => {
         run: { ...stale, startedAt: '2026-10-29T04:50:00.000Z' },
       }),
     ).toBe(false)
+  })
+
+  it('keeps the cleanup batch bounded while prioritizing orphaned runs', () => {
+    const activeHeartbeats = Array.from({ length: 12 }, (_, index) => ({
+      id: `heartbeat-${index}`,
+      conversationId: `conversation-${index}`,
+    }))
+    const orphan = { id: 'orphan' }
+
+    const batch = selectStaleScheduledRunBatch(
+      [...activeHeartbeats, orphan],
+      10,
+    )
+
+    expect(batch).toHaveLength(10)
+    expect(batch.map((run) => run.id)).toContain(orphan.id)
   })
 })

@@ -16,7 +16,10 @@ import type {
   ScheduledJobRun,
 } from '@/lib/schedules/scheduleTypes'
 import { getServerConversationLiveness } from '@/lib/schedules/server-conversation-liveness'
-import { shouldFailStaleScheduledRun } from '@/lib/schedules/stale-run-policy'
+import {
+  selectStaleScheduledRunBatch,
+  shouldFailStaleScheduledRun,
+} from '@/lib/schedules/stale-run-policy'
 import {
   listScheduledJobRunsOrNull,
   listScheduledJobsOrNull,
@@ -55,7 +58,7 @@ export const scheduledJobRuns = async () => {
     // sidecar is still actively streaming. Check the authoritative conversation
     // state before retiring a heartbeat run. Unknown state retains the claim.
     const serverUrl = await getAgentServerUrl().catch(() => null)
-    for (const run of stale.slice(0, 10)) {
+    for (const run of selectStaleScheduledRunBatch(stale, 10)) {
       if (run.conversationId) {
         if (!serverUrl) continue
         const status = await getServerConversationLiveness({
