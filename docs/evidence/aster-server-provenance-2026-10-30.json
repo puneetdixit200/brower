@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "build": {
+    "command": "bun scripts/build/aster-server.ts --target=linux-x64 --no-upload",
+    "cwd": "/home/puneet/Projects/aster-browser/upstream-browseros/packages/browseros-agent",
+    "bunPath": "/home/puneet/.local/bin/bun",
+    "bunVersion": "1.4.2",
+    "sourceRepoHead": "fdbe8038e93aa2982da2f308ed09d765d1058c64",
+    "result": "success",
+    "reportedProduct": "Aster development server",
+    "reportedVersion": "0.0.168",
+    "reportedTarget": "linux-x64",
+    "reportedMode": "full",
+    "upload": false,
+    "serverLaunched": false
+  },
+  "artifacts": {
+    "archive": {
+      "path": "packages/browseros-agent/dist/prod/aster-server/aster-server-resources-linux-x64.zip",
+      "sha256": "c610fd2ae509b8d037a303780fa879bc935b5f724d528a76cd1cc1fc1ac18913"
+    },
+    "metadata": {
+      "path": "packages/browseros-agent/dist/prod/aster-server/linux-x64/artifact-metadata.json",
+      "sha256": "b4b2952328d800ed5f98e03b71491f397974a43f86099df66929844e3e5b3033",
+      "version": "0.0.168",
+      "target": "linux-x64"
+    },
+    "compiledServer": {
+      "path": "packages/browseros-agent/dist/prod/aster-server/linux-x64/resources/bin/aster_server",
+      "sha256": "13f239a16c47eef9955f37f4988206ab50cfc5e185c2c1212810ef38a32522af",
+      "sizeBytes": 88438240
+    },
+    "bundledBun": {
+      "path": "packages/browseros-agent/dist/prod/aster-server/linux-x64/resources/bin/third_party/bun",
+      "sha256": "a83d263767d839e4d2649ca8e35d07159c7afc99afdc96d731ced29e056dda0c",
+      "sizeBytes": 79500640,
+      "provenance": {
+        "schemaVersion": 1,
+        "version": "1.4.2",
+        "platform": "linux",
+        "arch": "x64",
+        "sha256": "a83d263767d839e4d2649ca8e35d07159c7afc99afdc96d731ced29e056dda0c"
+      }
+    }
+  },
+  "buildInputs": {
+    "packages/browseros-agent/scripts/build/aster-server.ts": "3e030d04a7dfd67f5e656de6c305781cd26bee066160d758917943ef7dddb651",
+    "packages/browseros-agent/scripts/build/server/aster-descriptor.ts": "eb6eb0a645d7abd467170db70346ec2c2efd33af4500497f00dc89b33ee4aae2",
+    "packages/browseros-agent/scripts/build/server/aster-runtime.ts": "7c6f097d1b56bfb76c3641b6ea3d0ccf450e1ae551ed3d303c2338eb2f02b15b",
+    "packages/browseros-agent/scripts/build/config/aster-server-resources.json": "7ed59950d431269d26ee330083c70b129660897a77df4146aeb63562821242bf",
+    "packages/browseros-agent/package.json": "81d845cdd4b0cae14840e4a6540d2e0c7fd3e1bc2866e2f2b4daa3fa4f99e396",
+    "packages/browseros-agent/apps/server/src/compiled-bootstrap.ts": "98de55d8b893b6a461a1b31bb960b54db8501069965e1d7b8b30de4a5fca0fc4",
+    "packages/browseros-agent/apps/server/src/env.ts": "d3717ad0c7146aa24a86851f351e4168b13fbb7e1f2bee55e2f00920fe1a081d",
+    "packages/browseros-agent/apps/server/src/lib/browseros-dir.ts": "00ba72303bd278d196e43a5f23221c1b73dc1808446802aa6a35c7de28bfa554",
+    "packages/browseros-agent/apps/server/src/lib/db/migrations/0030_pretty_spencer_smythe.sql": "aeb15d295bc73bb2ff445c0489834c2b0ad8233bea4a96353ca180d4e9b20cb5"
+  },
+  "migrations": {
+    "sourceCount": 51,
+    "archiveCount": 51,
+    "allSourceMigrationAndMetadataFilesMatchArchive": true,
+    "missing": [],
+    "extra": [],
+    "mismatched": [],
+    "includedMigration0030": {
+      "path": "resources/db/migrations/0030_pretty_spencer_smythe.sql",
+      "sha256": "aeb15d295bc73bb2ff445c0489834c2b0ad8233bea4a96353ca180d4e9b20cb5"
+    }
+  },
+  "identityEvidence": {
+    "descriptorAsterServerBuildOverride": "aster",
+    "staticBinaryStringsIncludeAsterSpecificRoutesAndMemoryCode": true,
+    "runtimeIdentityWasNotExercised": true
+  },
+  "verificationLimits": [
+    "The compiled server was not launched; no runtime assertion is made.",
+    "No upload or native staging was performed."
+  ],
+  "checkoutEffects": {
+    "sourceAndDocsChanged": false,
+    "nativeCheckoutChanged": false,
+    "artifactDirectoryIsGitIgnored": true
+  }
+}

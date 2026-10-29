@@ -6,11 +6,14 @@ import {
   ExternalLink,
   Globe2,
   History,
+  Pause,
+  Play,
   Puzzle,
   RotateCw,
   Settings2,
   Square,
   SquarePlus,
+  X,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -18,13 +21,16 @@ import {
   stopSelectedWebTabLoading,
 } from './browser-navigation-actions'
 import {
+  canControlDownload,
   createPendingDownloadUpdates,
+  type DownloadAction,
   type DownloadProgressRow,
   type DownloadProgressUpdate,
+  downloadFailureMessage,
   downloadRowFromItem,
-  downloadUpdateFromDelta,
   mergeDownloadSnapshot,
   mergeDownloadUpdate,
+  performDownloadAction,
 } from './downloads-progress'
 import { loadRecentHistory } from './history-items'
 import { resolveHomeSearchUrl } from './home-search'
@@ -42,6 +48,9 @@ export function BrowserQuickControls({
   const [webTabs, setWebTabs] = useState<{ id: number; title: string }[]>([])
   const [selectedTabId, setSelectedTabId] = useState<number | null>(null)
   const [downloads, setDownloads] = useState<DownloadProgressRow[]>([])
+  const [downloadActionErrors, setDownloadActionErrors] = useState<
+    Record<number, string>
+  >({})
   const [history, setHistory] = useState<
     { id: string; title: string; url: string }[]
   >([])
@@ -64,6 +73,7 @@ export function BrowserQuickControls({
     null,
   )
   const contextShotPreview = useRef<HTMLImageElement>(null)
+  const downloadActionsInFlight = useRef(new Set<number>())
 
   useEffect(() => {
     let active = true
@@ -190,15 +200,10 @@ export function BrowserQuickControls({
       setDownloads((current) => mergeDownloadUpdate(current, update))
     }
     const onCreated = (item: chrome.downloads.DownloadItem) => {
+      if (item.incognito !== false) return
       applyUpdate(downloadRowFromItem(item))
     }
     const onChanged = (delta: chrome.downloads.DownloadDelta) => {
-      const update = downloadUpdateFromDelta(
-        delta as chrome.downloads.DownloadDelta & {
-          bytesReceived?: { current: number }
-        },
-      )
-      applyUpdate(update)
       const sequence = ++refreshSequence
       latestRefreshById.set(delta.id, sequence)
       void chrome.downloads
@@ -206,7 +211,7 @@ export function BrowserQuickControls({
         .then((items) => {
           if (!active || latestRefreshById.get(delta.id) !== sequence) return
           const item = items[0]
-          if (item) applyUpdate(downloadRowFromItem(item))
+          if (item?.incognito === false) applyUpdate(downloadRowFromItem(item))
         })
         .catch(() => undefined)
     }
@@ -218,7 +223,9 @@ export function BrowserQuickControls({
         if (!active) return
         setDownloads(
           mergeDownloadSnapshot(
-            recent.map(downloadRowFromItem),
+            recent
+              .filter((item) => item.incognito === false)
+              .map(downloadRowFromItem),
             pendingUpdates.settle(),
           ),
         )
@@ -235,6 +242,43 @@ export function BrowserQuickControls({
       chrome.downloads.onChanged.removeListener(onChanged)
     }
   }, [privateWindow, showDownloads])
+
+  const controlDownload = (id: number, operation: DownloadAction) => {
+    if (busy || downloadActionsInFlight.current.has(id)) return
+    downloadActionsInFlight.current.add(id)
+    setDownloadActionErrors((current) => {
+      const next = { ...current }
+      delete next[id]
+      return next
+    })
+    void (async () => {
+      try {
+        const updated = await performDownloadAction(
+          chrome.downloads,
+          () => chrome.windows.getCurrent(),
+          privateWindow,
+          id,
+          operation,
+        )
+        if (!updated && operation === 'cancel') {
+          setDownloads((rows) => rows.filter((row) => row.id !== id))
+          return
+        }
+        if (!updated) return
+        setDownloads((rows) =>
+          mergeDownloadUpdate(rows, downloadRowFromItem(updated)),
+        )
+      } catch (cause) {
+        const message =
+          cause instanceof Error
+            ? cause.message
+            : 'The browser could not update this download.'
+        setDownloadActionErrors((current) => ({ ...current, [id]: message }))
+      } finally {
+        downloadActionsInFlight.current.delete(id)
+      }
+    })()
+  }
 
   const screenshot = () => {
     void action(async () => {
@@ -612,18 +656,64 @@ export function BrowserQuickControls({
             <li>No recent downloads.</li>
           ) : (
             downloads.map((item) => (
-              <li key={item.id} className="flex items-center gap-2">
-                <ExternalLink aria-hidden="true" className="size-3" />
-                <span className="min-w-0 flex-1 truncate" title={item.filename}>
-                  {item.filename}
-                </span>
-                <span className="shrink-0 text-muted-foreground">
-                  {item.state}{' '}
-                  {item.totalBytes > 0
-                    ? Math.round((item.receivedBytes / item.totalBytes) * 100) +
-                      '%'
-                    : ''}
-                </span>
+              <li key={item.id} className="space-y-1 rounded-md border p-2">
+                <div className="flex items-center gap-2">
+                  <ExternalLink aria-hidden="true" className="size-3" />
+                  <span
+                    className="min-w-0 flex-1 truncate"
+                    title={item.filename}
+                  >
+                    {item.filename}
+                  </span>
+                  <span className="shrink-0 text-muted-foreground">
+                    {item.paused ? 'paused' : item.state}{' '}
+                    {item.totalBytes > 0
+                      ? `${Math.round(
+                          (item.receivedBytes / item.totalBytes) * 100,
+                        )}%`
+                      : ''}
+                  </span>
+                  {canControlDownload(item, 'pause') && (
+                    <button
+                      type="button"
+                      aria-label={`Pause ${item.filename}`}
+                      title="Pause download"
+                      className="rounded border p-1"
+                      onClick={() => controlDownload(item.id, 'pause')}
+                    >
+                      <Pause aria-hidden="true" className="size-3" />
+                    </button>
+                  )}
+                  {canControlDownload(item, 'resume') && (
+                    <button
+                      type="button"
+                      aria-label={`Resume ${item.filename}`}
+                      title="Resume download"
+                      className="rounded border p-1"
+                      onClick={() => controlDownload(item.id, 'resume')}
+                    >
+                      <Play aria-hidden="true" className="size-3" />
+                    </button>
+                  )}
+                  {canControlDownload(item, 'cancel') && (
+                    <button
+                      type="button"
+                      aria-label={`Cancel ${item.filename}`}
+                      title="Cancel download"
+                      className="rounded border p-1"
+                      onClick={() => controlDownload(item.id, 'cancel')}
+                    >
+                      <X aria-hidden="true" className="size-3" />
+                    </button>
+                  )}
+                </div>
+                {(downloadActionErrors[item.id] ||
+                  downloadFailureMessage(item.error)) && (
+                  <p role="status" className="text-destructive">
+                    {downloadActionErrors[item.id] ||
+                      downloadFailureMessage(item.error)}
+                  </p>
+                )}
               </li>
             ))
           )}
@@ -653,8 +743,8 @@ export function BrowserQuickControls({
       )}
       {privateWindow && (
         <p className="text-muted-foreground text-xs">
-          History, closed-tab restore and screenshots stay hidden in private
-          windows.
+          Downloads, history, closed-tab restore and screenshots stay hidden in
+          private windows.
         </p>
       )}
     </section>

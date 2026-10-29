@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'bun:test'
 import {
+  canControlDownload,
   createPendingDownloadUpdates,
   downloadBasename,
+  downloadFailureMessage,
   downloadRowFromItem,
   downloadUpdateFromDelta,
   mergeDownloadSnapshot,
   mergeDownloadUpdate,
+  performDownloadAction,
 } from './downloads-progress'
 
 describe('downloads progress helpers', () => {
@@ -16,6 +19,9 @@ describe('downloads progress helpers', () => {
       state: 'complete',
       receivedBytes: 1,
       totalBytes: 1,
+      paused: false,
+      canResume: false,
+      incognito: false,
     }))
     rows = mergeDownloadUpdate(rows, {
       id: 10,
@@ -68,6 +74,7 @@ describe('downloads progress helpers', () => {
         state: 'in_progress',
         bytesReceived: 1,
         totalBytes: 100,
+        incognito: false,
       }),
     ]
     const updates = [
@@ -76,6 +83,7 @@ describe('downloads progress helpers', () => {
         id: 23,
         filename: '/private/location/new.txt',
         state: 'complete',
+        incognito: false,
       },
     ]
     expect(mergeDownloadSnapshot(snapshot, updates)).toEqual([
@@ -85,6 +93,10 @@ describe('downloads progress helpers', () => {
         state: 'complete',
         receivedBytes: 0,
         totalBytes: 0,
+        paused: false,
+        canResume: false,
+        incognito: false,
+        error: undefined,
       },
       {
         id: 22,
@@ -92,6 +104,10 @@ describe('downloads progress helpers', () => {
         state: 'in_progress',
         receivedBytes: 75,
         totalBytes: 100,
+        paused: false,
+        canResume: false,
+        incognito: false,
+        error: undefined,
       },
     ])
   })
@@ -140,5 +156,194 @@ describe('downloads progress helpers', () => {
       downloadRowFromItem({ id: 1, filename: '/home/person/secret.txt' })
         .filename,
     ).toBe('secret.txt')
+    expect(downloadRowFromItem({ id: 2, incognito: undefined }).incognito).toBe(
+      true,
+    )
+  })
+
+  it('offers lifecycle actions only for fresh actionable states', () => {
+    const running = {
+      state: 'in_progress',
+      paused: false,
+      canResume: false,
+      incognito: false,
+    }
+    expect(canControlDownload(running, 'pause')).toBe(true)
+    expect(canControlDownload(running, 'cancel')).toBe(true)
+    expect(canControlDownload(running, 'resume')).toBe(false)
+    expect(canControlDownload({ ...running, paused: true }, 'resume')).toBe(
+      true,
+    )
+    expect(
+      canControlDownload(
+        { ...running, state: 'interrupted', canResume: true },
+        'resume',
+      ),
+    ).toBe(true)
+    expect(
+      canControlDownload(
+        { ...running, state: 'interrupted', canResume: true },
+        'cancel',
+      ),
+    ).toBe(false)
+    expect(canControlDownload({ ...running, incognito: true }, 'cancel')).toBe(
+      false,
+    )
+    expect(
+      canControlDownload({ ...running, state: 'complete' }, 'cancel'),
+    ).toBe(false)
+  })
+
+  it('maps browser download errors to actionable, safe messages', () => {
+    expect(downloadFailureMessage('NETWORK_TIMEOUT')).toContain('timed out')
+    expect(downloadFailureMessage('FILE_NO_SPACE')).toContain('disk space')
+    expect(downloadFailureMessage('UNRECOGNIZED_ERROR')).toBe(
+      'The browser reported a download error.',
+    )
+    expect(downloadFailureMessage(undefined)).toBeUndefined()
+  })
+
+  it('revalidates window, download identity, and state before controlling it', async () => {
+    const calls: string[] = []
+    let searches = 0
+    const api = {
+      search: async ({ id }: { id: number }) => {
+        calls.push(`search:${id}`)
+        searches += 1
+        return searches === 1
+          ? [{ id, state: 'in_progress', paused: false, incognito: false }]
+          : [{ id, state: 'in_progress', paused: true, incognito: false }]
+      },
+      pause: async (id: number) => void calls.push(`pause:${id}`),
+      resume: async (id: number) => void calls.push(`resume:${id}`),
+      cancel: async (id: number) => void calls.push(`cancel:${id}`),
+    }
+    const result = await performDownloadAction(
+      api,
+      async () => ({ incognito: false }),
+      false,
+      42,
+      'pause',
+    )
+    expect(result).toMatchObject({ id: 42, paused: true })
+    expect(calls).toEqual(['search:42', 'pause:42', 'search:42'])
+  })
+
+  it('rejects private windows, private downloads, stale state, and unavailable IDs', async () => {
+    const running: {
+      id: number
+      state: string
+      incognito: boolean | undefined
+      paused: boolean
+    } = {
+      id: 1,
+      state: 'in_progress',
+      incognito: false,
+      paused: false,
+    }
+    const api = (item: typeof running | undefined) => ({
+      search: async () => (item ? [item] : []),
+      pause: async () => undefined,
+      resume: async () => undefined,
+      cancel: async () => undefined,
+    })
+    await expect(
+      performDownloadAction(
+        api(running),
+        async () => ({ incognito: false }),
+        true,
+        1,
+        'pause',
+      ),
+    ).rejects.toThrow('hidden in private windows')
+    await expect(
+      performDownloadAction(
+        api({ ...running, incognito: true }),
+        async () => ({ incognito: false }),
+        false,
+        1,
+        'pause',
+      ),
+    ).rejects.toThrow('Private-window downloads')
+    await expect(
+      performDownloadAction(
+        api({ ...running, state: 'complete' }),
+        async () => ({ incognito: false }),
+        false,
+        1,
+        'pause',
+      ),
+    ).rejects.toThrow('no longer running')
+    await expect(
+      performDownloadAction(
+        api(undefined),
+        async () => ({ incognito: false }),
+        false,
+        1,
+        'cancel',
+      ),
+    ).rejects.toThrow('no longer available')
+    await expect(
+      performDownloadAction(api(running), async () => ({}), false, 1, 'pause'),
+    ).rejects.toThrow('hidden in private windows')
+    await expect(
+      performDownloadAction(
+        api({ ...running, incognito: undefined }),
+        async () => ({ incognito: false }),
+        false,
+        1,
+        'pause',
+      ),
+    ).rejects.toThrow('Private-window downloads')
+  })
+
+  it('replaces unexpected browser API errors with a safe action message', async () => {
+    const api = {
+      search: async () => [
+        { id: 5, state: 'in_progress', paused: false, incognito: false },
+      ],
+      pause: async () => {
+        throw new Error('sensitive native implementation detail')
+      },
+      resume: async () => undefined,
+      cancel: async () => undefined,
+    }
+    await expect(
+      performDownloadAction(
+        api,
+        async () => ({ incognito: false }),
+        false,
+        5,
+        'pause',
+      ),
+    ).rejects.toThrow(
+      'The browser could not pause this download. Refresh Downloads to check its current state.',
+    )
+  })
+
+  it('does not query downloads when the window is private or uncertain', async () => {
+    let searches = 0
+    const api = {
+      search: async () => {
+        searches += 1
+        return []
+      },
+      pause: async () => undefined,
+      resume: async () => undefined,
+      cancel: async () => undefined,
+    }
+    await expect(
+      performDownloadAction(
+        api,
+        async () => ({ incognito: false }),
+        true,
+        9,
+        'pause',
+      ),
+    ).rejects.toThrow('hidden in private windows')
+    await expect(
+      performDownloadAction(api, async () => ({}), false, 9, 'pause'),
+    ).rejects.toThrow('hidden in private windows')
+    expect(searches).toBe(0)
   })
 })

@@ -1,5 +1,13 @@
 # Progress
 
+### B05 download controls — 2026-10-30
+
+Pause/Resume/Cancel are implemented with fresh regular-window/item validation, per-item in-flight exclusion and safe errors. Unknown privacy fails closed; queried download snapshots override stale event deltas. Focused tests pass 12/12 (46 assertions), app typecheck and targeted Biome pass, and two independent Luna reviews found no remaining issue. The current development bundle builds with `NODE_OPTIONS=--max-old-space-size=3072 bun run build:dev`.
+
+The [sandboxed headed Chromium fixture evidence](evidence/aster-b05-controls-2026-10-30/result.json) confirms a real temporary download and visible controls ([screenshot](evidence/aster-b05-controls-2026-10-30/in-progress.png)), but the runner stalled before confirming its first action. Only its owned browser was terminated and its disposable profile was removed. An earlier sandbox-disabled run is rejected as acceptance. No Pause/Resume/Cancel runtime success or Aster-native evidence is claimed; B05 remains PARTIAL. Next diagnose the runner stall and validate all three actions in a reliable sandboxed fixture, then native/package and private-window behavior.
+
+The current sidecar resource bundle was built locally with pinned Bun; [provenance and migration hashes](evidence/aster-server-provenance-2026-10-30.json) record the artifact at source `fdbe8038e`. This alone does not verify server launch or browser integration.
+
 ### B03 pinned native syntax check — 2026-10-30
 
 The current API source/header/IDL plus histogram enum passed a temp-only pinned Chromium API-generator and clang syntax check. The first attempt exposed a missing staged enum, corrected in the second attempt; no native source defect was found. The adjacent checkout's HEAD/status fingerprint was unchanged. [Raw argv, staging script and hashes](evidence/aster-b03-syntax-2026-10-30.json) distinguish this from object compilation, linking or native runtime acceptance. B03/T20a remain PARTIAL.

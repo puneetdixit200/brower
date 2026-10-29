@@ -4,6 +4,138 @@ export type DownloadProgressRow = {
   state: string
   receivedBytes: number
   totalBytes: number
+  paused: boolean
+  canResume: boolean
+  error?: string
+  incognito: boolean
+}
+
+export type DownloadAction = 'pause' | 'resume' | 'cancel'
+
+type DownloadControlItem = {
+  id: number
+  filename?: string
+  state?: string
+  bytesReceived?: number
+  totalBytes?: number
+  paused?: boolean
+  canResume?: boolean
+  error?: string
+  incognito?: boolean
+}
+
+export async function performDownloadAction(
+  api: {
+    search: (query: { id: number }) => Promise<DownloadControlItem[]>
+    pause: (id: number) => Promise<void>
+    resume: (id: number) => Promise<void>
+    cancel: (id: number) => Promise<void>
+  },
+  getCurrentWindow: () => Promise<{ incognito?: boolean }>,
+  privateWindow: boolean,
+  id: number,
+  action: DownloadAction,
+): Promise<DownloadControlItem | null> {
+  if (privateWindow) throw new Error('Downloads are hidden in private windows.')
+  let currentWindow: { incognito?: boolean }
+  try {
+    currentWindow = await getCurrentWindow()
+  } catch {
+    throw new Error(
+      'Could not verify the active window. Reopen Downloads from a regular window and retry.',
+    )
+  }
+  if (currentWindow.incognito !== false)
+    throw new Error('Downloads are hidden in private windows.')
+  let item: DownloadControlItem | undefined
+  try {
+    ;[item] = await api.search({ id })
+  } catch {
+    throw new Error(
+      'Could not verify this download. Refresh Downloads and retry.',
+    )
+  }
+  if (!item) throw new Error('This download is no longer available.')
+  if (item.incognito !== false)
+    throw new Error('Private-window downloads cannot be controlled here.')
+  if (
+    !canControlDownload(
+      {
+        state: item.state || 'in_progress',
+        paused: Boolean(item.paused),
+        canResume: Boolean(item.canResume),
+        incognito: Boolean(item.incognito),
+      },
+      action,
+    )
+  ) {
+    throw new Error(
+      action === 'pause'
+        ? 'This download is no longer running.'
+        : action === 'resume'
+          ? 'This download cannot be resumed by the browser.'
+          : 'This download can no longer be canceled.',
+    )
+  }
+  try {
+    await api[action](id)
+  } catch {
+    throw new Error(
+      `The browser could not ${action} this download. Refresh Downloads to check its current state.`,
+    )
+  }
+  let updated: DownloadControlItem | undefined
+  try {
+    ;[updated] = await api.search({ id })
+  } catch {
+    throw new Error(
+      'The browser could not confirm the download update. Refresh Downloads to check its current state.',
+    )
+  }
+  if (!updated && action === 'cancel') return null
+  if (updated?.incognito !== false)
+    throw new Error('The download ended or became unavailable.')
+  return updated
+}
+
+export function canControlDownload(
+  item: Pick<
+    DownloadProgressRow,
+    'state' | 'paused' | 'canResume' | 'incognito'
+  >,
+  action: DownloadAction,
+): boolean {
+  if (item.incognito !== false) return false
+  if (action === 'pause') return item.state === 'in_progress' && !item.paused
+  if (action === 'resume')
+    return (
+      (item.state === 'in_progress' && item.paused) ||
+      (item.state === 'interrupted' && item.canResume)
+    )
+  return item.state === 'in_progress'
+}
+
+export function downloadFailureMessage(error?: string): string | undefined {
+  if (!error) return undefined
+  const known: Record<string, string> = {
+    FILE_ACCESS_DENIED: 'The browser cannot access the download file.',
+    FILE_BLOCKED: 'The browser blocked this download.',
+    FILE_FAILED: 'The browser could not save this file.',
+    FILE_TRANSIENT_ERROR: 'A temporary file error stopped this download.',
+    FILE_NO_SPACE: 'There is not enough disk space to continue this download.',
+    FILE_NAME_TOO_LONG: 'The download filename is too long.',
+    FILE_TOO_LARGE: 'The download is too large for this file system.',
+    FILE_VIRUS_INFECTED: 'The browser blocked this file as unsafe.',
+    NETWORK_FAILED: 'The network connection failed.',
+    NETWORK_TIMEOUT: 'The download timed out.',
+    SERVER_FAILED: 'The server failed while sending this download.',
+    SERVER_UNAUTHORIZED: 'The server no longer authorizes this download.',
+    SERVER_FORBIDDEN: 'The server denied this download.',
+    SERVER_CERT_PROBLEM: 'The server certificate prevented this download.',
+    USER_CANCELED: 'This download was canceled.',
+    USER_SHUTDOWN: 'The browser closed before this download finished.',
+  }
+  return known[error] || 'The browser reported a download error.'
 }
 
 export type DownloadProgressUpdate = Partial<DownloadProgressRow> & {
@@ -76,6 +208,10 @@ export function downloadRowFromItem(item: {
   state?: string
   bytesReceived?: number
   totalBytes?: number
+  paused?: boolean
+  canResume?: boolean
+  error?: string
+  incognito?: boolean
 }): DownloadProgressRow {
   return {
     id: item.id,
@@ -83,6 +219,10 @@ export function downloadRowFromItem(item: {
     state: item.state || 'in_progress',
     receivedBytes: item.bytesReceived || 0,
     totalBytes: item.totalBytes || 0,
+    paused: Boolean(item.paused),
+    canResume: Boolean(item.canResume),
+    error: item.error,
+    incognito: item.incognito !== false,
   }
 }
 
@@ -101,6 +241,11 @@ export function mergeDownloadUpdate(
     state: update.state || existing?.state || 'in_progress',
     receivedBytes: update.receivedBytes ?? existing?.receivedBytes ?? 0,
     totalBytes: update.totalBytes ?? existing?.totalBytes ?? 0,
+    paused: update.paused ?? existing?.paused ?? false,
+    canResume: update.canResume ?? existing?.canResume ?? false,
+    error: Object.hasOwn(update, 'error') ? update.error : existing?.error,
+    incognito:
+      update.incognito === false ? false : (existing?.incognito ?? true),
   }
   if (existing) {
     return rows.map((row) => (row.id === update.id ? next : row))
@@ -126,6 +271,11 @@ export function mergeDownloadSnapshot(
       state: update.state || existing?.state || 'in_progress',
       receivedBytes: update.receivedBytes ?? existing?.receivedBytes ?? 0,
       totalBytes: update.totalBytes ?? existing?.totalBytes ?? 0,
+      paused: update.paused ?? existing?.paused ?? false,
+      canResume: update.canResume ?? existing?.canResume ?? false,
+      error: Object.hasOwn(update, 'error') ? update.error : existing?.error,
+      incognito:
+        update.incognito === false ? false : (existing?.incognito ?? true),
     }
     if (index < 0) rows.unshift(next)
     else rows[index] = next
