@@ -16,25 +16,21 @@ const baseSignal: HumanChallengeSignal = {
 }
 
 describe('human challenge detector contract', () => {
-  it('classifies a CAPTCHA only when explicit state and independent markers agree', () => {
+  it('classifies a standard provider iframe and widget marker without custom state', () => {
     expect(
       detectHumanChallenge({
         ...baseSignal,
-        urlPath: '/captcha',
         captchaIframeCount: 1,
         captchaProviderMarkerCount: 1,
-        explicitChallengeState: 'captcha',
-        formState: 'challenge',
       }),
     ).toEqual({ kind: 'captcha', reason: 'captcha_signals_agree' })
   })
 
-  it('classifies MFA only when explicit state, visible OTP, and challenge form agree', () => {
+  it('classifies a visible one-time-code field as MFA without custom state', () => {
     expect(
       detectHumanChallenge({
         ...baseSignal,
         visibleOtpInputCount: 1,
-        explicitChallengeState: 'mfa',
         formState: 'challenge',
       }),
     ).toEqual({ kind: 'mfa', reason: 'mfa_signals_agree' })
@@ -47,9 +43,7 @@ describe('human challenge detector contract', () => {
       { ...baseSignal, formState: 'consent' },
       {
         ...baseSignal,
-        captchaIframeCount: 1,
-        captchaProviderMarkerCount: 1,
-        explicitChallengeState: 'unknown',
+        urlPath: '/verify',
       },
     ]) {
       expect(detectHumanChallenge(signal)).toEqual({

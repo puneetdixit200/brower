@@ -177,6 +177,9 @@ describe('Observer stable refs', () => {
     const observer = stubObserverHarness(state)
     await observer.challengeSignals()
     expect(state.challengeExpression).toContain("el.type==='hidden'")
+    expect(state.challengeExpression).toContain(
+      "getAttribute('autocomplete')==='one-time-code'",
+    )
     expect(state.challengeExpression).toContain("s.visibility!=='visible'")
     expect(state.challengeExpression).toContain(
       "hasAttribute('data-hcaptcha-widget-id')",

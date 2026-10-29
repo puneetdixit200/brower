@@ -376,6 +376,11 @@ describe('research support assessment', () => {
                     support: 'supported',
                     explanation: 'From first.',
                     sourceIds: [prompt.evidence[0].id],
+                    quoteEvidence: [
+                      { sourceId: prompt.evidence[0].id, quote: 'first page' },
+                      { sourceId: 'unknown-source', quote: 'first page' },
+                      { sourceId: prompt.evidence[1].id, quote: 'first page' },
+                    ],
                   },
                   {
                     claim: 'Claim two',
@@ -385,6 +390,10 @@ describe('research support assessment', () => {
                       prompt.evidence[0].id,
                       prompt.evidence[1].id,
                       'outside-call',
+                    ],
+                    quoteEvidence: [
+                      { sourceId: prompt.evidence[1].id, quote: 'first page' },
+                      { sourceId: 'unknown-source', quote: 'first page' },
                     ],
                   },
                 ],
@@ -427,6 +436,11 @@ describe('research support assessment', () => {
       ['src_test_a'],
       ['src_test_a', 'src_test_b'],
     ])
+    expect(result.assessments[0]).toMatchObject({
+      support: 'supported',
+      quoteEvidence: [{ sourceId: 'src_test_a', quote: 'first page' }],
+    })
+    expect(result.assessments[1].quoteEvidence).toEqual([])
     expect(result.assessments.map((item) => item.sources)).toEqual([
       [
         {
@@ -465,6 +479,7 @@ describe('research support assessment', () => {
                   support: 'supported',
                   explanation: maxExplanation,
                   sourceIds: ['src_legacy_1'],
+                  quoteEvidence: [],
                 },
                 {
                   claim:
@@ -473,6 +488,10 @@ describe('research support assessment', () => {
                   explanation:
                     'Evidence at https://private.example.test/source?key=secret',
                   sourceIds: ['unknown-source'],
+                  quoteEvidence: [
+                    { sourceId: 'unknown-source', quote: 'The page says' },
+                    { sourceId: 'src_legacy_1', quote: 'not present here' },
+                  ],
                 },
               ],
             }),
@@ -497,12 +516,13 @@ describe('research support assessment', () => {
 
     expect(result.status).toBe('completed')
     expect(result.assessments).toHaveLength(2)
-    expect(result.assessments[0]).toMatchObject({ support: 'supported' })
+    expect(result.assessments[0]).toMatchObject({ support: 'unclear' })
     expect(result.assessments[0].claim).toBe(maxClaim)
     expect(result.assessments[0].claim).toHaveLength(500)
     expect(result.assessments[0].explanation).toBe(maxExplanation)
     expect(result.assessments[0].explanation).toHaveLength(600)
     expect(result.assessments[0].sourceIds).toEqual(['src_legacy_1'])
+    expect(result.assessments[0].quoteEvidence).toEqual([])
     expect(result.assessments[1]).toMatchObject({ support: 'mixed' })
     expect(result.assessments[1].claim).toContain('[source URL omitted]')
     expect(result.assessments[1].claim).not.toContain('https://')
@@ -511,5 +531,6 @@ describe('research support assessment', () => {
     expect(result.assessments[1].explanation).not.toContain('https://')
     expect(result.assessments[1].explanation).not.toContain('key=secret')
     expect(result.assessments[1].sourceIds).toEqual([])
+    expect(result.assessments[1].quoteEvidence).toEqual([])
   })
 })

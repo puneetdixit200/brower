@@ -16,6 +16,34 @@ export interface OwnerTabSelection {
   text: string
   url: string
   title: string
+  timestamp?: number
+}
+
+export interface PendingOwnerTabSelection {
+  tabKey: string
+  selection: OwnerTabSelection
+}
+
+export function snapshotOwnerTabSelection(
+  tabId: number | undefined,
+  selection: OwnerTabSelection | undefined,
+): PendingOwnerTabSelection | null {
+  if (tabId === undefined || !selection) return null
+  const tabKey = String(tabId)
+  return { tabKey, selection: { ...selection } }
+}
+
+/** True when a persisted selection still matches the one attached to a send. */
+export function isSameOwnerTabSelection(
+  current: OwnerTabSelection | undefined,
+  sent: OwnerTabSelection,
+): boolean {
+  return (
+    current?.text === sent.text &&
+    current?.url === sent.url &&
+    current?.title === sent.title &&
+    current?.timestamp === sent.timestamp
+  )
 }
 
 export function buildRequestBrowserContext({
@@ -74,6 +102,9 @@ export function getOwnerTabSelection(
     text: selection.text,
     url: selection.url,
     title: selection.title,
+    ...(selection.timestamp === undefined
+      ? {}
+      : { timestamp: selection.timestamp }),
   }
 }
 

@@ -8,6 +8,7 @@ export interface ResearchSupportAssessmentData {
     explanation?: string
     sourceIds?: string[]
     sources?: Array<{ id?: string; url?: string; label?: string }>
+    quoteEvidence?: Array<{ sourceId?: string; quote?: string }>
   }>
 }
 
@@ -95,6 +96,17 @@ export const ResearchSupportAssessment: FC<{
         {data.assessments.slice(0, 8).map((item) => {
           const sourceIds = safeSourceIds(item.sourceIds)
           const sources = safeSourceLinks(item.sources, sourceIds)
+          const quotes = (item.quoteEvidence ?? []).flatMap((evidence) => {
+            if (
+              !evidence.sourceId ||
+              !sourceIds.includes(evidence.sourceId) ||
+              !evidence.quote?.trim()
+            ) {
+              return []
+            }
+            const source = sources.find(({ id }) => id === evidence.sourceId)
+            return [{ quote: evidence.quote.slice(0, 500), source }]
+          })
           return (
             <li key={`${item.support}:${item.claim}:${item.explanation}`}>
               <span className="font-medium">
@@ -113,6 +125,30 @@ export const ResearchSupportAssessment: FC<{
                 <p className="mt-0.5 text-muted-foreground">
                   {item.explanation.slice(0, 600)}
                 </p>
+              )}
+              {quotes.length > 0 && (
+                <ul className="mt-1 space-y-1">
+                  {quotes.map(({ quote, source }) => (
+                    <li
+                      className="text-muted-foreground"
+                      key={`${source?.id ?? 'excerpt'}:${quote}`}
+                    >
+                      <q>{quote}</q>{' '}
+                      {source ? (
+                        <a
+                          href={source.url}
+                          rel="noreferrer"
+                          target="_blank"
+                          className="underline"
+                        >
+                          Source: {source.label}
+                        </a>
+                      ) : (
+                        <span>Supplied excerpt</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               )}
               {sourceIds.length > 0 && (
                 <p className="mt-1 text-muted-foreground">

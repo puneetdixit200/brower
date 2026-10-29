@@ -72,16 +72,11 @@ export function detectHumanChallenge(input: unknown): HumanChallengeResult {
     return ambiguous('conflicting_signals')
   }
 
-  if (
-    input.explicitChallengeState === 'captcha' &&
-    hasCaptchaMarkers &&
-    input.visibleOtpInputCount === 0
-  ) {
+  if (hasCaptchaMarkers && input.visibleOtpInputCount === 0) {
     return { kind: 'captcha', reason: 'captcha_signals_agree' }
   }
 
   if (
-    input.explicitChallengeState === 'mfa' &&
     hasMfaMarkers &&
     input.captchaIframeCount === 0 &&
     input.captchaProviderMarkerCount === 0

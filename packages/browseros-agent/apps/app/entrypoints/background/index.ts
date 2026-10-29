@@ -23,6 +23,7 @@ import { onServerMessage } from '@/lib/messaging/server/serverMessages'
 import { onOpenSidePanelWithSearch } from '@/lib/messaging/sidepanel/openSidepanelWithSearch'
 import { searchActionsStorage } from '@/lib/search-actions/searchActionsStorage'
 import { selectedTextStorage } from '@/lib/selected-text/selectedTextStorage'
+import { createSerializedMutationQueue } from '@/lib/selected-text/serializedMutationQueue'
 import { stopAgentStorage } from '@/lib/stop-agent/stop-agent-storage'
 import { scheduledJobRuns } from './scheduledJobRuns'
 
@@ -125,14 +126,53 @@ export default defineBackground(() => {
     })
   })
 
+  // Keep whole-map selected-text mutations in one extension context and one
+  // queue. The content script, panel and background cleanup can otherwise
+  // race a read/modify/write and lose a newer tab selection.
+  const mutateSelectedText = createSerializedMutationQueue()
+  onRuntimeMessage(RuntimeMessageType.setSelectedText, ({ data, sender }) =>
+    mutateSelectedText(async () => {
+      if (sender.tab?.id !== data.tabId) return
+      const map = await selectedTextStorage.getValue()
+      await selectedTextStorage.setValue({ ...map, [data.tabId]: data })
+    }),
+  )
+  onRuntimeMessage(RuntimeMessageType.removeSelectedText, ({ data }) =>
+    mutateSelectedText(async () => {
+      const map = await selectedTextStorage.getValue()
+      const key = String(data.tabId)
+      if (!map[key]) return
+      const { [key]: _removed, ...remaining } = map
+      await selectedTextStorage.setValue(remaining)
+    }),
+  )
+  onRuntimeMessage(RuntimeMessageType.removeSelectedTextIfMatches, ({ data }) =>
+    mutateSelectedText(async () => {
+      const map = await selectedTextStorage.getValue()
+      const key = String(data.tabId)
+      const current = map[key]
+      if (
+        !current ||
+        current.text !== data.selection.text ||
+        current.pageUrl !== data.selection.url ||
+        current.pageTitle !== data.selection.title ||
+        current.timestamp !== data.selection.timestamp
+      ) {
+        return
+      }
+      const { [key]: _removed, ...remaining } = map
+      await selectedTextStorage.setValue(remaining)
+    }),
+  )
+
   chrome.tabs.onRemoved.addListener((tabId) => {
     void conversationPanelBroker.removeTab(tabId).catch(() => undefined)
-    const key = String(tabId)
-    selectedTextStorage.getValue().then((map) => {
-      if (map[key]) {
-        const { [key]: _, ...rest } = map
-        selectedTextStorage.setValue(rest)
-      }
+    void mutateSelectedText(async () => {
+      const map = await selectedTextStorage.getValue()
+      const key = String(tabId)
+      if (!map[key]) return
+      const { [key]: _removed, ...remaining } = map
+      await selectedTextStorage.setValue(remaining)
     })
   })
 

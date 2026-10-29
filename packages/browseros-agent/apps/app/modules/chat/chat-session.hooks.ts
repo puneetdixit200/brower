@@ -32,6 +32,10 @@ import { formatConversationHistory } from '@/lib/conversations/formatConversatio
 import { declinedAppsStorage } from '@/lib/declined-apps/storage'
 import { createExecutionHistoryFetch } from '@/lib/execution-history/server-run-id'
 import { resolveChatProvider } from '@/lib/llm-providers/provider-runtime'
+import {
+  RuntimeMessageType,
+  sendRuntimeMessage,
+} from '@/lib/messaging/runtime/runtimeMessages'
 import { track } from '@/lib/metrics/track'
 import { searchActionsStorage } from '@/lib/search-actions/searchActionsStorage'
 import { selectedTextStorage } from '@/lib/selected-text/selectedTextStorage'
@@ -51,11 +55,17 @@ import {
   getPersistableMessages,
   shouldPersistHistory,
 } from './chat-session-persistence'
+import type {
+  OwnerTabSelection,
+  PendingOwnerTabSelection,
+} from './chat-session-request'
 import {
   buildRequestBrowserContext,
   getOwnerTabSelection,
   getToolApprovalResponse,
+  isSameOwnerTabSelection,
   prepareSidepanelSendMessagesRequest,
+  snapshotOwnerTabSelection,
   toProviderOption,
 } from './chat-session-request'
 import {
@@ -385,22 +395,33 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   const permissionModeRef = useRef<PermissionMode>(permissionMode)
   const textToActionRef = useRef<Map<string, ChatAction>>(textToAction)
   const workingDirRef = useRef<string | undefined>(undefined)
-  const selectionMapRef = useRef<
-    Record<string, { text: string; url: string; title: string }>
-  >({})
-  const pendingSelectionTabKeyRef = useRef<string | null>(null)
+  const selectionMapRef = useRef<Record<string, OwnerTabSelection>>({})
+  const pendingSelectionRef = useRef<PendingOwnerTabSelection | null>(null)
   const messagesRef = useRef<UIMessage[]>([])
 
   useEffect(() => {
     const toRef = (
-      map: Record<string, { text: string; pageUrl: string; pageTitle: string }>,
+      map: Record<
+        string,
+        {
+          text: string
+          pageUrl: string
+          pageTitle: string
+          timestamp: number
+        }
+      >,
     ) => {
       const result: Record<
         string,
-        { text: string; url: string; title: string }
+        { text: string; url: string; title: string; timestamp: number }
       > = {}
       for (const [k, v] of Object.entries(map)) {
-        result[k] = { text: v.text, url: v.pageUrl, title: v.pageTitle }
+        result[k] = {
+          text: v.text,
+          url: v.pageUrl,
+          title: v.pageTitle,
+          timestamp: v.timestamp,
+        }
       }
       return result
     }
@@ -550,8 +571,10 @@ export const useChatSession = (options?: ChatSessionOptions) => {
         })
 
         // Track which tab's selection was sent so we can clear it on success
-        pendingSelectionTabKeyRef.current =
-          activeTabSelection && activeTab?.id ? String(activeTab.id) : null
+        pendingSelectionRef.current = snapshotOwnerTabSelection(
+          activeTab?.id,
+          activeTabSelection,
+        )
 
         return result
       },
@@ -633,6 +656,22 @@ export const useChatSession = (options?: ChatSessionOptions) => {
     attachmentRef.current?.retire(previousConversationId)
     pendingMessagesRef.current = []
     localStreamConversationRef.current = undefined
+    const pendingSelection = pendingSelectionRef.current
+    if (pendingSelection) {
+      await sendRuntimeMessage(RuntimeMessageType.removeSelectedTextIfMatches, {
+        tabId: Number(pendingSelection.tabKey),
+        selection: pendingSelection.selection,
+      })
+      if (
+        isSameOwnerTabSelection(
+          selectionMapRef.current[pendingSelection.tabKey],
+          pendingSelection.selection,
+        )
+      ) {
+        delete selectionMapRef.current[pendingSelection.tabKey]
+      }
+      pendingSelectionRef.current = null
+    }
     await detachView()
     if (conversationIdRef.current !== previousConversationId) return false
 
@@ -884,16 +923,21 @@ export const useChatSession = (options?: ChatSessionOptions) => {
     if (!justFinished) return
 
     // Clear the selected text that was sent with this request
-    const tabKey = pendingSelectionTabKeyRef.current
-    if (status === 'ready' && tabKey) {
-      pendingSelectionTabKeyRef.current = null
-      delete selectionMapRef.current[tabKey]
-      selectedTextStorage.getValue().then((map) => {
-        if (map[tabKey]) {
-          const { [tabKey]: _, ...rest } = map
-          selectedTextStorage.setValue(rest)
-        }
+    const pendingSelection = pendingSelectionRef.current
+    if (status === 'ready' && pendingSelection) {
+      pendingSelectionRef.current = null
+      void sendRuntimeMessage(RuntimeMessageType.removeSelectedTextIfMatches, {
+        tabId: Number(pendingSelection.tabKey),
+        selection: pendingSelection.selection,
       })
+      if (
+        isSameOwnerTabSelection(
+          selectionMapRef.current[pendingSelection.tabKey],
+          pendingSelection.selection,
+        )
+      ) {
+        delete selectionMapRef.current[pendingSelection.tabKey]
+      }
     }
 
     const messagesToSave = getPersistableMessages(messages)

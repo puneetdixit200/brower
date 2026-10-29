@@ -1,5 +1,9 @@
 # Aster continuation handoff and full implementation plan
 
+### Current local checkpoint — 2026-10-29, based on `9b0dff23a`
+
+`git fetch aster --prune` found no newer remote feature-branch commit. Local source now includes A12 standard CAPTCHA/MFA metadata detection, exact selected-text cleanup serialized through a background queue, and T26.1 claim-linked exact quote evidence bound to captured excerpts. A12 tests cover stop/replacement/reopen recovery; A11 tests cover valid/wrong-source/unknown quotes and downgrade without a validated quote. Verification: A12 server 62/62, app 19/19, browser-core 10/10 and selected-text queue 2/2; A11 server research 16/16, ChatService 20/20, app research UI 6/6. App/server typechecks, targeted Biome and production extension build pass, and both source slices received independent Luna review with no actionable finding. These do not establish semantic entailment, live-provider accuracy, headed real-site precision, killed-process restart, or packaged/native acceptance. A11/A12 remain PARTIAL; matrix remains 2/72 PASS (2.8%). Next evaluate T26.1 on controlled supporting/irrelevant/contradictory/incomplete source cases, then live provider/headed Aster; continue A12 headed/restart coverage, T30.2 no-overlap and T20a native build, then the remaining plan. Do not mark the full goal complete.
+
 Updated 2026-10-29. The full project remains incomplete. The previous goal was paused at the user-requested 5% allowance threshold. The user explicitly resumed it on 2026-10-28; the project remains incomplete. This file supplements, and does not reduce, the original master specification or the 103-subtask implementation plan.
 
 ## Mandatory implementation scope

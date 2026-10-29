@@ -8,6 +8,10 @@ import { WorkspaceSelector } from '@/components/elements/workspace-selector'
 import { McpServerIcon } from '@/components/mcp/McpServerIcon'
 import { useMcpServers } from '@/lib/mcp/mcpServerStorage'
 import {
+  RuntimeMessageType,
+  sendRuntimeMessage,
+} from '@/lib/messaging/runtime/runtimeMessages'
+import {
   type SelectedTextData,
   selectedTextStorage,
 } from '@/lib/selected-text/selectedTextStorage'
@@ -128,10 +132,8 @@ export const ChatFooter: FC<ChatFooterProps> = ({
           }}
           onDismiss={() => {
             if (!activeTabId) return
-            const key = String(activeTabId)
-            selectedTextStorage.getValue().then((map) => {
-              const { [key]: _, ...rest } = map
-              selectedTextStorage.setValue(rest)
+            void sendRuntimeMessage(RuntimeMessageType.removeSelectedText, {
+              tabId: activeTabId,
             })
           }}
         />

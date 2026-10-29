@@ -8,13 +8,36 @@ import {
   buildSidepanelPreparedSendMessagesRequest,
   getOwnerTabSelection,
   getToolApprovalResponse,
+  isSameOwnerTabSelection,
   prepareSidepanelSendMessagesRequest,
+  snapshotOwnerTabSelection,
 } from './chat-session-request'
 import type { SidepanelChatTarget } from './sidepanel-chat-targets'
 
 const conversationId = '00000000-0000-4000-8000-000000000001'
 
 describe('chat request preparation', () => {
+  it('clears only the exact selected-text snapshot attached to a send', () => {
+    const sent = {
+      text: 'selected excerpt',
+      url: 'https://example.com/page',
+      title: 'Page title',
+      timestamp: 100,
+    }
+    expect(isSameOwnerTabSelection(sent, sent)).toBe(true)
+    expect(snapshotOwnerTabSelection(12, sent)).toEqual({
+      tabKey: '12',
+      selection: sent,
+    })
+    expect(snapshotOwnerTabSelection(undefined, sent)).toBeNull()
+    expect(
+      isSameOwnerTabSelection({ ...sent, text: 'new selection' }, sent),
+    ).toBe(false)
+    expect(isSameOwnerTabSelection({ ...sent, timestamp: 200 }, sent)).toBe(
+      false,
+    )
+  })
+
   it('omits active and selected tab URL/title metadata for human login continuation only', () => {
     const activeTab = {
       id: 10,

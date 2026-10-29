@@ -241,6 +241,27 @@ describe('ChatService research support assessment', () => {
       baseUrl: 'https://llm.example.test/v1',
     }))
     generateObjectSpy.mockClear()
+    generateObjectSpy.mockImplementation(async (options) => {
+      const prompt = JSON.parse((options as { prompt: string }).prompt) as {
+        evidence: Array<{ id: string }>
+      }
+      const sourceId = prompt.evidence[0]?.id
+      return {
+        object: {
+          assessments: [
+            {
+              claim: 'The answer is supported.',
+              support: 'supported',
+              explanation: 'The captured page supports it.',
+              sourceIds: sourceId ? [sourceId] : [],
+              quoteEvidence: sourceId
+                ? [{ sourceId, quote: 'captured page evidence' }]
+                : [],
+            },
+          ],
+        },
+      }
+    })
 
     const fakeAgent = createFakeAgent()
     agentToReturn = fakeAgent
@@ -334,6 +355,7 @@ describe('ChatService research support assessment', () => {
     expect(assessmentIndex).toBeGreaterThanOrEqual(0)
     expect(finishIndex).toBeGreaterThan(assessmentIndex)
     expect(streamText).toContain('The answer is supported.')
+    expect(streamText).toContain('captured page evidence')
   })
 })
 

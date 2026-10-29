@@ -34,6 +34,8 @@ export function HumanInterventionResume({
     setFreshStartFailed(false)
     try {
       setFreshStartFailed(!(await onStartFresh()))
+    } catch {
+      setFreshStartFailed(true)
     } finally {
       setIsStartingFresh(false)
     }

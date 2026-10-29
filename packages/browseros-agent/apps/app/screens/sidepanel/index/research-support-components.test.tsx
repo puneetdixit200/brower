@@ -30,6 +30,12 @@ describe('research support UI', () => {
               support: 'supported',
               explanation: 'An excerpt appears relevant.',
               sourceIds: ['src_abc123'],
+              quoteEvidence: [
+                { sourceId: 'src_abc123', quote: 'A short exact quote.' },
+              ],
+              sources: [
+                { id: 'src_abc123', url: 'https://source.example.test/page' },
+              ],
             },
           ],
         }}
@@ -37,7 +43,9 @@ describe('research support UI', () => {
     )
     expect(completed).toContain('AI support assessment')
     expect(completed).toContain('Excerpt appears to support')
-    expect(completed).toContain('Supplied excerpt <code>src_abc123</code>')
+    expect(completed).toContain('A short exact quote.')
+    expect(completed).toContain('Source: source.example.test')
+    expect(completed).not.toContain('Supplied excerpt <code>src_abc123</code>')
     expect(completed).toContain('does not establish claim accuracy')
     expect(completed).not.toContain('verified')
     expect(completed).not.toContain('is true')
@@ -121,6 +129,36 @@ describe('research support UI', () => {
     expect(html).not.toContain('unsafe.example.test')
     expect(html).not.toContain('public.example.test')
     expect(html).toContain('does not establish')
+  })
+
+  it('shows a quote only with its matching validated source reference', () => {
+    const html = renderToStaticMarkup(
+      <ResearchSupportAssessment
+        data={{
+          status: 'completed',
+          assessments: [
+            {
+              claim: 'Claim',
+              support: 'supported',
+              sourceIds: ['src_good'],
+              quoteEvidence: [
+                { sourceId: 'src_good', quote: 'Verified excerpt text.' },
+                { sourceId: 'src_unknown', quote: 'Must not appear.' },
+              ],
+              sources: [
+                { id: 'src_good', url: 'https://good.example.test/page' },
+                { id: 'src_unknown', url: 'https://unknown.example.test/page' },
+              ],
+            },
+          ],
+        }}
+      />,
+    )
+    expect(html).toContain('Verified excerpt text.')
+    expect(html).toContain('href="https://good.example.test/page"')
+    expect(html).not.toContain('Must not appear.')
+    expect(html).not.toContain('unknown.example.test')
+    expect(html).toContain('does not establish claim accuracy')
   })
 
   it('suppresses trailing-dot localhost and local-use source links', () => {

@@ -149,6 +149,68 @@ describe('dbScheduledJobRunStore', () => {
     }
   })
 
+  test('keeps a running claim exclusive across separate Bun processes', async () => {
+    const dbPath = await useTempDbWithJob()
+    const claimed = await dbScheduledJobRunStore.start(
+      baseRun({ id: 'process-owner', status: 'running' }),
+    )
+    expect(claimed).toMatchObject({ id: 'process-owner', status: 'running' })
+
+    const clientUrl = new URL('../../../src/lib/db/client.ts', import.meta.url)
+      .href
+    const storeUrl = new URL(
+      '../../../src/lib/schedules/run-store.ts',
+      import.meta.url,
+    ).href
+    const childScript = `
+      const { openBrowserOsDatabase } = await import(${JSON.stringify(clientUrl)})
+      const { createScheduledJobRunStore } = await import(${JSON.stringify(storeUrl)})
+      const handle = openBrowserOsDatabase({ dbPath: process.env.RUN_STORE_DB_PATH })
+      try {
+        const store = createScheduledJobRunStore(() => handle.db)
+        const competing = await store.start({ id: 'process-competitor', jobId: 'job-1', status: 'running', startedAt: 2000 })
+        const owner = await store.get('process-owner')
+        console.log(JSON.stringify({ competing, owner }))
+      } finally {
+        handle.sqlite.close()
+      }
+    `
+    const child = Bun.spawn([process.execPath, '-e', childScript], {
+      env: { ...process.env, RUN_STORE_DB_PATH: dbPath },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    const timedOut = Symbol('timed-out')
+    const exitCode = await Promise.race([
+      child.exited,
+      new Promise<typeof timedOut>((resolve) => {
+        timeout = setTimeout(() => {
+          child.kill()
+          resolve(timedOut)
+        }, 5000)
+      }),
+    ])
+    if (timeout) clearTimeout(timeout)
+
+    const [stdout, stderr] = await Promise.all([
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ])
+    expect(exitCode, `child Bun process timed out; stderr: ${stderr}`).not.toBe(
+      timedOut,
+    )
+    expect(exitCode, `child Bun process failed; stderr: ${stderr}`).toBe(0)
+    expect(JSON.parse(stdout)).toEqual({
+      competing: null,
+      owner: expect.objectContaining({
+        id: 'process-owner',
+        status: 'running',
+      }),
+    })
+  })
+
   test('treats a retry with the same run id as an idempotent claim', async () => {
     await useTempDbWithJob()
     const first = await dbScheduledJobRunStore.start(

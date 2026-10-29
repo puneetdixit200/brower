@@ -117,7 +117,7 @@ describe('automatic human challenge pause', () => {
     const result = { content: [{ type: 'text' as const, text: 'safe' }] }
     const serializedBefore = JSON.stringify(result)
     await pauseForDetectedHumanChallenge(call, result)
-    expect(waits).toBe(0)
+    expect(waits).toBe(1)
     expect(JSON.stringify(result)).toBe(serializedBefore)
   })
 })
