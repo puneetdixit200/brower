@@ -7,11 +7,15 @@
 
 Updated 2026-10-29. The full project remains incomplete. Work was stopped after the user-requested commit/push checkpoint; the 5%-remaining allowance threshold had not been reached. This continuation resumes the same project objective. This file supplements, and does not reduce, the original master specification or the 103-subtask implementation plan.
 
-### Latest continuation checkpoint — remote tip before the M06 slice `d141591e1`, 2026-10-29
+### Previous source checkpoint — before the M06 slice `d141591e1`, 2026-10-29
 
 `git fetch aster --prune` found no commits beyond the then-current branch tip. Commits `335d0e6fe` and `57cdb52db` add early GN-safe filename validation for unpacked extension staging and bounded local note revision history with explicit undo; `d141591e1` records the corrected T24.2/A08 two-conversation interleaving fixture. M03 has focused source coverage (14 tests, 97 assertions) and remains PARTIAL pending headed UI/runtime acceptance. A08 passes 24/24 focused tests (150 assertions), while headed multi-tab/provider/load acceptance remains open. The current M06 source slice adds route-contract tests (8/8 combined route/store tests, 121 assertions) with accurate originless-read behavior; M06 remains PARTIAL pending headed UI/private-context/package acceptance.
 
 The latest read-only native audit found no live build, no linked `chrome` binary and no `.ninja_log`; six relevant objects exist, and the pinned native checkout still has 319 changed paths. `NEXT_STEPS.md` is newer and authoritative for native work: preserve the checkout, do not start a build or regenerate GN until safe incremental-state recovery and a bounded dry run are established. The 72-row matrix remains 2/72 PASS (2.8%); the overall project remains incomplete.
+
+### Current continuation — 2026-10-29
+
+`git fetch aster --prune` found no commits beyond `a54b59ef8` on `feat/aster-linux-ui`. The current source slice adds selected-tab Back and Forward actions to `BrowserQuickControls`, with current-window and HTTP(S) revalidation immediately before dispatch. The helper suite passes 8/8; app typecheck, targeted Biome, and `git diff --check` pass, and an independent Luna review found no issue. B03 remains PARTIAL: Stop and headed/native navigation acceptance remain open. Docs were updated in `FEATURE_MATRIX.md`, `PROGRESS.md`, and `NEXT_STEPS.md`. The matrix remains 2/72 PASS (2.8%); overall implementation remains incomplete. Continue with the full master spec and 103-subtask plan; preserve the native build gate below.
 
 ## Mandatory implementation scope
 
@@ -36,7 +40,7 @@ PASS rows are U04 and U05. Native browser acceptance, package release, performan
 - Branch: `feat/aster-linux-ui`.
 - User remote `aster`: `https://github.com/puneetdixit200/brower.git`. Preserve `origin`, the BrowserOS upstream remote.
 - First inspect status, branch, log and remote divergence. Preserve newer and uncommitted work. Fetch and fast-forward only when safe; never force-reset the user repository.
-- Latest pushed Aster feature-branch commit adds the A11 stream-order test, T24.1 queue reliability slice, and T26.2 dummy MFA fixture plus its qualified route notice. The tree is clean after the checkpoint. Continue from `NEXT_STEPS.md`; retain the evidence and explicit remaining acceptance gates in `FEATURE_MATRIX.md` and `PROGRESS.md`.
+- Latest remote checkpoint at the start of this continuation is `a54b59ef8` (M06 route-contract tests); the current B03 Back/Forward source slice is recorded above and in `PROGRESS.md`. Continue from `NEXT_STEPS.md`; retain the evidence and explicit remaining acceptance gates in `FEATURE_MATRIX.md` and `PROGRESS.md`.
 - Use Luna medium for implementation, planning, judging and independent review. Deploy no more than five Luna medium subagents concurrently. Do not use Sol or Terra for this project.
 - Delegate narrow owned tasks. Avoid duplicate exploration, huge handoffs, parallel builds sharing one output directory and broad test repetition without a relevant change.
 - User authorizes implementation, routine decisions, testing and reviewed milestone commits/pushes. Avoid unnecessary questions.

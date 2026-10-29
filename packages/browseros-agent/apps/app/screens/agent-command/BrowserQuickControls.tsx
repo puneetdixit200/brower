@@ -1,4 +1,6 @@
 import {
+  ArrowLeft,
+  ArrowRight,
   Camera,
   Download,
   ExternalLink,
@@ -10,6 +12,7 @@ import {
   SquarePlus,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { navigateSelectedWebTab } from './browser-navigation-actions'
 import { resolveHomeSearchUrl } from './home-search'
 import { captureVisibleTabContext } from './screenshot-context'
 
@@ -127,6 +130,12 @@ export function BrowserQuickControls({
         throw new Error('Website tab moved or closed')
       await chrome.tabs.reload(target.id)
     })
+  }
+
+  const navigateSelected = (direction: 'back' | 'forward') => {
+    void action(() =>
+      navigateSelectedWebTab(chrome.tabs, selectedTabId, direction),
+    )
   }
 
   const activateWebTab = () => {
@@ -391,6 +400,16 @@ export function BrowserQuickControls({
             run: () => void action(() => chrome.tabs.create({})),
           },
           { name: 'Activate selected tab', Icon: Globe2, run: activateWebTab },
+          {
+            name: 'Back selected webpage',
+            Icon: ArrowLeft,
+            run: () => navigateSelected('back'),
+          },
+          {
+            name: 'Forward selected webpage',
+            Icon: ArrowRight,
+            run: () => navigateSelected('forward'),
+          },
           { name: 'Reload selected webpage', Icon: RotateCw, run: reload },
           { name: 'Reopen closed tab', Icon: History, run: restoreClosed },
           { name: 'Recent history', Icon: History, run: showRecentHistory },
@@ -416,6 +435,8 @@ export function BrowserQuickControls({
               (name === 'Select screenshot context' &&
                 !screenshotContextEnabled) ||
               ((name === 'Activate selected tab' ||
+                name === 'Back selected webpage' ||
+                name === 'Forward selected webpage' ||
                 name === 'Reload selected webpage' ||
                 name === 'Screenshot' ||
                 name === 'Select screenshot context') &&

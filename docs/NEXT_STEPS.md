@@ -8,6 +8,7 @@ Checkpoint: 2026-10-29, branch `feat/aster-linux-ui`. This repository contains t
 
 ## Next execution order
 
+- **B03 source slice:** selected-tab Back and Forward controls now revalidate the current-window HTTP(S) tab before dispatch; focused checks pass. Next add Stop only with an appropriate cancellation boundary, then exercise navigation controls in headed Aster. Keep B03 PARTIAL until native acceptance.
 - **T27.3 / M03 source slice complete:** local bounded revision history and one-step undo are implemented and focused checks pass. Next verify the history disclosure, revision list, undo feedback, provenance restoration and delete semantics in a headed disposable Aster profile; keep M03 PARTIAL until then.
 - **T24.2 / A08 service fixture verified:** `conversation-runs.test.ts` passes 24/24 (150 assertions) with concurrent stream/approval/tab/stop isolation. Next run headed Aster with two tabs and confirm task context, approvals and results remain isolated; then add provider-level concurrency/load evidence. Keep A08 PARTIAL until those gates pass.
 
