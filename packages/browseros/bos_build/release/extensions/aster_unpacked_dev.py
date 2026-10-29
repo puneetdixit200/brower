@@ -124,6 +124,13 @@ def validate_aster_unpacked_debug(
         if path.is_dir():
             continue
         relative = path.relative_to(directory).as_posix()
+        # The validated list is emitted verbatim into a GN source list by the
+        # staging step. Reject unsafe names here so preparation cannot produce
+        # a bundle that only fails later during Chromium staging.
+        if not re.fullmatch(r"[A-Za-z0-9._@+/\[\]-]+", relative):
+            raise ValueError(
+                f"Unpacked extension contains unsafe GN filename: {relative!r}"
+            )
         files.append(relative)
         bytes_total += path.stat().st_size
         if len(files) > MAX_FILES or bytes_total > MAX_BYTES:

@@ -105,6 +105,24 @@ class AsterUnpackedDevelopmentTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "manifest"):
             self._validate()
 
+    def test_rejects_filenames_unsafe_for_generated_gn_list(self):
+        for name in ('bad"name.js', "$evil.js", "bad name.js", "bad\nname.js"):
+            with self.subTest(name=name):
+                path = self.directory / name
+                path.write_text("payload")
+                with self.assertRaisesRegex(ValueError, "unsafe GN filename"):
+                    self._validate()
+                path.unlink()
+
+    def test_accepts_wxt_font_filename_in_gn_list(self):
+        font = self.directory / "geist-mono/GeistMono-Italic[wght].woff2"
+        font.parent.mkdir()
+        font.write_bytes(b"font")
+
+        result = self._validate()
+
+        self.assertIn("geist-mono/GeistMono-Italic[wght].woff2", result.files)
+
 
 if __name__ == "__main__":
     unittest.main()
