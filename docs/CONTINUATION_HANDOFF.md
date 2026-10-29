@@ -1,11 +1,17 @@
 # Aster continuation handoff and full implementation plan
 
-### Current local checkpoint — 2026-10-29, local `7ad761bed`, remote `9b0dff23a`
+### Historical checkpoint — 2026-10-29, local `7ad761bed`, remote `9b0dff23a`
 
 `git fetch aster --prune` found no newer remote feature-branch commit. Local source now includes A12 standard CAPTCHA/MFA metadata detection, exact selected-text cleanup serialized through a background queue, and T26.1 claim-linked exact quote evidence bound to captured excerpts. A12 tests cover stop/replacement/reopen recovery; A11 tests cover valid/wrong-source/unknown quotes and downgrade without a validated quote. Verification: A12 server 62/62, app 19/19, browser-core 10/10 and selected-text queue 2/2; A11 server research 16/16, ChatService 20/20, app research UI 6/6. App/server typechecks, targeted Biome and production extension build pass, and both source slices received independent Luna review with no actionable finding. These do not establish semantic entailment, live-provider accuracy, headed real-site precision, killed-process restart, or packaged/native acceptance. A11/A12 remain PARTIAL; matrix remains 2/72 PASS (2.8%). Next evaluate T26.1 on controlled supporting/irrelevant/contradictory/incomplete source cases, then live provider/headed Aster; continue A12 headed/restart coverage, T30.2 no-overlap and T20a native build, then the remaining plan. Do not mark the full goal complete.
 `git fetch aster --prune` found no newer remote feature-branch commit. Local source includes A12 standard CAPTCHA/MFA metadata detection, exact selected-text cleanup serialized through a background queue, and T26.1 claim-linked exact quote evidence bound to captured excerpts. Since local `7ad761bed`, T26.1 gained offline evidence-pipeline fixtures (18/18 combined verifier tests, 103 assertions) and more precise model instructions for supported/mixed/unsupported/unclear; fixture labels are mocked and do not measure model accuracy. A12 detector/testbed tests pass 53/53 (393 assertions, four suites), but no headed BrowserOS binary or MCP endpoint exists. The system Ninja 1.13.2 and bundled Chromium Ninja 1.12.1 both stall on the same bounded target query beyond 25 seconds; no native build was started and the 319 modified Chromium paths were preserved. A11/A12 remain PARTIAL; matrix remains 2/72 PASS (2.8%). Next: consented live-provider semantic evaluation, headed Aster challenge coverage, real process/package restart checks, T30.2 runtime no-overlap, diagnose Ninja startup, then native build and remaining plan. Do not mark the full goal complete.
 
-Updated 2026-10-29. The full project remains incomplete. The previous goal was paused at the user-requested 5% allowance threshold. The user explicitly resumed it on 2026-10-28; the project remains incomplete. This file supplements, and does not reduce, the original master specification or the 103-subtask implementation plan.
+Updated 2026-10-29. The full project remains incomplete. Work was stopped after the user-requested commit/push checkpoint; the 5%-remaining allowance threshold had not been reached. This continuation resumes the same project objective. This file supplements, and does not reduce, the original master specification or the 103-subtask implementation plan.
+
+### Latest continuation checkpoint — feature branch base `57cdb52db`, 2026-10-29
+
+`git fetch aster --prune` found no commits beyond the then-current branch tip. Commits `335d0e6fe` and `57cdb52db` add early GN-safe filename validation for unpacked extension staging and bounded local note revision history with explicit undo. M03 has focused source coverage (14 tests, 97 assertions) and remains PARTIAL pending headed UI/runtime acceptance. T24.2/A08 has a two-conversation interleaving fixture; its corrected focused suite passes 24/24 (150 assertions), while headed multi-tab/provider/load acceptance remains open.
+
+The latest read-only native audit found no live build, no linked `chrome` binary and no `.ninja_log`; six relevant objects exist, and the pinned native checkout still has 319 changed paths. `NEXT_STEPS.md` is newer and authoritative for native work: preserve the checkout, do not start a build or regenerate GN until safe incremental-state recovery and a bounded dry run are established. The 72-row matrix remains 2/72 PASS (2.8%); the overall project remains incomplete.
 
 ## Mandatory implementation scope
 
@@ -40,25 +46,20 @@ PASS rows are U04 and U05. Native browser acceptance, package release, performan
 
 Pinned Chromium checkout: `/home/puneet/Projects/aster-browser/chromium-aster-dev/src`, tag `155.0.8059.26`, HEAD `16c3e55476d3564bea713314b2fff638749ce3e6`. Dependencies and Linux sysroot are provisioned. Source/resources staged into this checkout come from Aster baseline `3fb17c5c6`; the newer tab-palette frontend has **not** been copied there.
 
-- All 424 patches applied; full GN generation passed (35,759 targets / 5,077 files).
-- Actual pinned compiler produced `browseros_product.o` and `browseros_product_state.o`, both exit 0. Along with the server config/manager objects, four translation units compile; this is not a linked browser.
-- The full two-job graph (57,342 actions) and then a combined object preflight were intentionally interrupted to prioritize smaller checks. Completed outputs remain reusable.
-- Server configuration and manager object preflight finished successfully: exit 0, all 2,556 scheduled actions completed, including both requested C++ objects. No task-owned Ninja build is expected to remain live at this checkpoint. **Check actual process state before starting one; never run concurrent Ninja processes against the same output directory.** A locator or lockfile alone is not proof of a live process.
-- Host-local locator: `/home/puneet/Documents/Codex/2026-10-27/paste-this-into-the-new-codex/work/aster-native-build-state.json`. The last server session 73371 is terminal with exit 0; its log is `work/aster-native-server-objects.log` under that task directory. Another chat may not have access to the same tool-session handle; inspect the actual process and logfile in that case. A transient observation timeout is not proof that it stopped.
-- Native checkout lock: `/home/puneet/Projects/aster-browser/chromium-aster-dev/.browseros-build-locks/src-0bf2808ad004.lock`.
-- Earlier task-created source changes were archived at the task directory's `work/native-retry-backup/` before restoring pinned tracked files. No user project checkout was reset.
-- A cloud/GitHub-only agent cannot inspect these host-local processes. Record that limit and continue source work in disjoint areas; do not assume the build passed, restart it remotely or overwrite the native baseline.
+- A live audit on 2026-10-29 found no active Ninja/GN/compiler/linker process. The task-local locator reports no driver PIDs and no live owned build; its recorded build session is terminal. Never use the locator or lockfile by itself as proof that a process is live.
+- The checkout has 319 tracked/untracked changes; preserve all of them. Six relevant object files exist, including the extension loader and crash-reporter objects, but there is no linked `chrome` binary.
+- `.ninja_log` is absent throughout the Aster native checkout. Although several bounded object preflights completed, read-only queries/dry-runs show broad manifest parsing and action expansion when incremental state is missing.
+- **The newer `NEXT_STEPS.md` native gate is authoritative:** do not start another native build or regenerate GN until a safe incremental-state recovery method is established and a bounded dry run succeeds. Continue disjoint source work meanwhile. The earlier “resume the full build” sequence below is deferred behind that gate.
+- A cloud/GitHub-only agent cannot inspect these host-local processes or files. Recheck live process state before any future build; do not restart a build remotely or overwrite the native baseline.
 
 ## Execution order and acceptance gates
 
 ### 1. Finish native bootstrap and actual browser integration
 
-1. Verify the recorded successful product/config/manager object outputs and check there is no live build. Preserve completed outputs. Continue with the remaining changed translation units; fix concrete compiler/API failures against pinned Chromium.
-2. Product-state compilation also passed. Compile the remaining exact loader and crash-reporter objects identified from generated Ninja rules:
-   - `obj/chrome/browser/extensions/extensions/browseros_extension_loader.o`
-   - `obj/chrome/browser/core/chrome_crash_reporter_client.o`
-3. Resume the full `chrome chromedriver chrome_sandbox` build with **two total jobs**, then package the product. Do not run concurrent Ninja processes against the same output directory.
-4. After the active baseline build is terminal, stage the latest reviewed source/resources through the normal pipeline. Keep source SHA, resource manifests and artifact provenance honest; do not silently label an older extension/native bundle as current HEAD.
+1. Establish a safe way to restore or reconstruct compatible Ninja incremental state without discarding existing outputs or the 319 changed native paths. Verify the method on a bounded dry run before compiling.
+2. Once the gate is met, verify the existing product/config/manager/loader/crash-reporter object outputs, then continue exact changed translation units against pinned Chromium. Never run concurrent Ninja processes against the same output directory.
+3. Resume the full `chrome chromedriver chrome_sandbox` build with **two total jobs**, then package the product.
+4. After the build is terminal, stage the latest reviewed source/resources through the normal pipeline. Keep source SHA, resource manifests and artifact provenance honest; do not silently label an older extension/native bundle as current HEAD.
 5. Launch the actual Aster binary on a disposable profile with explicit `ASTER_DIR`. Verify baked product/profile paths, original Aster branding, extension ID `oifdmombnijnaiocijiacjhajbnpdlhb`, installed/READY state, new-tab UI and sandbox.
 6. Verify complete Aster sidecar resources (including executable Bun and migrations), loopback listeners/authentication, health/CDP, tool-output paths, telemetry default OFF, restart persistence and clean shutdown. Do not substitute BrowserOS runtime evidence for native Aster evidence.
 7. Test B01–B10 in that binary: secure navigation/search/back/reload, tabs and recovery, downloads/files, history/bookmarks, incognito, supported extensions/password managers, media/WebRTC/permissions/devtools and session restore.

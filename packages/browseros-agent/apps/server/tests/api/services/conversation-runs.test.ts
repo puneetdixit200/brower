@@ -352,6 +352,268 @@ describe('ConversationRuns', () => {
     ).toBe(snapshot?.traceEvents?.length)
   })
 
+  it('keeps interleaved conversations, approvals, results, panels, and stops isolated', async () => {
+    const conversationA = 'parallel-conversation-a'
+    const conversationB = 'parallel-conversation-b'
+    const sourceA = controlledSource()
+    const sourceB = controlledSource()
+    const runs = new ConversationRuns()
+    const startedA = await runs.start({
+      conversationId: conversationA,
+      messages: [
+        {
+          id: 'user-a',
+          role: 'user',
+          parts: [{ type: 'text', text: 'context-a' }],
+        },
+      ],
+      panelTabIds: [41],
+      createStream: () => sourceA.stream,
+    })
+    const startedB = await runs.start({
+      conversationId: conversationB,
+      messages: [
+        {
+          id: 'user-b',
+          role: 'user',
+          parts: [{ type: 'text', text: 'context-b' }],
+        },
+      ],
+      panelTabIds: [42],
+      createStream: () => sourceB.stream,
+    })
+
+    sourceA.write({ type: 'text-start', id: 'answer-a' })
+    sourceB.write({ type: 'text-start', id: 'answer-b' })
+    sourceA.write({
+      type: 'tool-input-start',
+      toolCallId: 'private-call-a',
+      toolName: 'browser.navigate',
+    })
+    sourceB.write({
+      type: 'tool-input-start',
+      toolCallId: 'private-call-b',
+      toolName: 'browser.navigate',
+    })
+    sourceA.write({
+      type: 'tool-approval-request',
+      approvalId: 'private-approval-a',
+      toolCallId: 'private-call-a',
+    })
+    sourceB.write({
+      type: 'tool-approval-request',
+      approvalId: 'private-approval-b',
+      toolCallId: 'private-call-b',
+    })
+    sourceA.write({
+      type: 'tool-approval-response',
+      approvalId: 'private-approval-b',
+      approved: true,
+    })
+    sourceA.write({ type: 'text-delta', id: 'answer-a', delta: 'result-a' })
+    sourceB.write({ type: 'text-delta', id: 'answer-b', delta: 'result-b' })
+
+    const assignmentByTab = Object.fromEntries(
+      (await currentPanelAssignments(runs)).assignments.map((item) => [
+        item.tabId,
+        item.conversationId,
+      ]),
+    )
+    expect(assignmentByTab).toEqual({ 41: conversationA, 42: conversationB })
+    expect(runs.getSnapshot(conversationA)?.messages?.[0]?.id).toBe('user-a')
+    expect(runs.getSnapshot(conversationB)?.messages?.[0]?.id).toBe('user-b')
+    expect(
+      runs.updateMessages(conversationA, startedB.runId, [
+        { id: 'foreign-b', role: 'assistant', parts: [] },
+      ]),
+    ).toBe(false)
+    expect(
+      runs.updateMessages(conversationB, startedA.runId, [
+        { id: 'foreign-a', role: 'assistant', parts: [] },
+      ]),
+    ).toBe(false)
+    expect(
+      runs.updateMessages(conversationA, startedA.runId, [
+        { id: 'message-a', role: 'assistant', parts: [] },
+      ]),
+    ).toBe(true)
+    expect(
+      runs.updateMessages(conversationB, startedB.runId, [
+        { id: 'message-b', role: 'assistant', parts: [] },
+      ]),
+    ).toBe(true)
+
+    await eventually(() => {
+      expect(
+        runs
+          .getSnapshot(conversationA)
+          ?.traceEvents?.filter((event) => event.kind === 'approval_requested'),
+      ).toHaveLength(1)
+      expect(
+        runs
+          .getSnapshot(conversationB)
+          ?.traceEvents?.filter((event) => event.kind === 'approval_requested'),
+      ).toHaveLength(1)
+    })
+    expect(
+      runs
+        .getSnapshot(conversationA)
+        ?.traceEvents?.filter((event) => event.kind === 'approval_resolved'),
+    ).toHaveLength(0)
+    expect(
+      runs
+        .getSnapshot(conversationB)
+        ?.traceEvents?.filter((event) => event.kind === 'approval_resolved'),
+    ).toHaveLength(0)
+    sourceA.write({
+      type: 'tool-approval-response',
+      approvalId: 'private-approval-a',
+      approved: true,
+    })
+    await eventually(() => {
+      expect(
+        runs
+          .getSnapshot(conversationA)
+          ?.traceEvents?.filter((event) => event.kind === 'approval_resolved'),
+      ).toHaveLength(1)
+      expect(
+        runs
+          .getSnapshot(conversationB)
+          ?.traceEvents?.filter((event) => event.kind === 'approval_resolved'),
+      ).toHaveLength(0)
+    })
+
+    const traceA = runs.getSnapshot(conversationA)?.traceEvents ?? []
+    const traceB = runs.getSnapshot(conversationB)?.traceEvents ?? []
+    const operationA = traceA.find(
+      (event) => event.kind === 'approval_requested',
+    )?.approvalOperationId
+    const operationB = traceB.find(
+      (event) => event.kind === 'approval_requested',
+    )?.approvalOperationId
+    expect(operationA).toMatch(/^[0-9a-f-]{36}$/)
+    expect(operationB).toMatch(/^[0-9a-f-]{36}$/)
+    expect(operationA).not.toBe(operationB)
+    expect(
+      traceA
+        .filter((event) => event.kind.startsWith('approval_'))
+        .map((event) => event.approvalOperationId),
+    ).toEqual([operationA, operationA])
+    expect(
+      traceB
+        .filter((event) => event.kind.startsWith('approval_'))
+        .map((event) => event.approvalOperationId),
+    ).toEqual([operationB])
+    expect(
+      traceA
+        .filter((event) => event.kind === 'approval_resolved')
+        .map((event) => ({
+          approvalOperationId: event.approvalOperationId,
+          outcome: event.outcome,
+        })),
+    ).toEqual([{ approvalOperationId: operationA, outcome: 'approved' }])
+    expect(JSON.stringify(traceA)).not.toContain('private-approval-b')
+    expect(JSON.stringify(traceB)).not.toContain('private-approval-a')
+
+    expect(await runs.stop(conversationA)).toBe(true)
+    expect(runs.getSnapshot(conversationA)?.status).toBe('aborted')
+    expect(runs.getSnapshot(conversationB)?.status).toBe('running')
+    expect(
+      (await currentPanelAssignments(runs)).assignments.map((item) => [
+        item.tabId,
+        item.conversationId,
+        item.status,
+      ]),
+    ).toEqual([
+      [41, conversationA, 'aborted'],
+      [42, conversationB, 'running'],
+    ])
+
+    const replayA = await collect(runs.subscribe(conversationA, startedA.runId))
+    expect(
+      replayA.some(
+        (chunk) => chunk.type === 'text-delta' && chunk.delta === 'result-a',
+      ),
+    ).toBe(true)
+    expect(
+      replayA.some(
+        (chunk) => chunk.type === 'text-delta' && chunk.delta === 'result-b',
+      ),
+    ).toBe(false)
+    expect(
+      runs.updateMessages(conversationA, startedB.runId, [
+        { id: 'foreign-after-stop', role: 'assistant', parts: [] },
+      ]),
+    ).toBe(false)
+
+    const replacementSource = controlledSource()
+    const replacement = await runs.start({
+      conversationId: conversationA,
+      messages: [],
+      createStream: () => replacementSource.stream,
+    })
+    expect(replacement.runId).not.toBe(startedA.runId)
+    expect(
+      runs.updateMessages(conversationA, startedA.runId, [
+        { id: 'stale-a', role: 'assistant', parts: [] },
+      ]),
+    ).toBe(false)
+    expect(
+      runs.updateMessages(conversationA, startedB.runId, [
+        { id: 'foreign-b-replacement', role: 'assistant', parts: [] },
+      ]),
+    ).toBe(false)
+    expect(
+      runs.updateMessages(conversationA, replacement.runId, [
+        { id: 'replacement-message', role: 'assistant', parts: [] },
+      ]),
+    ).toBe(true)
+
+    sourceB.write({
+      type: 'tool-approval-response',
+      approvalId: 'private-approval-b',
+      approved: false,
+    })
+    sourceB.write({
+      type: 'tool-output-denied',
+      toolCallId: 'private-call-b',
+      reason: 'denied privately',
+    })
+    sourceB.write({ type: 'text-end', id: 'answer-b' })
+    sourceB.close()
+    await eventually(() =>
+      expect(runs.getSnapshot(conversationB)?.status).toBe('completed'),
+    )
+    expect(
+      runs
+        .getSnapshot(conversationB)
+        ?.traceEvents?.filter((event) => event.kind === 'approval_resolved')
+        .map((event) => ({
+          approvalOperationId: event.approvalOperationId,
+          outcome: event.outcome,
+        })),
+    ).toEqual([{ approvalOperationId: operationB, outcome: 'denied' }])
+    const replayB = await collect(runs.subscribe(conversationB, startedB.runId))
+    expect(
+      replayB.some(
+        (chunk) => chunk.type === 'text-delta' && chunk.delta === 'result-b',
+      ),
+    ).toBe(true)
+    expect(
+      replayB.some(
+        (chunk) => chunk.type === 'text-delta' && chunk.delta === 'result-a',
+      ),
+    ).toBe(false)
+    expect(
+      JSON.stringify(runs.getSnapshot(conversationB)?.traceEvents),
+    ).not.toContain('private-approval-a')
+
+    expect(await runs.stop(conversationA)).toBe(true)
+    await eventually(() =>
+      expect(runs.getSnapshot(conversationA)?.status).toBe('aborted'),
+    )
+  })
+
   it('persists lifecycle metadata and returns a non-resumable interruption snapshot', async () => {
     const rows = new Map<
       string,

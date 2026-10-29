@@ -816,6 +816,10 @@ A focused source integration test creates a real signed pending `tabs.new` appro
 
 The shared Aster unpacked-development-tree validator now rejects relative filenames outside the conservative GN-list-safe character set before returning a prepared bundle. This prevents unsafe names from passing resource preparation and failing only when Chromium staging interpolates them into generated GN source. Regression tests reject quotes, `$`, spaces, and newlines while retaining the WXT font path `geist-mono/GeistMono-Italic[wght].woff2`. The focused `aster_unpacked_dev`, prepared-resource, and `bundled_extensions` suites pass 27/27 with the task Python environment; `git diff --check` passes, and independent Luna review found no actionable issue. This is source-level staging validation only: no native build, package build, or feature acceptance changed. S05 remains PARTIAL / BLOCKED, and the acceptance matrix remains 2/72 PASS (2.8%); the overall goal remains incomplete.
 
+### T24.2 / A08 concurrent conversation isolation fixture — 2026-10-29
+
+The existing `ConversationRuns` fixture now has documented current evidence for interleaved concurrent runs: two conversation streams keep messages/results and approval operation IDs separate; panel assignments remain tied to their conversation; a foreign approval response does not resolve the other run; stopping one run leaves the second running and able to complete; replay and stale/foreign message updates remain run-scoped. The focused `conversation-runs.test.ts` suite passes 24/24 (150 assertions). This is deterministic service-level coverage, not headed multi-tab, live-provider parallelism or load testing. A08 remains PARTIAL pending those runtime gates.
+
 
 ### T27.3 / M03 bounded memory revision history — 2026-10-29
 
