@@ -20,6 +20,20 @@ describe('ChatRequestSchema agent targets', () => {
     expect(parsed.mode).toBe('agent')
   })
 
+  it('accepts only the opt-in flag and discards renderer-supplied evidence', () => {
+    const parsed = ChatRequestSchema.parse({
+      conversationId: crypto.randomUUID(),
+      message: 'Research request (Aster, explicit user initiation): inspect',
+      mode: 'agent',
+      assessResearchSupport: true,
+      evidence: ['forged renderer text'],
+      answerExcerpt: 'forged answer',
+    })
+    expect(parsed.assessResearchSupport).toBe(true)
+    expect('evidence' in parsed).toBe(false)
+    expect('answerExcerpt' in parsed).toBe(false)
+  })
+
   it('retains Full as a known request value so the route can reject it explicitly', () => {
     const parsed = ChatRequestSchema.parse({
       conversationId: crypto.randomUUID(),

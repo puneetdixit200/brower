@@ -219,7 +219,17 @@ def write_aster_server_gn_manifest(chromium_src: Path) -> None:
     """Enumerate the prepared Aster server tree for the debug-only GN action."""
     parent = chromium_src / "chrome/browser/browseros/aster_server"
     root = parent / "resources"
-    if not root.is_dir() or root.is_symlink():
+    output = parent / "aster_server_sources.gni"
+
+    # Check the lexical path before inspecting or writing through it. Resolving
+    # first would hide symlinked ancestors and could redirect the generated
+    # manifest outside the Chromium checkout.
+    if output.is_symlink():
+        raise ValueError("Aster server GN manifest path cannot be a symlink")
+    for path in (output, *output.parents):
+        if path.is_symlink():
+            raise ValueError(f"Aster server staging path contains a symlink: {path}")
+    if root.is_symlink() or not root.is_dir():
         raise ValueError("Aster server resources are missing or unsafe")
     files = []
     for path in sorted(root.rglob("*")):
@@ -234,7 +244,7 @@ def write_aster_server_gn_manifest(chromium_src: Path) -> None:
         if required not in files or not (root / required).stat().st_mode & 0o111:
             raise ValueError(f"Missing or non-executable Aster server resource: {required}")
     lines = ['aster_server_files = ['] + [f'  "{item}",' for item in files] + [']']
-    (parent / "aster_server_sources.gni").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    output.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def product_matches(

@@ -31,6 +31,7 @@ import { ChatMessages } from './ChatMessages'
 import { HumanLoginHandoff } from './HumanLoginHandoff'
 import { continuationTabs } from './human-login-handoff'
 import { IncognitoNotice } from './IncognitoNotice'
+import { ResearchSupportConsent } from './ResearchSupportConsent'
 import { prepareSourceResearch } from './research-request'
 
 /**
@@ -77,6 +78,9 @@ export const Chat = () => {
   const [queuedPrompts, setQueuedPrompts] = useState<string[]>([])
   const queueAwaitingRun = useRef(false)
   const [attachedTabs, setAttachedTabs] = useState<chrome.tabs.Tab[]>([])
+  const [assessResearchSupport, setAssessResearchSupport] = useState(false)
+  const selectedProviderId = selectedProvider?.id
+  const previousSelectedProviderId = useRef(selectedProviderId)
   const [draftOwnerTabId, setDraftOwnerTabId] = useState<number | undefined>()
   const [draftIncognito, setDraftIncognito] = useState(true)
   const [draftLoaded, setDraftLoaded] = useState(false)
@@ -85,6 +89,13 @@ export const Chat = () => {
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (previousSelectedProviderId.current !== selectedProviderId) {
+      previousSelectedProviderId.current = selectedProviderId
+      setAssessResearchSupport(false)
+    }
+  }, [selectedProviderId])
 
   useEffect(() => {
     let cancelled = false
@@ -270,11 +281,14 @@ export const Chat = () => {
         mode: 'agent',
         message: request,
         tabs: attachedTabs,
+        assessResearchSupport:
+          selectedProvider?.kind === 'llm' && assessResearchSupport,
       }),
     })
     if (sent) {
       setInput('')
       setAttachedTabs([])
+      setAssessResearchSupport(false)
     }
   }
 
@@ -383,6 +397,12 @@ export const Chat = () => {
           >
             Research with source URLs
           </button>
+          {selectedProvider?.kind === 'llm' && (
+            <ResearchSupportConsent
+              checked={assessResearchSupport}
+              onChange={setAssessResearchSupport}
+            />
+          )}
           <p className="mt-1 text-muted-foreground">
             Uses selected tabs as source leads. Aster does not independently
             verify every citation; review sources before relying on results.

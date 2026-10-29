@@ -55,7 +55,7 @@ This is a deterministic provenance check, not semantic claim support, live-provi
 ## Required next work
 
 1. T30.2: Make stale cleanup robust across service-worker restart and a server run still actively executing; use a server-authoritative run-status/lease check or safe reconciliation state, without overlapping jobs or silent replay. Exercise interruption and forced restart in a disposable fixture.
-2. T26.3: Implement actual, trust-bounded claim-to-source support and user-visible uncertainty; do not mistake URL visits or literal quote matches for truth. Test against a live configured provider and real returned page evidence.
+2. T26.1: Implement actual, trust-bounded claim-to-source support and user-visible uncertainty; do not mistake URL visits or literal quote matches for truth. Test against a live configured provider and real returned page evidence.
 3. Continue T20a native Chromium linking/launch/extension READY/sandbox against pinned source on an eligible Linux host, then run complete packaged smoke tests, release identity and ownership checks.
 4. Keep the full 103-subtask plan active and all 72 feature rows evidence-based. P03 stays NOT_STARTED and S05 PARTIAL/BLOCKED pending real native credential trust boundaries and release signing/update ownership.
 

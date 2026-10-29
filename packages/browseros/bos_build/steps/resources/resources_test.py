@@ -643,6 +643,65 @@ class AsterServerManifestTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Unsafe"):
                 write_aster_server_gn_manifest(src)
 
+    def test_manifest_rejects_symlinked_ancestor_without_writing_outside_tree(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp) / "src"
+            outside = Path(tmp) / "outside"
+            resources = outside / "browseros/aster_server/resources"
+            resources.mkdir(parents=True)
+            for name in ("bin/aster_server", "bin/third_party/bun"):
+                file = resources / name
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_text("fixture")
+                file.chmod(0o755)
+            chrome = src / "chrome"
+            chrome.parent.mkdir(parents=True)
+            chrome.symlink_to(outside, target_is_directory=True)
+
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                write_aster_server_gn_manifest(src)
+            self.assertFalse(
+                (outside / "browseros/aster_server/aster_server_sources.gni").exists()
+            )
+
+    def test_manifest_rejects_symlinked_parent_of_chromium_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            real_parent = base / "real-parent"
+            src = real_parent / "src"
+            resources = src / "chrome/browser/browseros/aster_server/resources"
+            for name in ("bin/aster_server", "bin/third_party/bun"):
+                file = resources / name
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_text("fixture")
+                file.chmod(0o755)
+            linked_parent = base / "linked-parent"
+            linked_parent.symlink_to(real_parent, target_is_directory=True)
+
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                write_aster_server_gn_manifest(linked_parent / "src")
+            self.assertFalse(
+                (src / "chrome/browser/browseros/aster_server/aster_server_sources.gni").exists()
+            )
+
+    def test_manifest_rejects_symlinked_output_without_overwriting_target(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp)
+            parent = src / "chrome/browser/browseros/aster_server"
+            resources = parent / "resources"
+            for name in ("bin/aster_server", "bin/third_party/bun"):
+                file = resources / name
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_text("fixture")
+                file.chmod(0o755)
+            sentinel = src / "sentinel.gni"
+            sentinel.write_text("preserve")
+            (parent / "aster_server_sources.gni").symlink_to(sentinel)
+
+            with self.assertRaisesRegex(ValueError, "manifest path"):
+                write_aster_server_gn_manifest(src)
+            self.assertEqual(sentinel.read_text(), "preserve")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,6 +17,14 @@ import type {
 } from '@/lib/schedules/scheduleTypes'
 import { getServerConversationLiveness } from '@/lib/schedules/server-conversation-liveness'
 import {
+  handleStaleRunCleanupAlarm,
+  readStaleRunCleanupCursor,
+  type StaleRunCleanupCursorStore,
+  scheduleStaleRunCleanupAlarm as scheduleStaleRunCleanupAlarmPolicy,
+  writeStaleRunCleanupCursor,
+} from '@/lib/schedules/stale-run-cleanup'
+import {
+  advanceStaleRunCleanupCursor,
   selectStaleScheduledRunBatch,
   shouldFailStaleScheduledRun,
 } from '@/lib/schedules/stale-run-policy'
@@ -39,7 +47,12 @@ export const scheduledJobRuns = async () => {
   // not be rebuilt on startup and schedules would quietly stop firing, with no
   // failed run to show for it. Skipping the pass instead leaves the next
   // startup to retry.
-  const cleanupStaleJobRuns = async () => {
+  const cleanupStaleJobRunsOnce = async () => {
+    const cursorStore: StaleRunCleanupCursorStore = {
+      get: (key) => chrome.storage.local.get(key),
+      set: (value) => chrome.storage.local.set(value),
+    }
+    const cursor = await readStaleRunCleanupCursor(cursorStore)
     const current = await listScheduledJobRunsOrNull()
     if (current === null) return
     const now = Date.now()
@@ -58,7 +71,15 @@ export const scheduledJobRuns = async () => {
     // sidecar is still actively streaming. Check the authoritative conversation
     // state before retiring a heartbeat run. Unknown state retains the claim.
     const serverUrl = await getAgentServerUrl().catch(() => null)
-    for (const run of selectStaleScheduledRunBatch(stale, 10)) {
+    const batch = selectStaleScheduledRunBatch(stale, 10, cursor)
+    const nextCursor = advanceStaleRunCleanupCursor(
+      batch,
+      cursor,
+      stale.some((run) => !run.conversationId),
+      stale.some((run) => Boolean(run.conversationId)),
+    )
+    await writeStaleRunCleanupCursor(cursorStore, nextCursor)
+    for (const run of batch) {
       if (run.conversationId) {
         if (!serverUrl) continue
         const status = await getServerConversationLiveness({
@@ -74,6 +95,21 @@ export const scheduledJobRuns = async () => {
         result: 'Job timed out!',
       })
     }
+  }
+
+  let cleanupInFlight: Promise<void> | undefined
+  const cleanupStaleJobRuns = () => {
+    if (cleanupInFlight) return cleanupInFlight
+    cleanupInFlight = cleanupStaleJobRunsOnce().finally(() => {
+      cleanupInFlight = undefined
+    })
+    return cleanupInFlight
+  }
+
+  const scheduleStaleRunCleanup = async () => {
+    await scheduleStaleRunCleanupAlarmPolicy((name, options) =>
+      chrome.alarms.create(name, options),
+    )
   }
 
   const scheduleAlarmReconciliation = async () => {
@@ -258,6 +294,9 @@ export const scheduledJobRuns = async () => {
   }
 
   chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (await handleStaleRunCleanupAlarm(alarm.name, cleanupStaleJobRuns)) {
+      return
+    }
     if (alarm.name === SCHEDULE_RECONCILIATION_ALARM) {
       await syncAlarmState()
       return
@@ -309,11 +348,13 @@ export const scheduledJobRuns = async () => {
   })
 
   chrome.runtime.onStartup.addListener(async () => {
+    await scheduleStaleRunCleanup()
     await cleanupStaleJobRuns()
     await syncAlarmState()
   })
 
   chrome.runtime.onInstalled.addListener(async () => {
+    await scheduleStaleRunCleanup()
     await cleanupStaleJobRuns()
     await syncAlarmState()
   })
@@ -332,4 +373,8 @@ export const scheduledJobRuns = async () => {
       // transition can retry. Do not claim a task succeeded.
     })
   })
+
+  // Establish the periodic alarm whenever the service worker starts. The
+  // persisted pass cursor keeps its candidate window across worker restarts.
+  void scheduleStaleRunCleanup().catch(() => undefined)
 }

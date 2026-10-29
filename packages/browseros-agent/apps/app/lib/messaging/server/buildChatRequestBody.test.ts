@@ -102,6 +102,22 @@ describe('buildChatRequestBody', () => {
     expect(body.permissionMode).toBe('read-only')
   })
 
+  it('keeps the second-request assessment opt-in false unless explicitly selected', () => {
+    const ordinary = buildChatRequestBody({
+      conversationId: '6ff46e3b-e45a-40a4-9157-ca520e800f43',
+      provider,
+      mode: 'agent',
+    })
+    const optedIn = buildChatRequestBody({
+      conversationId: '6ff46e3b-e45a-40a4-9157-ca520e800f43',
+      provider,
+      mode: 'agent',
+      assessResearchSupport: true,
+    })
+    expect(ordinary.assessResearchSupport).toBe(false)
+    expect(optedIn.assessResearchSupport).toBe(true)
+  })
+
   it('forwards staged image attachments on an explicitly submitted LLM message', () => {
     const attachment = {
       mediaType: 'image/png',

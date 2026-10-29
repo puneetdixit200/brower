@@ -424,6 +424,9 @@ export const useChatSession = (options?: ChatSessionOptions) => {
           mode: currentMode,
           permissionMode: currentPermissionMode,
           browserContext: requestBrowserContext,
+          assessResearchSupport:
+            action?.type === 'browseros' &&
+            action.assessResearchSupport === true,
           userSystemPrompt,
           userWorkingDir: workingDirRef.current,
           previousConversation,

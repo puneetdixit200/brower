@@ -37,12 +37,90 @@ export function shouldFailStaleScheduledRun(input: {
  */
 export function selectStaleScheduledRunBatch<
   T extends { id: string; conversationId?: string },
->(staleRuns: readonly T[], limit: number): T[] {
+>(
+  staleRuns: readonly T[],
+  limit: number,
+  cursor: StaleRunCleanupCursor = {},
+): T[] {
   const boundedLimit = Math.max(0, Math.floor(limit))
-  return [...staleRuns]
-    .sort(
-      (a, b) =>
-        Number(Boolean(a.conversationId)) - Number(Boolean(b.conversationId)),
-    )
-    .slice(0, boundedLimit)
+  if (boundedLimit === 0) return []
+
+  const orphans = staleRuns
+    .filter((run) => !run.conversationId)
+    .sort((a, b) => a.id.localeCompare(b.id))
+  const conversations = staleRuns
+    .filter((run) => Boolean(run.conversationId))
+    .sort((a, b) => a.id.localeCompare(b.id))
+
+  // Orphans keep priority, but each class has its own rotating window. Reserve
+  // one slot for a heartbeat when possible. A one-item mixed batch alternates
+  // classes using nextClass; no single batch can include both classes.
+  if (boundedLimit === 1 && orphans.length > 0 && conversations.length > 0) {
+    const preferred = cursor.nextClass === 'heartbeat' ? 'heartbeat' : 'orphan'
+    const selectedClass = preferred === 'orphan' ? orphans : conversations
+    const afterRunId =
+      preferred === 'orphan'
+        ? cursor.afterOrphanRunId
+        : cursor.afterHeartbeatRunId
+    return selectRunWindow(selectedClass, 1, afterRunId)
+  }
+
+  const orphanLimit =
+    conversations.length > 0 && boundedLimit > 1
+      ? boundedLimit - 1
+      : boundedLimit
+  const batch = selectRunWindow(orphans, orphanLimit, cursor.afterOrphanRunId)
+  const remaining = boundedLimit - batch.length
+  if (remaining === 0 || conversations.length === 0) return batch
+
+  batch.push(
+    ...selectRunWindow(conversations, remaining, cursor.afterHeartbeatRunId),
+  )
+  return batch
+}
+
+export interface StaleRunCleanupCursor {
+  afterOrphanRunId?: string
+  afterHeartbeatRunId?: string
+  nextClass?: 'orphan' | 'heartbeat'
+}
+
+export function advanceStaleRunCleanupCursor(
+  batch: readonly { id: string; conversationId?: string }[],
+  cursor: StaleRunCleanupCursor,
+  hasOrphans: boolean,
+  hasHeartbeats: boolean,
+): StaleRunCleanupCursor {
+  const lastOrphan = batch.filter((run) => !run.conversationId).at(-1)?.id
+  const lastHeartbeat = batch
+    .filter((run) => Boolean(run.conversationId))
+    .at(-1)?.id
+  const bothClassesPresent = hasOrphans && hasHeartbeats
+
+  return {
+    afterOrphanRunId: lastOrphan ?? cursor.afterOrphanRunId,
+    afterHeartbeatRunId: lastHeartbeat ?? cursor.afterHeartbeatRunId,
+    nextClass:
+      bothClassesPresent && batch.length === 1
+        ? lastOrphan
+          ? 'heartbeat'
+          : 'orphan'
+        : cursor.nextClass,
+  }
+}
+
+function selectRunWindow<T extends { id: string }>(
+  runs: readonly T[],
+  limit: number,
+  afterRunId?: string,
+): T[] {
+  if (limit <= 0 || runs.length === 0) return []
+  const nextIndex = runs.findIndex(
+    (run) => afterRunId !== undefined && run.id.localeCompare(afterRunId) > 0,
+  )
+  const start = nextIndex === -1 ? 0 : nextIndex
+  return Array.from(
+    { length: Math.min(limit, runs.length) },
+    (_, index) => runs[(start + index) % runs.length],
+  ).filter((run): run is T => run !== undefined)
 }

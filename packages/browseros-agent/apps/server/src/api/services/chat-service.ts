@@ -29,6 +29,17 @@ import {
   stripReasoningParts,
 } from '../../agent/message-validation'
 import { resolvePermissionMode } from '../../agent/permission-mode'
+import { createLanguageModel } from '../../agent/provider-factory'
+import {
+  assessResearchSupport,
+  beginResearchEvidenceCapture,
+  cleanupResearchEvidenceOnStreamEnd,
+  clearResearchEvidence,
+  extractCurrentTurnAssistantText,
+  isEligibleResearchSupportRequest,
+  type ResearchSupportResult,
+  takeResearchEvidence,
+} from '../../agent/research-support-assessment'
 import type { AgentSession, SessionStore } from '../../agent/session-store'
 import { applyToolApprovalResponse } from '../../agent/tool-approval-response'
 import type { ResolvedAgentConfig } from '../../agent/types'
@@ -500,6 +511,20 @@ export class ChatService {
         session.agent.messages[session.agent.messages.length - 1]?.id
     }
     const promptUserText = contextPrefix + userContent
+    const assessSupport = isEligibleResearchSupportRequest({
+      optedIn: request.assessResearchSupport === true,
+      mode: request.mode,
+      scheduled: request.isScheduledTask,
+      message: request.message,
+    })
+    let assessmentAnswer = ''
+    let finishAssessmentTurn: (() => void) | undefined
+    const assessmentTurnFinished = assessSupport
+      ? new Promise<void>((resolve) => {
+          finishAssessmentTurn = resolve
+        })
+      : undefined
+    if (assessSupport) beginResearchEvidenceCapture(runId)
 
     // Strip reasoning from the request copy only. session.agent.messages keeps
     // reasoning so it still persists to SQLite and renders in the client history;
@@ -526,11 +551,13 @@ export class ChatService {
         abortSignal,
         options: {
           taskId: runId,
+          assessResearchSupport: assessSupport,
         },
         // Without this the SDK substitutes its masking default, which discards
         // the status code, provider code, and message of every mid-stream
         // failure - including every rate limit and credit exhaustion.
         onError: (error: unknown) => {
+          finishAssessmentTurn?.()
           logger.error('Agent stream failed', {
             conversationId: request.conversationId,
             provider: agentConfig.provider,
@@ -540,6 +567,12 @@ export class ChatService {
           return toChatErrorText(error, { provider: agentConfig.provider })
         },
         onFinish: async ({ messages }: { messages: UIMessage[] }) => {
+          if (assessSupport) {
+            assessmentAnswer = extractCurrentTurnAssistantText(
+              messages,
+              wrappedUserMessageId,
+            )
+          }
           const restored = messages.map((message) =>
             message.id === wrappedUserMessageId && message.role === 'user'
               ? {
@@ -550,6 +583,7 @@ export class ChatService {
           )
           session.agent.messages = filterValidMessages(restored)
           updateMessages(session.agent.messages)
+          finishAssessmentTurn?.()
 
           // Only persist a turn that produced an assistant reply. A stream that
           // errored before any output leaves the history ending on the user
@@ -577,7 +611,6 @@ export class ChatService {
               { required: request.persistScheduledTask },
             )
           }
-
           if (session.scheduledPageId) {
             const pageId = session.scheduledPageId
             session.scheduledPageId = undefined
@@ -586,8 +619,69 @@ export class ChatService {
         },
       })
 
-      return stream
+      if (!assessSupport || !assessmentTurnFinished) return stream
+      let assessmentEmitted = false
+      const emitAssessment = async (
+        controller: TransformStreamDefaultController<UIMessageChunk>,
+      ) => {
+        if (assessmentEmitted) return
+        assessmentEmitted = true
+        try {
+          await assessmentTurnFinished
+          const evidence = takeResearchEvidence(runId)
+          let result: ResearchSupportResult = {
+            status: 'unavailable',
+            assessments: [],
+          }
+          if (assessmentAnswer && evidence.length) {
+            const { model } = await createLanguageModel(agentConfig)
+            result = await assessResearchSupport({
+              model,
+              answer: assessmentAnswer,
+              evidence,
+              signal: abortSignal,
+            })
+          }
+          controller.enqueue({
+            type: 'data-a11Support',
+            data: result,
+          } as unknown as UIMessageChunk)
+        } catch {
+          controller.enqueue({
+            type: 'data-a11Support',
+            data: { status: 'unavailable', assessments: [] },
+          } as unknown as UIMessageChunk)
+        } finally {
+          clearResearchEvidence(runId)
+        }
+      }
+      let finishChunk: UIMessageChunk | undefined
+      const assessedStream = stream.pipeThrough(
+        new TransformStream<UIMessageChunk, UIMessageChunk>({
+          transform(chunk, controller) {
+            // Read through the source finish so its onFinish callback can run;
+            // that callback supplies the final answer and resolves the gate.
+            if (chunk.type === 'finish') {
+              finishChunk = chunk
+              return
+            }
+            controller.enqueue(chunk)
+          },
+          async flush(controller) {
+            await emitAssessment(controller)
+            if (finishChunk) controller.enqueue(finishChunk)
+          },
+        }),
+      )
+      return cleanupResearchEvidenceOnStreamEnd({
+        stream: assessedStream,
+        taskId: runId,
+        signal: abortSignal,
+        onCleanup: () => finishAssessmentTurn?.(),
+      })
     } catch (error) {
+      if (assessSupport) clearResearchEvidence(runId)
+      finishAssessmentTurn?.()
       session.agent.messages = messagesBeforeTurn
       updateMessages(messagesBeforeTurn)
       throw error

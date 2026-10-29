@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { UIMessageChunk } from 'ai'
 import * as _ai from 'ai'
+import * as researchSupportModule from '../../../src/agent/research-support-assessment'
 import type { KlavisProxyStatus } from '../../../src/api/services/klavis'
 import { DbConversationStore } from '../../../src/lib/conversations/conversation-store'
 import { closeDb, initializeDb } from '../../../src/lib/db'
@@ -38,6 +39,7 @@ interface StreamResponseOptions {
 }
 
 let agentToReturn: MockAgent | undefined
+let includeFinishChunk = false
 let streamResponseHandler:
   | ((options: StreamResponseOptions) => Promise<Response>)
   | undefined
@@ -56,6 +58,7 @@ const createAgentUIStreamSpy = mock(async (options: StreamResponseOptions) => {
   const response = await streamResponseHandler(options)
   const reader = response.body?.getReader()
   const decoder = new TextDecoder()
+  let emittedFinish = false
   return new ReadableStream<UIMessageChunk>({
     async pull(controller) {
       if (!reader) {
@@ -64,6 +67,11 @@ const createAgentUIStreamSpy = mock(async (options: StreamResponseOptions) => {
       }
       const { done, value } = await reader.read()
       if (done) {
+        if (includeFinishChunk && !emittedFinish) {
+          emittedFinish = true
+          controller.enqueue({ type: 'finish', finishReason: 'stop' })
+          return
+        }
         controller.close()
         return
       }
@@ -78,6 +86,18 @@ const createAgentUIStreamSpy = mock(async (options: StreamResponseOptions) => {
     },
   })
 })
+
+const generateObjectSpy = mock(async (_options: unknown) => ({
+  object: {
+    assessments: [
+      {
+        claim: 'The answer is supported.',
+        support: 'supported',
+        explanation: 'The captured page supports it.',
+      },
+    ],
+  },
+}))
 
 const resolveLLMConfigSpy = mock(async () => ({
   provider: 'openai',
@@ -96,6 +116,7 @@ const resolveLLMConfigSpy = mock(async () => ({
 mock.module('ai', () => ({
   ..._ai,
   createAgentUIStream: createAgentUIStreamSpy,
+  generateObject: generateObjectSpy,
 }))
 
 mock.module('../../../src/agent/ai-sdk-agent', () => ({
@@ -192,6 +213,124 @@ function createSessionStore() {
     },
   }
 }
+
+describe('ChatService research support assessment', () => {
+  afterEach(() => {
+    includeFinishChunk = false
+    resolveLLMConfigSpy.mockImplementation(async () => ({
+      provider: 'openai',
+      model: 'gpt-5',
+      apiKey: 'test-key',
+    }))
+  })
+
+  it('assesses only opted-in explicit research with the request provider and streams before finish', async () => {
+    includeFinishChunk = true
+    resolveLLMConfigSpy.mockImplementation(async () => ({
+      provider: 'openai-compatible',
+      providerId: 'selected-provider',
+      model: 'selected-model',
+      apiKey: 'selected-key',
+      baseUrl: 'https://llm.example.test/v1',
+    }))
+    generateObjectSpy.mockClear()
+
+    const fakeAgent = createFakeAgent()
+    agentToReturn = fakeAgent
+    streamResponseHandler = async ({ onFinish, options }) => {
+      researchSupportModule.captureSuccessfulBuiltInRead(
+        options?.taskId ?? '',
+        { text: 'captured page evidence' },
+      )
+      await onFinish({
+        messages: [
+          ...fakeAgent.messages,
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            parts: [{ type: 'text', text: 'A researched answer.' }],
+          },
+        ],
+      })
+      return new Response('A researched answer.')
+    }
+
+    const service = new ChatService({
+      sessionStore: createSessionStore() as never,
+      klavis: createKlavisStub() as never,
+      browser: {
+        resolveTabIds: mock(async () => new Map<number, number>()),
+        newPage: mock(async () => 91),
+        listPages: mock(async () => []),
+        closePage: mock(async () => {}),
+      } as never,
+      registry: {} as never,
+    })
+    const baseRequest = {
+      target: BROWSEROS_TARGET,
+      persist: false,
+      message:
+        'Research request (Aster, explicit user initiation): Compare the latest results.',
+      isScheduledTask: false,
+      mode: 'agent',
+      origin: 'sidepanel',
+      assessResearchSupport: true,
+      providerId: 'selected-provider',
+    }
+
+    for (const request of [
+      { ...baseRequest, assessResearchSupport: false },
+      {
+        ...baseRequest,
+        message: 'What is the capital of France?',
+      },
+      { ...baseRequest, isScheduledTask: true },
+      { ...baseRequest, mode: 'chat' },
+    ]) {
+      const negativeResponse = await service.processMessage(
+        {
+          ...request,
+          conversationId: crypto.randomUUID(),
+        } as never,
+        new AbortController().signal,
+      )
+      await negativeResponse.text()
+    }
+
+    expect(generateObjectSpy).not.toHaveBeenCalled()
+
+    const response = await service.processMessage(
+      {
+        ...baseRequest,
+        conversationId: crypto.randomUUID(),
+      } as never,
+      new AbortController().signal,
+    )
+    const streamText = await response.text()
+
+    expect(generateObjectSpy).toHaveBeenCalledTimes(1)
+    const resolvedRequest = resolveLLMConfigSpy.mock.calls.at(-1)?.[0] as {
+      providerId?: string
+    }
+    expect(resolvedRequest.providerId).toBe('selected-provider')
+    const generationArgs = generateObjectSpy.mock.calls[0]?.[0] as {
+      model?: { provider?: string; modelId?: string }
+      prompt?: string
+    }
+    expect(generationArgs.model).toMatchObject({
+      provider: 'openai-compatible.chat',
+      modelId: 'selected-model',
+    })
+    expect(generationArgs.prompt).toContain('A researched answer.')
+    expect(generationArgs.prompt).toContain('captured page evidence')
+
+    const assessmentIndex = streamText.indexOf('data-a11Support')
+    const finishIndex = streamText.indexOf('"type":"finish"')
+    expect(assessmentIndex).toBeGreaterThanOrEqual(0)
+    expect(finishIndex).toBeGreaterThan(assessmentIndex)
+    expect(streamText).toContain('The answer is supported.')
+  })
+})
 
 function createFakeAgent() {
   const messages: MockMessage[] = []

@@ -51,6 +51,7 @@ import {
   serializesReasoningContent,
 } from './provider-factory'
 import { buildAgentReasoningConfig } from './reasoning-config'
+import { captureSuccessfulBuiltInRead } from './research-support-assessment'
 import {
   AgentToolCallEnvelopeSchema,
   AgentToolResultEnvelopeSchema,
@@ -62,6 +63,7 @@ import type { ResolvedAgentConfig } from './types'
 const TOOL_APPROVAL_SECRET = randomBytes(32)
 export interface AgentToolCallOptions {
   taskId: string
+  assessResearchSupport?: boolean
 }
 
 /** The server-side approval check shared by production agents and fixture tests. */
@@ -165,23 +167,27 @@ function summarizeToolResultError(
 }
 
 const AgentToolRunContextSchema = z
-  .object({ taskId: z.string().uuid() })
+  .object({
+    taskId: z.string().uuid(),
+    assessResearchSupport: z.boolean().optional(),
+  })
   .strict()
 
-function buildAgentToolRunContexts(
+export function buildAgentToolRunContexts(
   tools: ToolSet,
   taskId: string,
-): Record<string, { taskId: string }> {
+  assessResearchSupport = false,
+): Record<string, { taskId: string; assessResearchSupport?: boolean }> {
   return Object.fromEntries(
     Object.entries(tools)
       .filter(([, tool]) => tool.contextSchema !== undefined)
-      .map(([toolName]) => [toolName, { taskId }]),
+      .map(([toolName]) => [toolName, { taskId, assessResearchSupport }]),
   )
 }
 
 /** Add a per-call task identity to each tool's execution context and validate
  * the versioned transport envelope at the actual dispatch/result boundary. */
-function addToolEnvelopeBoundary(tools: ToolSet): ToolSet {
+export function addToolEnvelopeBoundary(tools: ToolSet): ToolSet {
   const wrapped: ToolSet = {}
   for (const [toolName, tool] of Object.entries(tools)) {
     if (!tool.execute) {
@@ -228,6 +234,9 @@ function addToolEnvelopeBoundary(tools: ToolSet): ToolSet {
           throw error
         }
         const isError = toolResultIsError(output)
+        if (!isError && context.assessResearchSupport && toolName === 'read') {
+          captureSuccessfulBuiltInRead(context.taskId, output)
+        }
         const result = AgentToolResultEnvelopeSchema.parse(
           isError
             ? {
@@ -294,8 +303,15 @@ export class AiSdkAgent {
   }
 
   /** Build contexts per invocation; run identity is never retained on the cached agent. */
-  getToolRunContexts(taskId: string): Record<string, { taskId: string }> {
-    return buildAgentToolRunContexts(this._agent.tools, taskId)
+  getToolRunContexts(
+    taskId: string,
+    assessResearchSupport = false,
+  ): Record<string, { taskId: string; assessResearchSupport?: boolean }> {
+    return buildAgentToolRunContexts(
+      this._agent.tools,
+      taskId,
+      assessResearchSupport,
+    )
   }
 
   static async create(config: AiSdkAgentConfig): Promise<AiSdkAgent> {
@@ -536,7 +552,11 @@ export class AiSdkAgent {
         prepareStep,
         prepareCall: ({ options, ...call }) => ({
           ...call,
-          toolsContext: buildAgentToolRunContexts(tools, options.taskId),
+          toolsContext: buildAgentToolRunContexts(
+            tools,
+            options.taskId,
+            options.assessResearchSupport,
+          ),
         }),
         ...buildAgentReasoningConfig(config.resolvedConfig),
       })

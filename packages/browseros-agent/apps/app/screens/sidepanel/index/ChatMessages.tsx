@@ -21,6 +21,7 @@ import { ChatMessageActions } from './ChatMessageActions'
 import { ConnectAppCard } from './ConnectAppCard'
 import { getMessageSegments } from './getMessageSegments'
 import { JtbdPopup } from './JtbdPopup'
+import { ResearchSupportAssessment } from './ResearchSupportAssessment'
 import {
   getResearchSourceLedger,
   RESEARCH_LEDGER_LIMITATION,
@@ -80,6 +81,20 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
               ?.filter((each) => each.type === 'text')
               ?.map((each) => each.text)
               ?.join('\n\n')
+            const supportPart = message.parts.find(
+              (part) => part.type === 'data-a11Support',
+            ) as
+              | {
+                  data?: {
+                    status?: string
+                    assessments?: Array<{
+                      claim?: string
+                      support?: string
+                      explanation?: string
+                    }>
+                  }
+                }
+              | undefined
 
             const likeAction = () => onClickLike(message.id)
             const dislikeAction = (comment?: string) =>
@@ -211,6 +226,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
                           its claim or that the claim is true.
                         </p>
                       </aside>
+                    )}
+                    {message.role === 'assistant' && supportPart?.data && (
+                      <ResearchSupportAssessment data={supportPart.data} />
                     )}
                   </MessageContent>
                 </Message>

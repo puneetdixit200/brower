@@ -29,6 +29,7 @@ export interface BrowserOSAction extends BaseChatAction {
   tabs?: chrome.tabs.Tab[]
   /** Narrow request-context policy for the user-driven login continuation. */
   contextPrivacy?: 'human-login-continuation'
+  assessResearchSupport?: boolean
 }
 
 /**
@@ -73,6 +74,7 @@ export const createBrowserOSAction = (params: {
   message: string
   tabs?: chrome.tabs.Tab[]
   contextPrivacy?: 'human-login-continuation'
+  assessResearchSupport?: boolean
 }): BrowserOSAction => ({
   id: crypto.randomUUID(),
   type: 'browseros',
@@ -81,4 +83,5 @@ export const createBrowserOSAction = (params: {
   message: params.message,
   tabs: params.tabs,
   contextPrivacy: params.contextPrivacy,
+  assessResearchSupport: params.assessResearchSupport,
 })

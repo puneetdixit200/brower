@@ -64,6 +64,8 @@ const ChatInputSchema = z.object({
   userWorkingDir: z.string().min(1).optional(),
   supportsImages: z.boolean().optional().default(true),
   supportsReasoning: z.boolean().optional().default(true),
+  /** Explicit user opt-in for a second, same-provider research support assessment. */
+  assessResearchSupport: z.boolean().optional().default(false),
   mode: z.enum(['chat', 'agent']).optional().default('agent'),
   // `mode` is the legacy task mode. Permission is an independent capability
   // choice; Full is parsed so the route can reject forged requests clearly.

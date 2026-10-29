@@ -57,6 +57,7 @@ export interface ChatRequestBodyParams {
   userSystemPrompt?: string
   userWorkingDir?: string
   supportsImages?: boolean
+  assessResearchSupport?: boolean
   previousConversation?: ChatHistoryEntry[] | string
   /** Whether the conversation is written to the local database. */
   persist?: boolean
@@ -83,6 +84,7 @@ export const buildChatRequestBody = ({
   userSystemPrompt,
   userWorkingDir,
   supportsImages,
+  assessResearchSupport,
   previousConversation,
   persist,
   declinedApps,
@@ -113,6 +115,7 @@ export const buildChatRequestBody = ({
   // Sent because the caller can override what the provider says, and because
   // the reasoning answer comes from a model catalogue the extension bundles.
   supportsImages: supportsImages ?? provider?.supportsImages,
+  assessResearchSupport: assessResearchSupport ?? false,
   supportsReasoning: provider ? resolvesSupportsReasoning(provider) : undefined,
   previousConversation,
   attachments: attachments?.length ? attachments : undefined,

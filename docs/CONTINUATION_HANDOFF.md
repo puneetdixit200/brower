@@ -15,7 +15,7 @@ The user explicitly requests **building all features**, including when the next 
 
 ## Verified progress accounting
 
-Feature matrix snapshot: **72 total; 2 PASS (2.8%), 32 partial including one blocked, 38 NOT_STARTED** as of the remote implementation batch. Thirty-four features (47.2%) have implementation/evidence work recorded. This is status coverage; remaining effort is not uniform across features. No reliable weighted code/effort completion percentage has been measured.
+Feature matrix snapshot: **72 total; 2 PASS (2.8%), 68 PARTIAL, 1 PARTIAL/BLOCKED, and 1 NOT_STARTED**. These are acceptance statuses, not a weighted effort estimate; no reliable percentage of total implementation effort has been measured.
 
 PASS rows are U04 and U05. Native browser acceptance, package release, performance and broad security gates remain open.
 
@@ -25,8 +25,8 @@ PASS rows are U04 and U05. Native browser acceptance, package release, performan
 - Branch: `feat/aster-linux-ui`.
 - User remote `aster`: `https://github.com/puneetdixit200/brower.git`. Preserve `origin`, the BrowserOS upstream remote.
 - First inspect status, branch, log and remote divergence. Preserve newer and uncommitted work. Fetch and fast-forward only when safe; never force-reset the user repository.
-- Most recent functional feature commit before this documentation checkpoint: `bfb012e11` (current-window tab search/activation). Later documentation records the native product-object compile. Use actual HEAD/remote state for the final checkpoint identity.
-- Use Luna medium for most implementation, focused checks and documentation. Use Terra medium for planning, judging, independent review and difficult integration. Use Sol only for exceptional unresolved cases after Terra cannot resolve them.
+- Latest Aster feature-branch commit confirmed by `git fetch aster --prune`: `5e1d01d52` (`fix(aster): avoid stale run and research evidence starvation`); `HEAD` and `aster/feat/aster-linux-ui` matched. The current working tree contains uncommitted A11 semantic-assessment, R02/R03 fair stale cleanup, resource-manifest symlink protection, and matching focused tests/docs. See the latest dated entries in `PROGRESS.md` and `NEXT_STEPS.md`; do not overwrite or discard these changes.
+- Use Luna medium for implementation, planning, judging and independent review. Deploy no more than five Luna medium subagents concurrently. Do not use Sol or Terra for this project.
 - Delegate narrow owned tasks. Avoid duplicate exploration, huge handoffs, parallel builds sharing one output directory and broad test repetition without a relevant change.
 - User authorizes implementation, routine decisions, testing and reviewed milestone commits/pushes. Avoid unnecessary questions.
 - At **5% remaining account allowance**, checkpoint all source and docs, record exact next TODO and live process state, stop owned tests/build processes and agents, push, pause the goal and stop until the user resumes. Never mark the entire project complete at a usage limit.
@@ -332,8 +332,10 @@ Scheduled heartbeat run claims now validate the persisted job conversation insid
 This does not resume an interrupted stream or tool sequence; the checkpoint only gives advisory context to a new turn after a completed run, and cannot guarantee against model replay. No server-enforced no-replay, approval/lease recovery, or headed restart acceptance exists. Do not claim T30.1 or R02 complete until safe continuation semantics and packaged Aster restart/failure behavior are verified. Matrix remains 2/72 PASS (2.8%); full project remains incomplete.
 
 
-## New GitHub-only R02/R03 and A11 source checkpoint — 2026-10-29
+## Historical GitHub-only R02/R03 and A11 source checkpoint — superseded 2026-10-29
+
+This checkpoint records the earlier remote-only state and is superseded by the fetched local continuation at Aster tip `5e1d01d52`. Current local source, test, documentation, and native-state evidence is recorded in `PROGRESS.md` and the latest section of `NEXT_STEPS.md`.
 
 Authenticated remote HEAD at start matched the requested `9ee82a38f` checkpoint. GitHub DNS prevented cloning this repository into the current container. No local user worktree or host-local Chromium products were inspected or touched. No Luna medium subagent runtime was exposed; source work and review were performed directly, with no Sol or Terra workers.
 
-Owner-aware stale-job reconciliation, loopback server-side conversation liveness checks and explicit ambiguous research-quote attribution are committed. The scheduler source has [19 passing regression tests and app/formatter checks](https://github.com/puneetdixit200/brower/actions/runs/40787505020); the research ledger has [22 passing tests and app/formatter checks](https://github.com/puneetdixit200/brower/actions/runs/40786688768). Neither is a native Aster launch or real-model acceptance run. The 72-row matrix remains **2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, 1 NOT_STARTED**, with all 103 engineering subtasks still within scope. Detailed evidence and unverified boundaries: [aster-github-continuation-2026-10-29.md](evidence/aster-github-continuation-2026-10-29.md). Continue T30.2 full restart/overlap, T26.3 semantic source support and T20a native build first.
+Owner-aware stale-job reconciliation, loopback server-side conversation liveness checks and explicit ambiguous research-quote attribution are committed. The scheduler source has [19 passing regression tests and app/formatter checks](https://github.com/puneetdixit200/brower/actions/runs/40787505020); the research ledger has [22 passing tests and app/formatter checks](https://github.com/puneetdixit200/brower/actions/runs/40786688768). Neither is a native Aster launch or real-model acceptance run. The 72-row matrix remains **2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, 1 NOT_STARTED**, with all 103 engineering subtasks still within scope. Detailed evidence and unverified boundaries: [aster-github-continuation-2026-10-29.md](evidence/aster-github-continuation-2026-10-29.md). Continue T30.2 full restart/overlap, T26.1 semantic source support and T20a native build first.
