@@ -75,6 +75,10 @@ export const AgentTaskTraceEventSchema = z
     // Trace IDs are generated locally; raw provider/tool call IDs may contain
     // credential-like data and must never be copied into the trace.
     toolCallId: z.string().uuid().optional(),
+    // Server-minted correlation ID for an approval lifecycle. It is not an
+    // approval token and must never be accepted as execution authorization.
+    // Optional so trace rows written by earlier versions remain readable.
+    approvalOperationId: z.string().uuid().optional(),
     toolName: z
       .string()
       .min(1)
@@ -113,7 +117,9 @@ export const AgentTaskTraceEventSchema = z
     if (
       !toolEvent &&
       !approvalEvent &&
-      (event.toolCallId !== undefined || event.toolName !== undefined)
+      (event.toolCallId !== undefined ||
+        event.toolName !== undefined ||
+        event.approvalOperationId !== undefined)
     ) {
       context.addIssue({
         code: 'custom',
@@ -127,6 +133,13 @@ export const AgentTaskTraceEventSchema = z
       context.addIssue({
         code: 'custom',
         message: 'Approval events require toolCallId and toolName attribution',
+      })
+    }
+    if (!approvalEvent && event.approvalOperationId !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['approvalOperationId'],
+        message: 'Only approval events may include an approval operation ID',
       })
     }
     if (
@@ -203,6 +216,7 @@ export type AgentToolResultEnvelope = z.infer<
 export interface NewAgentTaskTraceEvent {
   kind: AgentTaskTraceEvent['kind']
   toolCallId?: string
+  approvalOperationId?: string
   toolName?: string
   outcome?: NonNullable<AgentTaskTraceEvent['outcome']>
   durationMs?: number

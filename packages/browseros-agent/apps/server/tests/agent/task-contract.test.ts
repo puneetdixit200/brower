@@ -191,8 +191,15 @@ describe('agent task contract', () => {
       kind: 'approval_requested',
       toolCallId: traceToolCallId,
       toolName: 'send_message',
+      approvalOperationId: '00000000-0000-4000-8000-000000000099',
     } as const
     expect(AgentTaskTraceEventSchema.parse(requested)).toEqual(requested)
+    const legacyRequested = { ...requested }
+    delete (legacyRequested as { approvalOperationId?: string })
+      .approvalOperationId
+    expect(AgentTaskTraceEventSchema.parse(legacyRequested)).toEqual(
+      legacyRequested,
+    )
     expect(
       AgentTaskTraceEventSchema.safeParse({
         ...requested,
@@ -205,6 +212,7 @@ describe('agent task contract', () => {
       toolCallId: traceToolCallId,
       toolName: 'send_message',
       outcome: 'denied',
+      approvalOperationId: requested.approvalOperationId,
     } as const
     expect(AgentTaskTraceEventSchema.parse(resolved)).toEqual(resolved)
     expect(
@@ -224,6 +232,15 @@ describe('agent task contract', () => {
       AgentTaskTraceEventSchema.safeParse({
         ...baseEvent,
         kind: 'approval_requested',
+      }).success,
+    ).toBe(false)
+    expect(
+      AgentTaskTraceEventSchema.safeParse({
+        ...baseEvent,
+        kind: 'tool_started',
+        toolCallId: traceToolCallId,
+        toolName: 'send_message',
+        approvalOperationId: requested.approvalOperationId,
       }).success,
     ).toBe(false)
   })

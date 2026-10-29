@@ -115,7 +115,10 @@ interface ConversationRunRecord {
   traceEvents: AgentTaskTraceEvent[]
   tracePersistenceDegraded: boolean
   toolTraceIds: Map<string, { traceId: string; toolName: string }>
-  approvalToolCalls: Map<string, string>
+  approvalToolCalls: Map<
+    string,
+    { toolCallId: string; approvalOperationId: string }
+  >
   humanWait?: {
     requestId: string
     resolve: () => void
@@ -971,7 +974,11 @@ export class ConversationRuns {
     ) {
       const call = record.toolTraceIds.get(part.toolCallId)
       if (!call) return
-      record.approvalToolCalls.set(part.approvalId, part.toolCallId)
+      const approvalOperationId = crypto.randomUUID()
+      record.approvalToolCalls.set(part.approvalId, {
+        toolCallId: part.toolCallId,
+        approvalOperationId,
+      })
       if (record.taskStatus === 'running') {
         record.taskStatus = transitionAgentTask(
           record.taskStatus,
@@ -982,6 +989,7 @@ export class ConversationRuns {
         kind: 'approval_requested',
         toolCallId: call.traceId,
         toolName: call.toolName,
+        approvalOperationId,
       })
       return
     }
@@ -991,8 +999,9 @@ export class ConversationRuns {
       typeof part.approvalId === 'string' &&
       typeof part.approved === 'boolean'
     ) {
-      const rawCallId = record.approvalToolCalls.get(part.approvalId)
-      const call = rawCallId && record.toolTraceIds.get(rawCallId)
+      const approval = record.approvalToolCalls.get(part.approvalId)
+      if (!approval) return
+      const call = record.toolTraceIds.get(approval.toolCallId)
       if (!call) return
       record.approvalToolCalls.delete(part.approvalId)
       if (record.taskStatus === 'waiting_approval') {
@@ -1002,6 +1011,7 @@ export class ConversationRuns {
         kind: 'approval_resolved',
         toolCallId: call.traceId,
         toolName: call.toolName,
+        approvalOperationId: approval.approvalOperationId,
         outcome: part.approved ? 'approved' : 'denied',
       })
       return

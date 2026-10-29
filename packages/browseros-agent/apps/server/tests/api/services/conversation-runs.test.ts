@@ -336,6 +336,14 @@ describe('ConversationRuns', () => {
     expect(
       snapshot?.traceEvents?.every((event) => event.taskId === started.runId),
     ).toBe(true)
+    const approvalEvents = snapshot?.traceEvents?.filter((event) =>
+      event.kind.startsWith('approval_'),
+    )
+    expect(approvalEvents).toHaveLength(2)
+    expect(approvalEvents?.[0]?.approvalOperationId).toMatch(/^[0-9a-f-]{36}$/)
+    expect(approvalEvents?.[1]?.approvalOperationId).toBe(
+      approvalEvents?.[0]?.approvalOperationId,
+    )
     expect(JSON.stringify(snapshot?.traceEvents)).not.toMatch(
       /provider-call-private-secret|approval-private-secret|private page context|result-private-secret|password/,
     )
