@@ -434,13 +434,16 @@ describe('research support assessment', () => {
     expect(result.status).toBe('completed')
     expect(result.assessments.map((item) => item.sourceIds)).toEqual([
       ['src_test_a'],
-      ['src_test_a', 'src_test_b'],
+      [],
     ])
     expect(result.assessments[0]).toMatchObject({
       support: 'supported',
       quoteEvidence: [{ sourceId: 'src_test_a', quote: 'first page' }],
     })
-    expect(result.assessments[1].quoteEvidence).toEqual([])
+    expect(result.assessments[1]).toMatchObject({
+      support: 'unclear',
+      quoteEvidence: [],
+    })
     expect(result.assessments.map((item) => item.sources)).toEqual([
       [
         {
@@ -449,18 +452,7 @@ describe('research support assessment', () => {
           label: 'first.example.test',
         },
       ],
-      [
-        {
-          id: 'src_test_a',
-          url: 'https://first.example.test/a',
-          label: 'first.example.test',
-        },
-        {
-          id: 'src_test_b',
-          url: 'https://second.example.test/b',
-          label: 'second.example.test',
-        },
-      ],
+      [],
     ])
   })
 
@@ -521,9 +513,9 @@ describe('research support assessment', () => {
     expect(result.assessments[0].claim).toHaveLength(500)
     expect(result.assessments[0].explanation).toBe(maxExplanation)
     expect(result.assessments[0].explanation).toHaveLength(600)
-    expect(result.assessments[0].sourceIds).toEqual(['src_legacy_1'])
+    expect(result.assessments[0].sourceIds).toEqual([])
     expect(result.assessments[0].quoteEvidence).toEqual([])
-    expect(result.assessments[1]).toMatchObject({ support: 'mixed' })
+    expect(result.assessments[1]).toMatchObject({ support: 'unclear' })
     expect(result.assessments[1].claim).toContain('[source URL omitted]')
     expect(result.assessments[1].claim).not.toContain('https://')
     expect(result.assessments[1].claim).not.toContain('token=secret')
