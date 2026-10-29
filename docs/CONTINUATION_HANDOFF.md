@@ -25,7 +25,7 @@ PASS rows are U04 and U05. Native browser acceptance, package release, performan
 - Branch: `feat/aster-linux-ui`.
 - User remote `aster`: `https://github.com/puneetdixit200/brower.git`. Preserve `origin`, the BrowserOS upstream remote.
 - First inspect status, branch, log and remote divergence. Preserve newer and uncommitted work. Fetch and fast-forward only when safe; never force-reset the user repository.
-- Latest pushed Aster feature-branch commit: `c01550022` (`feat(aster): add queue and MFA fixture follow-ups`), based on `b4307264f`. The tree is clean after the checkpoint. Continue from `NEXT_STEPS.md`; retain the evidence and explicit remaining acceptance gates in `FEATURE_MATRIX.md` and `PROGRESS.md`.
+- Latest pushed Aster feature-branch commit adds the A11 stream-order test, T24.1 queue reliability slice, and T26.2 dummy MFA fixture plus its qualified route notice. The tree is clean after the checkpoint. Continue from `NEXT_STEPS.md`; retain the evidence and explicit remaining acceptance gates in `FEATURE_MATRIX.md` and `PROGRESS.md`.
 - Use Luna medium for implementation, planning, judging and independent review. Deploy no more than five Luna medium subagents concurrently. Do not use Sol or Terra for this project.
 - Delegate narrow owned tasks. Avoid duplicate exploration, huge handoffs, parallel builds sharing one output directory and broad test repetition without a relevant change.
 - User authorizes implementation, routine decisions, testing and reviewed milestone commits/pushes. Avoid unnecessary questions.
