@@ -15,7 +15,7 @@ The latest read-only native audit found no live build, no linked `chrome` binary
 
 ### Current continuation — 2026-10-29
 
-`git fetch aster --prune` found no commits beyond `a54b59ef8` on `feat/aster-linux-ui`. The current source slice adds selected-tab Back and Forward actions to `BrowserQuickControls`, with current-window and HTTP(S) revalidation immediately before dispatch. The helper suite passes 8/8; app typecheck, targeted Biome, and `git diff --check` pass, and an independent Luna review found no issue. B03 remains PARTIAL: Stop and headed/native navigation acceptance remain open. Docs were updated in `FEATURE_MATRIX.md`, `PROGRESS.md`, and `NEXT_STEPS.md`. The matrix remains 2/72 PASS (2.8%); overall implementation remains incomplete. Continue with the full master spec and 103-subtask plan; preserve the native build gate below.
+The last fetch found no commits beyond `a54b59ef8`; B03 Back/Forward source work was then committed and pushed as `cdefdeac2`. The current B04 source slice adds current-window sidebar tab reorder through a drag handle and keyboard earlier/later controls. The focused sidebar data/reorder suites pass 10/10 (36 assertions), app typecheck and targeted Biome pass, and `git diff --check` is clean. Independent review caught and fixed an unpinned end-position bug, missing keyboard operation, and an external drag payload trust flaw; regression coverage, accessible controls, and local-drag-state validation are in place. B04 remains PARTIAL pending headed/native drag, tab-strip and session-restore acceptance. Docs are updated in `FEATURE_MATRIX.md`, `PROGRESS.md`, and `NEXT_STEPS.md`. The matrix remains 2/72 PASS (2.8%); overall implementation remains incomplete. Continue with the full master spec and 103-subtask plan; preserve the native build gate below.
 
 ## Mandatory implementation scope
 
@@ -40,7 +40,7 @@ PASS rows are U04 and U05. Native browser acceptance, package release, performan
 - Branch: `feat/aster-linux-ui`.
 - User remote `aster`: `https://github.com/puneetdixit200/brower.git`. Preserve `origin`, the BrowserOS upstream remote.
 - First inspect status, branch, log and remote divergence. Preserve newer and uncommitted work. Fetch and fast-forward only when safe; never force-reset the user repository.
-- Latest remote checkpoint at the start of this continuation is `a54b59ef8` (M06 route-contract tests); the current B03 Back/Forward source slice is recorded above and in `PROGRESS.md`. Continue from `NEXT_STEPS.md`; retain the evidence and explicit remaining acceptance gates in `FEATURE_MATRIX.md` and `PROGRESS.md`.
+- Latest pushed remote checkpoint is `cdefdeac2` (B03 selected-tab Back/Forward source controls); the current B04 sidebar reorder source slice is recorded above and in `PROGRESS.md`. Continue from `NEXT_STEPS.md`; retain the evidence and explicit remaining acceptance gates in `FEATURE_MATRIX.md` and `PROGRESS.md`.
 - Use Luna medium for implementation, planning, judging and independent review. Deploy no more than five Luna medium subagents concurrently. Do not use Sol or Terra for this project.
 - Delegate narrow owned tasks. Avoid duplicate exploration, huge handoffs, parallel builds sharing one output directory and broad test repetition without a relevant change.
 - User authorizes implementation, routine decisions, testing and reviewed milestone commits/pushes. Avoid unnecessary questions.

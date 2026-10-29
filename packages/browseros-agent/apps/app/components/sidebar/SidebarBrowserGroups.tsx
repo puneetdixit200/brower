@@ -1,10 +1,13 @@
 import {
+  ArrowDown,
+  ArrowUp,
   Bookmark,
   ChevronDown,
   ChevronLeft,
   ExternalLink,
   Folder,
   Globe2,
+  GripVertical,
   Pin,
   PinOff,
   RefreshCw,
@@ -24,6 +27,7 @@ import {
   visibleSidebarBookmarkEntries,
   visibleSidebarTabs,
 } from './sidebar-browser-data'
+import { reorderSidebarTab } from './sidebar-tab-reorder'
 
 type Section = 'tabs' | 'bookmarks'
 
@@ -48,6 +52,11 @@ export function SidebarBrowserGroups({
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [pendingTabId, setPendingTabId] = useState<number | null>(null)
+  const [draggedTabId, setDraggedTabId] = useState<number | null>(null)
+  const [dropTarget, setDropTarget] = useState<{
+    tabId: number
+    position: 'before' | 'after'
+  } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
   const id = useId()
@@ -218,6 +227,35 @@ export function SidebarBrowserGroups({
     }
   }
 
+  const reorderTab = async (
+    tabId: number,
+    targetTabId: number,
+    position: 'before' | 'after',
+  ) => {
+    if (pendingTabId !== null || isSearching) return
+    setPendingTabId(tabId)
+    setError(null)
+    try {
+      await reorderSidebarTab(
+        {
+          queryCurrentWindow: () => chrome.tabs.query({ currentWindow: true }),
+          move: (id, index) => chrome.tabs.move(id, { index }),
+        },
+        tabId,
+        targetTabId,
+        position,
+        chrome.runtime.getURL(''),
+      )
+      setRefreshToken((value) => value + 1)
+    } catch {
+      setError('Could not reorder this tab. Refresh the list and try again.')
+    } finally {
+      setPendingTabId(null)
+      setDraggedTabId(null)
+      setDropTarget(null)
+    }
+  }
+
   const openBookmark = async (bookmark: SidebarBookmark) => {
     setError(null)
     try {
@@ -314,51 +352,171 @@ export function SidebarBrowserGroups({
           )}
         <ul className="styled-scrollbar mt-1 max-h-[min(24rem,40dvh)] space-y-1 overflow-y-auto">
           {section === 'tabs'
-            ? filteredTabs.map((tab) => (
-                <li key={tab.id} className="flex min-w-0 items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      tab.id !== undefined && void activate(tab.id)
-                    }
-                    aria-current={tab.active ? 'page' : undefined}
-                    title={tab.url}
+            ? filteredTabs.map((tab, tabPosition) => {
+                const earlierTab = filteredTabs[tabPosition - 1]
+                const laterTab = filteredTabs[tabPosition + 1]
+                const tabLabel = tab.title || tab.url || 'tab'
+                return (
+                  <li
+                    key={tab.id}
+                    onDragOver={(event) => {
+                      if (
+                        draggedTabId === null ||
+                        isSearching ||
+                        pendingTabId !== null
+                      ) {
+                        return
+                      }
+                      event.preventDefault()
+                      event.dataTransfer.dropEffect = 'move'
+                      const bounds = event.currentTarget.getBoundingClientRect()
+                      const position =
+                        event.clientY < bounds.top + bounds.height / 2
+                          ? 'before'
+                          : 'after'
+                      setDropTarget({ tabId: tab.id, position })
+                    }}
+                    onDragLeave={(event) => {
+                      if (
+                        !event.currentTarget.contains(
+                          event.relatedTarget as Node,
+                        )
+                      ) {
+                        setDropTarget((target) =>
+                          target?.tabId === tab.id ? null : target,
+                        )
+                      }
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault()
+                      // Only the ID captured by this panel's own drag start is
+                      // trusted; external pages can forge custom drag payloads.
+                      const sourceId = draggedTabId
+                      const bounds = event.currentTarget.getBoundingClientRect()
+                      const position: 'before' | 'after' =
+                        event.clientY < bounds.top + bounds.height / 2
+                          ? 'before'
+                          : 'after'
+                      const target: {
+                        tabId: number
+                        position: 'before' | 'after'
+                      } = { tabId: tab.id, position }
+                      setDropTarget(null)
+                      if (sourceId !== null && !isSearching) {
+                        void reorderTab(sourceId, tab.id, target.position)
+                      }
+                    }}
                     className={cn(
-                      'flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring',
-                      tab.active && 'bg-sidebar-accent',
+                      'flex min-w-0 items-center gap-1',
+                      dropTarget?.tabId === tab.id &&
+                        (dropTarget.position === 'before'
+                          ? 'border-primary border-t-2'
+                          : 'border-primary border-b-2'),
                     )}
                   >
-                    <Globe2 className="size-3.5 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">
-                      {tab.title || tab.url || 'Untitled tab'}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={pendingTabId !== null}
-                    aria-label={tab.pinned ? 'Unpin tab' : 'Pin tab'}
-                    title={tab.pinned ? 'Unpin tab' : 'Pin tab'}
-                    onClick={() => void actOnTab(tab, 'pin')}
-                    className="shrink-0 rounded-md p-1 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
-                  >
-                    {tab.pinned ? (
-                      <PinOff className="size-3.5" />
-                    ) : (
-                      <Pin className="size-3.5" />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={pendingTabId !== null}
-                    aria-label="Close tab"
-                    title="Close tab"
-                    onClick={() => void actOnTab(tab, 'close')}
-                    className="shrink-0 rounded-md p-1 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                </li>
-              ))
+                    <button
+                      type="button"
+                      draggable={!isSearching && pendingTabId === null}
+                      disabled={pendingTabId !== null || isSearching}
+                      aria-label={`Reorder ${tab.title || tab.url || 'tab'}`}
+                      title="Drag to reorder"
+                      onDragStart={(event) => {
+                        if (isSearching || pendingTabId !== null) {
+                          event.preventDefault()
+                          return
+                        }
+                        event.dataTransfer.effectAllowed = 'move'
+                        setDraggedTabId(tab.id)
+                        setError(null)
+                      }}
+                      onDragEnd={() => {
+                        setDraggedTabId(null)
+                        setDropTarget(null)
+                      }}
+                      className="shrink-0 cursor-grab rounded-md p-1 text-muted-foreground hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <GripVertical className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={
+                        pendingTabId !== null ||
+                        isSearching ||
+                        !earlierTab ||
+                        earlierTab.pinned !== tab.pinned
+                      }
+                      aria-label={`Move ${tabLabel} earlier`}
+                      title="Move tab earlier"
+                      onClick={() =>
+                        earlierTab &&
+                        void reorderTab(tab.id, earlierTab.id, 'before')
+                      }
+                      className="shrink-0 rounded-md p-1 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
+                    >
+                      <ArrowUp aria-hidden="true" className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={
+                        pendingTabId !== null ||
+                        isSearching ||
+                        !laterTab ||
+                        laterTab.pinned !== tab.pinned
+                      }
+                      aria-label={`Move ${tabLabel} later`}
+                      title="Move tab later"
+                      onClick={() =>
+                        laterTab &&
+                        void reorderTab(tab.id, laterTab.id, 'after')
+                      }
+                      className="shrink-0 rounded-md p-1 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
+                    >
+                      <ArrowDown aria-hidden="true" className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        tab.id !== undefined && void activate(tab.id)
+                      }
+                      aria-current={tab.active ? 'page' : undefined}
+                      title={tab.url}
+                      className={cn(
+                        'flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring',
+                        tab.active && 'bg-sidebar-accent',
+                      )}
+                    >
+                      <Globe2 className="size-3.5 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">
+                        {tab.title || tab.url || 'Untitled tab'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={pendingTabId !== null}
+                      aria-label={tab.pinned ? 'Unpin tab' : 'Pin tab'}
+                      title={tab.pinned ? 'Unpin tab' : 'Pin tab'}
+                      onClick={() => void actOnTab(tab, 'pin')}
+                      className="shrink-0 rounded-md p-1 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
+                    >
+                      {tab.pinned ? (
+                        <PinOff className="size-3.5" />
+                      ) : (
+                        <Pin className="size-3.5" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={pendingTabId !== null}
+                      aria-label="Close tab"
+                      title="Close tab"
+                      onClick={() => void actOnTab(tab, 'close')}
+                      className="shrink-0 rounded-md p-1 hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </li>
+                )
+              })
             : visibleBookmarks.map((entry) =>
                 entry.kind === 'folder' ? (
                   <li key={`folder:${entry.id}`}>
