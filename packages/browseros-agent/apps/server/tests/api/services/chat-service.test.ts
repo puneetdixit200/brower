@@ -5,8 +5,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { UIMessageChunk } from 'ai'
 import * as _ai from 'ai'
+import { actionPolicyIdForCandidate } from '../../../src/agent/action-policy'
 import * as researchSupportModule from '../../../src/agent/research-support-assessment'
 import type { KlavisProxyStatus } from '../../../src/api/services/klavis'
+import { consumeApprovalOperation } from '../../../src/lib/conversations/approval-operation-ledger'
 import { DbConversationStore } from '../../../src/lib/conversations/conversation-store'
 import { closeDb, initializeDb } from '../../../src/lib/db'
 
@@ -34,7 +36,7 @@ const BROWSEROS_TARGET = { type: 'browseros', providerId: 'browseros' } as const
 interface StreamResponseOptions {
   uiMessages?: MockMessage[]
   abortSignal?: AbortSignal
-  options?: { taskId: string }
+  options?: { taskId: string; approvalId?: string }
   onFinish(args: { messages: MockMessage[] }): Promise<void>
 }
 
@@ -1325,6 +1327,76 @@ describe('ChatService history persistence', () => {
       },
     } as never
   }
+
+  it('forwards a server-held approval id and grants only its exact one-shot binding', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'browseros-chat-approval-'))
+    tempDirs.push(dir)
+    initializeDb({ dbPath: join(dir, 'browseros.sqlite') })
+
+    const approvalId = 'server-sdk-approval-42'
+    const toolCallId = 'provider-tool-call-9'
+    const toolName = 'filesystem_write'
+    const input = { path: '/tmp/approval-regression.txt', content: 'approved' }
+    const agent = createFakeAgent()
+    agent.messages.push({
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      parts: [
+        {
+          type: 'dynamic-tool',
+          toolName,
+          toolCallId,
+          input,
+          state: 'approval-requested',
+          approval: { id: approvalId },
+        },
+      ],
+    } as never)
+    agentToReturn = agent
+    streamResponseHandler = async ({ onFinish, uiMessages }) => {
+      await onFinish({ messages: uiMessages ?? agent.messages })
+      return new Response('ok')
+    }
+    const service = new ChatService({
+      sessionStore: createSessionStore() as never,
+      klavis: createKlavisStub() as never,
+      browser: persistenceBrowser() as never,
+    })
+
+    await service.processMessage(
+      {
+        ...browserOsRequest(crypto.randomUUID(), false),
+        message: '',
+        approvalResponse: { id: approvalId, approved: true },
+      } as never,
+      new AbortController().signal,
+    )
+
+    const streamOptions = createAgentUIStreamSpy.mock.calls.at(-1)?.[0]
+    expect(streamOptions?.options?.approvalId).toBe(approvalId)
+    const taskId = streamOptions?.options?.taskId
+    expect(taskId).toMatch(/^[0-9a-f-]{36}$/)
+    if (!taskId)
+      throw new Error('Expected the approval stream to include its run id')
+
+    const actionId = actionPolicyIdForCandidate({ toolName, input }) ?? toolName
+    const binding = {
+      taskId,
+      approvalId,
+      toolCallId,
+      toolName,
+      actionId,
+      input,
+    }
+    expect(
+      consumeApprovalOperation({
+        ...binding,
+        approvalId: 'client-substituted-id',
+      }),
+    ).toBe(false)
+    expect(consumeApprovalOperation(binding)).toBe(true)
+    expect(consumeApprovalOperation(binding)).toBe(false)
+  })
 
   it('hydrates from and persists to the store in local mode', async () => {
     const agent = createFakeAgent()
