@@ -43,6 +43,97 @@ export interface ActionPolicy {
   expiresAt: number | null
 }
 
+export interface ActionPolicyDraft {
+  decision: ActionDecision
+  expiry: string
+}
+
+export type ActionPolicyDraftDirtyFields = Record<
+  string,
+  Partial<Record<keyof ActionPolicyDraft, true>>
+>
+
+export function createActionPolicyLoadEpoch() {
+  let latest = 0
+  return {
+    begin: () => ++latest,
+    invalidate: () => {
+      return ++latest
+    },
+    isCurrent: (request: number) => request === latest,
+    commit<T>(request: number, value: T, apply: (value: T) => void): boolean {
+      if (request !== latest) return false
+      apply(value)
+      return true
+    },
+  }
+}
+
+export function confirmsActionPolicyReset(
+  snapshot: { epoch: number; actions: ActionPolicy[] },
+  actionId: string,
+  afterEpoch: number,
+): boolean {
+  if (snapshot.epoch <= afterEpoch) return false
+  const action = snapshot.actions.find(({ id }) => id === actionId)
+  return !action || (action.decision === 'ask' && action.expiresAt === null)
+}
+
+export function updateActionPolicyDraftDirtyFields(
+  dirtyFields: ActionPolicyDraftDirtyFields,
+  id: string,
+  draft: ActionPolicyDraft,
+  baseline: ActionPolicyDraft | undefined,
+): ActionPolicyDraftDirtyFields {
+  if (!baseline) return dirtyFields
+  const dirty = { ...dirtyFields[id] }
+  for (const field of ['decision', 'expiry'] as const) {
+    if (draft[field] === baseline[field]) delete dirty[field]
+    else dirty[field] = true
+  }
+  const next = { ...dirtyFields }
+  if (Object.keys(dirty).length) next[id] = dirty
+  else delete next[id]
+  return next
+}
+
+export function clearActionPolicyDraftDirtyFields(
+  dirtyFields: ActionPolicyDraftDirtyFields,
+  id: string,
+): ActionPolicyDraftDirtyFields {
+  if (!(id in dirtyFields)) return dirtyFields
+  const next = { ...dirtyFields }
+  delete next[id]
+  return next
+}
+
+export function mergeActionPolicyDrafts(
+  serverActions: ActionPolicy[],
+  currentDrafts: Record<string, ActionPolicyDraft>,
+  dirtyFields: ActionPolicyDraftDirtyFields,
+  expiryFor: (expiresAt: number | null) => string,
+  forceRefreshId?: string,
+): Record<string, ActionPolicyDraft> {
+  const nextDrafts = Object.fromEntries(
+    serverActions.map((action) => [
+      action.id,
+      { decision: action.decision, expiry: expiryFor(action.expiresAt) },
+    ]),
+  ) as Record<string, ActionPolicyDraft>
+  for (const action of serverActions) {
+    if (action.id === forceRefreshId) continue
+    const draft = currentDrafts[action.id]
+    const dirty = dirtyFields[action.id]
+    const serverDraft = nextDrafts[action.id]
+    if (!draft || !dirty || !serverDraft) continue
+    if (dirty.decision && draft.decision !== serverDraft.decision)
+      serverDraft.decision = draft.decision
+    if (dirty.expiry && draft.expiry !== serverDraft.expiry)
+      serverDraft.expiry = draft.expiry
+  }
+  return nextDrafts
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

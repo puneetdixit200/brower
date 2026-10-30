@@ -1,5 +1,9 @@
 # Aster next steps
 
+### T05.4 / A09 permission-rule draft safety — 2026-10-30
+
+The settings page now preserves unsaved per-field edits across quiet refreshes, refreshes untouched fields from server state, and prevents older refreshes from undoing save/reset results. Tests pass 12/12 (27 assertions); app typecheck, targeted Biome, and diff check pass. Independent Luna review findings were addressed and the final re-review found no concrete remaining issue. Keep A09 PARTIAL. Next verify headed settings behavior and persistence across a complete app/server restart, then test real built-in ACP mediated requests in a packaged Aster runtime when T20a is available. Continue the remaining MUST items in dependency order; do not infer overall implementation percentage from the feature acceptance count.
+
 ### T26.2 / A12 continuation target freshness — 2026-10-30
 
 Continuation now resolves only against live current-window tabs and aborts after the asynchronous lookup if its owning conversation is no longer selected; the handoff UI remounts per conversation. Focused handoff suite passes 13/13 (51 assertions), including chat-switch and query-rejection zero-send checks; app typecheck, targeted compatible-Biome and diff check pass. Next verify the handoff in headed Aster; broader challenge false-positive and process-restart acceptance remain open. Keep A12 PARTIAL.

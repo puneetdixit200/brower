@@ -1,4 +1,4 @@
-import { type FC, useCallback, useEffect, useState } from 'react'
+import { type FC, useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -10,14 +10,21 @@ import {
 import {
   type ActionDecision,
   type ActionPolicy,
+  type ActionPolicyDraft,
+  type ActionPolicyDraftDirtyFields,
+  clearActionPolicyDraftDirtyFields,
+  confirmsActionPolicyReset,
+  createActionPolicyLoadEpoch,
+  mergeActionPolicyDrafts,
   normalizeExpiredActionPolicy,
   parseActionPolicyList,
   parseUpdatedActionPolicy,
   readActionPolicyResponse,
+  updateActionPolicyDraftDirtyFields,
 } from '@/lib/action-policy/action-policy'
 import { getAgentServerUrl } from '@/lib/browseros/helpers'
 
-type Draft = { decision: ActionDecision; expiry: string }
+type Draft = ActionPolicyDraft
 type RowStatus = 'saved' | 'saving' | 'resetting' | null
 
 const EXPIRY_CHOICES = [
@@ -50,34 +57,86 @@ const makeDrafts = (actions: ActionPolicy[]): Record<string, Draft> =>
 export const ActionPolicyPage: FC = () => {
   const [actions, setActions] = useState<ActionPolicy[]>([])
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
+  const actionsRef = useRef(actions)
+  const draftsRef = useRef(drafts)
+  const dirtyDraftFieldsRef = useRef<ActionPolicyDraftDirtyFields>({})
+  const baselineDraftsRef = useRef<Record<string, Draft>>({})
+  const loadEpochRef = useRef(createActionPolicyLoadEpoch())
+  const committedSnapshotRef = useRef<{
+    epoch: number
+    actions: ActionPolicy[]
+  }>({ epoch: 0, actions: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [rowStatuses, setRowStatuses] = useState<Record<string, RowStatus>>({})
+  actionsRef.current = actions
+  draftsRef.current = drafts
 
-  const load = useCallback(async (quiet = false): Promise<boolean> => {
-    if (!quiet) setLoading(true)
-    setError(null)
-    try {
-      const serverUrl = await getAgentServerUrl()
-      const response = await fetch(`${serverUrl}/action-policy`)
-      const body = await readActionPolicyResponse(response)
-      const rows = parseActionPolicyList(body).map((row) =>
-        normalizeExpiredActionPolicy(row),
-      )
-      setActions(rows)
-      setDrafts(makeDrafts(rows))
-      return true
-    } catch (reason) {
-      setError(
-        reason instanceof Error
-          ? reason.message
-          : 'Could not load permission rules',
-      )
-      return false
-    } finally {
-      if (!quiet) setLoading(false)
-    }
-  }, [])
+  const load = useCallback(
+    async (quiet = false, forceRefreshId?: string): Promise<boolean> => {
+      const requestEpoch = loadEpochRef.current.begin()
+      if (!quiet) setLoading(true)
+      setError(null)
+      try {
+        const serverUrl = await getAgentServerUrl()
+        const response = await fetch(`${serverUrl}/action-policy`)
+        const body = await readActionPolicyResponse(response)
+        const rows = parseActionPolicyList(body).map((row) =>
+          normalizeExpiredActionPolicy(row),
+        )
+        const nextBaselineDrafts = makeDrafts(rows)
+        const nextDrafts = mergeActionPolicyDrafts(
+          rows,
+          draftsRef.current,
+          dirtyDraftFieldsRef.current,
+          expiryDraft,
+          forceRefreshId,
+        )
+        let nextDirtyFields = dirtyDraftFieldsRef.current
+        for (const row of rows) {
+          nextDirtyFields = updateActionPolicyDraftDirtyFields(
+            nextDirtyFields,
+            row.id,
+            nextDrafts[row.id],
+            nextBaselineDrafts[row.id],
+          )
+        }
+        if (forceRefreshId) {
+          const remainingDirty = { ...nextDirtyFields }
+          delete remainingDirty[forceRefreshId]
+          nextDirtyFields = remainingDirty
+        }
+        return loadEpochRef.current.commit(
+          requestEpoch,
+          { rows, nextDrafts, nextDirtyFields, nextBaselineDrafts },
+          ({ rows, nextDrafts, nextDirtyFields, nextBaselineDrafts }) => {
+            actionsRef.current = rows
+            draftsRef.current = nextDrafts
+            dirtyDraftFieldsRef.current = nextDirtyFields
+            baselineDraftsRef.current = nextBaselineDrafts
+            committedSnapshotRef.current = {
+              epoch: requestEpoch,
+              actions: rows,
+            }
+            setActions(rows)
+            setDrafts(nextDrafts)
+          },
+        )
+      } catch (reason) {
+        if (!loadEpochRef.current.isCurrent(requestEpoch)) return false
+        setError(
+          reason instanceof Error
+            ? reason.message
+            : 'Could not load permission rules',
+        )
+        return false
+      } finally {
+        if (!quiet && loadEpochRef.current.isCurrent(requestEpoch))
+          setLoading(false)
+      }
+    },
+    [],
+  )
 
   useEffect(() => {
     void load()
@@ -90,11 +149,35 @@ export const ActionPolicyPage: FC = () => {
         (action) => action.expiresAt !== null && action.expiresAt <= now,
       )
       if (expired.length > 0) {
+        loadEpochRef.current.invalidate()
         const normalized = actions.map((action) =>
           normalizeExpiredActionPolicy(action, now),
         )
+        const nextBaselineDrafts = makeDrafts(normalized)
+        const expiredIds = new Set(expired.map(({ id }) => id))
+        const remainingDirty = { ...dirtyDraftFieldsRef.current }
+        for (const id of expiredIds) delete remainingDirty[id]
+        const nextDrafts = mergeActionPolicyDrafts(
+          normalized,
+          draftsRef.current,
+          remainingDirty,
+          expiryDraft,
+        )
+        let nextDirtyFields = remainingDirty
+        for (const row of normalized) {
+          nextDirtyFields = updateActionPolicyDraftDirtyFields(
+            nextDirtyFields,
+            row.id,
+            nextDrafts[row.id],
+            nextBaselineDrafts[row.id],
+          )
+        }
+        dirtyDraftFieldsRef.current = nextDirtyFields
+        actionsRef.current = normalized
+        draftsRef.current = nextDrafts
+        baselineDraftsRef.current = nextBaselineDrafts
         setActions(normalized)
-        setDrafts(makeDrafts(normalized))
+        setDrafts(nextDrafts)
         setRowStatuses({})
         return true
       }
@@ -138,11 +221,22 @@ export const ActionPolicyPage: FC = () => {
       ...current,
       [id]: { ...current[id], ...patch },
     }))
+    draftsRef.current = {
+      ...draftsRef.current,
+      [id]: { ...draftsRef.current[id], ...patch },
+    }
+    dirtyDraftFieldsRef.current = updateActionPolicyDraftDirtyFields(
+      dirtyDraftFieldsRef.current,
+      id,
+      draftsRef.current[id],
+      baselineDraftsRef.current[id],
+    )
     setRowStatuses((current) => ({ ...current, [id]: null }))
   }
 
   const save = async (action: ActionPolicy) => {
     if (action.expiresAt !== null && action.expiresAt <= Date.now()) {
+      loadEpochRef.current.invalidate()
       const normalized = normalizeExpiredActionPolicy(action)
       setActions((current) =>
         current.map((row) => (row.id === action.id ? normalized : row)),
@@ -151,6 +245,18 @@ export const ActionPolicyPage: FC = () => {
         ...current,
         [action.id]: { decision: 'ask', expiry: 'never' },
       }))
+      delete dirtyDraftFieldsRef.current[action.id]
+      actionsRef.current = actionsRef.current.map((row) =>
+        row.id === action.id ? normalized : row,
+      )
+      draftsRef.current = {
+        ...draftsRef.current,
+        [action.id]: { decision: 'ask', expiry: 'never' },
+      }
+      baselineDraftsRef.current = {
+        ...baselineDraftsRef.current,
+        [action.id]: { decision: 'ask', expiry: 'never' },
+      }
       setRowStatuses((current) => ({ ...current, [action.id]: null }))
       void load(true)
       return
@@ -179,16 +285,30 @@ export const ActionPolicyPage: FC = () => {
       const updated = normalizeExpiredActionPolicy(
         parseUpdatedActionPolicy(body, action.id),
       )
+      loadEpochRef.current.invalidate()
+      const updatedDraft = {
+        decision: updated.decision,
+        expiry: expiryDraft(updated.expiresAt),
+      }
+      delete dirtyDraftFieldsRef.current[updated.id]
+      baselineDraftsRef.current = {
+        ...baselineDraftsRef.current,
+        [updated.id]: updatedDraft,
+      }
       setActions((current) =>
         current.map((row) => (row.id === updated.id ? updated : row)),
       )
       setDrafts((current) => ({
         ...current,
-        [updated.id]: {
-          decision: updated.decision,
-          expiry: expiryDraft(updated.expiresAt),
-        },
+        [updated.id]: updatedDraft,
       }))
+      actionsRef.current = actionsRef.current.map((row) =>
+        row.id === updated.id ? updated : row,
+      )
+      draftsRef.current = {
+        ...draftsRef.current,
+        [updated.id]: updatedDraft,
+      }
       setRowStatuses((current) => ({ ...current, [action.id]: 'saved' }))
     } catch (reason) {
       setRowStatuses((current) => ({ ...current, [action.id]: null }))
@@ -215,8 +335,20 @@ export const ActionPolicyPage: FC = () => {
         body.success !== true
       )
         throw new Error('The policy service returned an invalid reset response')
-      const refreshed = await load(true)
-      if (!refreshed)
+      dirtyDraftFieldsRef.current = clearActionPolicyDraftDirtyFields(
+        dirtyDraftFieldsRef.current,
+        action.id,
+      )
+      const resetEpoch = loadEpochRef.current.invalidate()
+      const refreshed = await load(true, action.id)
+      if (
+        !refreshed &&
+        !confirmsActionPolicyReset(
+          committedSnapshotRef.current,
+          action.id,
+          resetEpoch,
+        )
+      )
         throw new Error(
           'The rule was reset, but the updated policy could not be confirmed',
         )

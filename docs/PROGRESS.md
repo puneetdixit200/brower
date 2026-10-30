@@ -1,5 +1,9 @@
 # Progress
 
+### T05.4 / A09 action-policy draft refresh and reset safety — 2026-10-30
+
+Permission-rule refreshes now update pristine fields from the server while preserving unsaved edits. Dirty tracking is per field and clears when an edit returns to the loaded baseline or the server catches up. Successful save/reset operations invalidate older requests; a successful reset clears its row draft immediately so a later quiet refresh cannot restore it. Focused action-policy tests pass 12/12 (27 assertions), app typecheck, targeted Biome, and diff check pass. Independent Luna review findings on draft preservation, time-relative expiry classification, stale loads after save/reset, dirty reversion, and reset confirmation races were fixed; final re-review found no concrete remaining issue. No headed settings or full app/server restart persistence test was run. A09/T05 remains PARTIAL pending headed settings, restart persistence, packaged Aster/ACP acceptance, and the broader MUST plan.
+
 ### T26.2 / A12 live continuation target and conversation guard — 2026-10-30
 
 Human-login continuation now always queries live current-window tabs before resolving attached targets; stale attachment IDs are intersected with that live set, otherwise the live active HTTP(S) tab is used. The handoff component resets on conversation changes, and a continuation checks its owning conversation again after the asynchronous tab query, failing closed if the user switched chats. Focused handoff tests pass 13/13 (51 assertions), app typecheck and diff check pass; targeted compatible-Biome check passes with one existing suppression warning. Independent Luna review found no remaining defect; regressions confirm zero sends after either a pending query loses its owning conversation or live-tab lookup rejects. No headed BrowserOS/Aster runtime was run. A12 remains PARTIAL pending challenge precision, headed UI and native/process-restart acceptance.
