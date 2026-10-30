@@ -38,7 +38,11 @@ def main() -> int:
     marker = f"ASTER_FILE_RECEIPT_{uuid.uuid4().hex}"
     filename = f"aster-file-receipt-{uuid.uuid4().hex[:8]}.txt"
     prompt = "Read the attached fixture and report its receipt status."
-    response_text = "Aster local fixture provider acknowledged the request."
+    followup_prompt = "Answer this follow-up without using another file."
+    response_texts = [
+        "Aster local fixture provider acknowledged turn one.",
+        "Aster local fixture provider acknowledged turn two.",
+    ]
 
     class FixtureProvider(ThreadingHTTPServer):
         requests: list[dict] = []
@@ -50,6 +54,9 @@ def main() -> int:
                 return
             length = int(self.headers.get("Content-Length", "0"))
             FixtureProvider.requests.append(json.loads(self.rfile.read(length)))
+            response_text = response_texts[
+                min(len(FixtureProvider.requests) - 1, len(response_texts) - 1)
+            ]
             chunks = [
                 {
                     "id": "aster-local-fixture",
@@ -141,22 +148,19 @@ def main() -> int:
             set_file_input(cdp, str(file_path))
             wait_for(cdp, f"document.body.innerText.includes({json.dumps(filename)})")
             cdp.evaluate(
-                "(()=>{const original=window.fetch.bind(window);window.__asterChatRequest=null;"
+                "(()=>{const original=window.fetch.bind(window);window.__asterChatRequests=[];"
                 "window.fetch=(input,init={})=>{const url=typeof input==='string'?input:input.url;"
-                "if(url.endsWith('/chat'))window.__asterChatRequest={url,body:init.body||''};"
+                "if(url.endsWith('/chat'))window.__asterChatRequests.push({url,body:init.body||''});"
                 "return original(input,init)}})()"
             )
             set_textarea(cdp, prompt)
-            cdp.evaluate(
-                "document.querySelector('textarea')?.closest('div.flex.gap-3')"
-                "?.querySelector('button:last-child')?.click()"
-            )
+            click_send(cdp)
             wait_for(
                 cdp,
-                f"document.body.innerText.includes({json.dumps(response_text)})",
+                f"document.body.innerText.includes({json.dumps(response_texts[0])})",
                 timeout=60,
             )
-            request = cdp.evaluate("window.__asterChatRequest")
+            request = cdp.evaluate("window.__asterChatRequests[0]")
             if not request or not request.get("url", "").endswith("/chat"):
                 raise AssertionError("the extension did not submit a chat request")
             if marker in request["url"] or filename in request["url"]:
@@ -174,6 +178,42 @@ def main() -> int:
                 raise AssertionError("submitted request did not contain a readable file attachment") from exc
             if marker not in decoded_attachment:
                 raise AssertionError("selected file content was absent from the /chat request body")
+
+            # The completed transcript retains the file for display, but a
+            # new text-only turn must not replay the prior turn's bytes.
+            set_textarea(cdp, followup_prompt)
+            click_send(cdp)
+            wait_for(
+                cdp,
+                f"document.body.innerText.includes({json.dumps(response_texts[1])})",
+                timeout=60,
+            )
+            wait_for(cdp, "window.__asterChatRequests.length >= 2")
+            if len(FixtureProvider.requests) != 2:
+                raise AssertionError(
+                    f"expected exactly two local model requests, got {len(FixtureProvider.requests)}"
+                )
+            second_chat_request = cdp.evaluate("window.__asterChatRequests[1]")
+            if not second_chat_request or not second_chat_request.get("url", "").endswith("/chat"):
+                raise AssertionError("the extension did not submit the second chat request")
+            if marker in second_chat_request["url"] or filename in second_chat_request["url"]:
+                raise AssertionError("turn-one file content or filename leaked into turn-two /chat URL")
+            second_chat_body = second_chat_request.get("body", "")
+            if marker in second_chat_body or filename in second_chat_body:
+                raise AssertionError("turn-one file content or filename leaked into turn-two /chat body")
+            try:
+                parsed_second_chat_body = json.loads(second_chat_body)
+            except (TypeError, ValueError) as exc:
+                raise AssertionError("second /chat request body was not JSON") from exc
+            if parsed_second_chat_body.get("attachments"):
+                raise AssertionError("turn two unexpectedly submitted an attachment")
+            second_provider_request = FixtureProvider.requests[1]
+            if followup_prompt not in json.dumps(second_provider_request, ensure_ascii=False):
+                raise AssertionError("turn-two prompt was absent from the second local model request")
+            if request_contains_marker(second_provider_request, marker):
+                raise AssertionError("turn-one file content was replayed in the turn-two model request")
+            if filename in json.dumps(second_provider_request, ensure_ascii=False):
+                raise AssertionError("turn-one filename was replayed in the turn-two model request")
             current_url = cdp.evaluate("location.href")
             if marker in current_url or filename in current_url:
                 raise AssertionError("file content or filename leaked into the chat URL")
@@ -184,7 +224,9 @@ def main() -> int:
                         "browseros_file_attach_remove_submit": "passed",
                         "request_body_file_marker": "observed",
                         "local_provider_file_marker": "observed",
-                        "local_provider_response": "received",
+                        "local_provider_response": "turn_one_received",
+                        "turn_two_prior_file_marker": "absent_from_chat_and_model_request",
+                        "turn_two_local_provider_response": "received",
                         "page_and_chat_url_leak": "none",
                         "synthetic_fixture": filename,
                     }
@@ -309,6 +351,14 @@ def set_textarea(cdp: CDP, value: str) -> None:
         + json.dumps(value)
         + ");e.dispatchEvent(new Event('input',{bubbles:true}));return true})()"
     )
+
+
+def click_send(cdp: CDP) -> None:
+    button = "document.querySelector('textarea')?.closest('form')?.querySelector('button[type=submit]')||document.querySelector('textarea')?.closest('div.flex.gap-3')?.querySelector('button:last-child')"
+    wait_for(cdp, f"(()=>{{const button={button};return !!button&&!button.disabled}})()")
+    result = cdp.evaluate(f"(()=>{{const button={button};if(!button)throw Error('Send button missing');button.click();return true}})()")
+    if result is not True:
+        raise RuntimeError("could not submit the composer")
 
 
 def request_contains_marker(value: object, marker: str) -> bool:
