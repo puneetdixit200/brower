@@ -1,6 +1,6 @@
 # Aster continuation handoff and full implementation plan
 
-Prior allowance stop — 2026-10-30: the short window reached 95% used (5% remaining), and that batch was stopped. The user has since resumed the goal. At this resumed batch start the live meter showed 4% primary-window usage and 78% weekly usage (96% and 22% remaining); the 5%-remaining stop gate has not been reached.
+Historical allowance stop — 2026-10-30: a prior batch stopped at 5% remaining in one window. The user later resumed the same goal; check the live account meter at each new batch boundary rather than relying on historical readings.
 
 ### Latest verified checkpoint — 2026-10-30
 
@@ -11,7 +11,7 @@ Implementation commit `72d6d0c04` adds the T23.1 guard that prevents later `act(
 
 Source milestones: explicit pinned Ninja selection `df77a7571`, production approval pipeline fixture `4470195d3`, pinned native Stop API syntax evidence `fdbe8038e`, guarded Downloads controls `39e18df1f`, bounded headed diagnostic `1dc23e01b`, and refused-send draft preservation `b1561b021`. Final `bun tests/integration/process-approval-fixture.ts --execute` passes; add `--browser` only with a compatible binary. Compiled-sidecar real HTTP/custom-MCP approval evidence is now retained under `docs/evidence/aster-process-approval-2026-10-30/`. Approve-once/replay409/deny pass; browser navigation does not: stock Chromium lacks BrowserOS `Browser.getTabs`. The Downloads fixture asserts sandbox status but Puppeteer click dispatch times out; do not infer API success or repeat that dependency unchanged. Composer changes have typecheck/lint/review only, no DOM interaction test.
 
-Continue with T23.2 partial-transcript recovery and no-replay evidence over a real process restart, then compatible browser/runtime provisioning and actual browser tool targeting, followed by headed composer/download acceptance and the remaining 103-subtask plan. Preserve all 319 native checkout changes; native syntax checking is not linking/launch. Keep the full goal active and incomplete; matrix remains 2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED and 1 NOT_STARTED (72 rows). Use at most three simultaneous Luna-medium workers; checkpoint/push and stop at 5% remaining allowance.
+T23.2 now has bounded opt-in assistant-text checkpoints and an actual compiled-sidecar SIGKILL/restart fixture: the exact interrupted text is recovered, with no messages/replay, no post-restart model request and no MCP dispatch. Credential-shaped text is rejected before local recovery-marker persistence. See [process evidence](evidence/aster-partial-transcript-restart-2026-10-30.json). A05 remains PARTIAL because browser-process crash, headed Aster display, and packaged/native acceptance remain open; the credential detector is heuristic. Next inspect native build state and safe incremental-state recovery, then resume the actual headed browser integration gate and remaining 103-subtask plan. Preserve all 319 native checkout changes; native syntax checking is not linking/launch. Keep the full goal active and incomplete; matrix remains 2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED and 1 NOT_STARTED (72 rows). Use at most three simultaneous Luna-medium workers; checkpoint/push and stop at 5% remaining allowance.
 
 ### Historical checkpoint — 2026-10-29, local `7ad761bed`, remote `9b0dff23a`
 

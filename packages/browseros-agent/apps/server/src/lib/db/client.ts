@@ -402,6 +402,11 @@ const currentMigrationHistory = [
     hash: 'aeb15d295bc73bb2ff445c0489834c2b0ad8233bea4a96353ca180d4e9b20cb5',
     createdAt: 1794096000000,
   },
+  {
+    tag: '0031_talented_mathemanic',
+    hash: '2c8cfbd2e42d0ac774b67c1e38c70a43a850be5a7a3b6634c63e2227a5a8d9cf',
+    createdAt: 1794182400000,
+  },
 ]
 
 // TODO(nikhil): Remove this fallback once Windows/Linux packaging always includes Drizzle migrations.
@@ -567,6 +572,7 @@ const currentSchemaStatements = [
     )
   `,
   `CREATE INDEX IF NOT EXISTS conversation_run_state_status_idx ON conversation_run_state (status)`,
+  `CREATE TABLE IF NOT EXISTS conversation_run_text_checkpoints (conversation_id text PRIMARY KEY NOT NULL, run_id text NOT NULL, text text NOT NULL DEFAULT '' CHECK (length(CAST(text AS BLOB)) <= 16384))`,
   `CREATE TABLE IF NOT EXISTS conversation_run_trace_events (sequence integer PRIMARY KEY AUTOINCREMENT NOT NULL, conversation_id text NOT NULL, run_id text NOT NULL, event_id text NOT NULL UNIQUE, event_json text NOT NULL)`,
   `CREATE INDEX IF NOT EXISTS conversation_run_trace_events_scope_idx ON conversation_run_trace_events (conversation_id, run_id, sequence)`,
   `CREATE TABLE IF NOT EXISTS conversation_human_waits (conversation_id text NOT NULL, run_id text NOT NULL, request_id text NOT NULL, phase text NOT NULL CHECK (phase IN ('waiting', 'human_completed', 'cancelled', 'interrupted')), created_at integer NOT NULL, updated_at integer NOT NULL, completed_at integer, fresh_conversation_id text, version integer NOT NULL DEFAULT 1, PRIMARY KEY (conversation_id, run_id))`,

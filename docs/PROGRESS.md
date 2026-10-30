@@ -1,10 +1,16 @@
 # Progress
 
-### Current status report — 2026-10-30
+### Current status report — 2026-10-30 (T23.2)
+
+T23.2 adds opt-in persistence of assistant `text-delta` display text for persistent runs only, with 16 KiB UTF-8 cap, 256-byte checkpoint batching, interrupted-only exposure, and no canonical-history or model-input replay. Task History accepts the bounded transcript only for the exact interrupted conversation/run and rejects credential-shaped text before local recovery-marker persistence; the detector remains heuristic. A compiled Linux x64 sidecar process fixture streams 360 synthetic bytes, confirms a durable SQLite checkpoint, SIGKILLs/restarts the sidecar against the same disposable state, then verifies exact interrupted text, no replayable messages, zero post-restart provider calls and zero MCP dispatches. Evidence: [T23.2 process restart](evidence/aster-partial-transcript-restart-2026-10-30.md) and its [sanitized record](evidence/aster-partial-transcript-restart-2026-10-30.json).
+
+Focused checks: server recovery/lifecycle/DB/ChatService suites 76/76 (370 assertions); app recovery/history suites 32/32 (52 assertions); app and server typechecks pass; standalone process-fixture TypeScript passes; targeted Biome and `git diff --check` pass. The sidecar SIGKILL fixture passed. No browser-process crash, headed UI, native Chromium, packaged Aster or live-provider acceptance ran. A05 remains PARTIAL. Matrix remains 2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED and 1 NOT_STARTED (72 total); this is not an engineering completion percentage.
+
+### Historical status report — 2026-10-30 (before T23.2)
 
 The latest source commit is `72d6d0c04` (T23.1 later-field cancellation guard); the latest prior documentation checkpoint is `2c596d7ef`. Matrix acceptance accounting remains 2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, and 1 NOT_STARTED across 72 rows. This ratio is not a project-effort completion percentage. See [the current status report and next-agent prompt](STATUS_REPORT_2026-10-30.md).
 
-Next: implement and process-test T23.2 partial-transcript durability and no-replay recovery across sidecar/browser crash, without replaying uncertain mutations. The native checkout remains protected: 319 changed paths, no `.ninja_log`, no linked browser; do not build or regenerate GN until safe incremental-state recovery and bounded dry-run behavior are established.
+At this historical checkpoint, T23.2 remained unimplemented. The later T23.2 entry above records its bounded sidecar process-restart coverage. Browser-process crash and native/headed acceptance remain open. The native checkout remains protected: 319 changed paths, no `.ninja_log`, no linked browser; do not build or regenerate GN until safe incremental-state recovery and bounded dry-run behavior are established.
 
 ### T23.1 browser fill cancellation — 2026-10-30
 

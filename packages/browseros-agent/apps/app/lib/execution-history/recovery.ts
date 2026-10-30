@@ -1,3 +1,4 @@
+import { containsCredentialShapedText } from './safety'
 import type {
   ExecutionHistoryByConversation,
   ExecutionTaskRecord,
@@ -8,9 +9,19 @@ export interface ExecutionRecoveryMarker {
   conversationId: string
   status: Exclude<ExecutionTaskRecord['status'], 'running'>
   completedAt: string
+  /** Bounded server transcript context for an interrupted run, kept local only. */
+  responsePreview?: string
 }
 
 const RECOVERY_MARKER_PREFIX = 'executionHistoryRecovery:'
+const MAX_RESPONSE_PREVIEW_BYTES = 16 * 1024
+
+function isBoundedResponsePreview(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    new TextEncoder().encode(value).byteLength <= MAX_RESPONSE_PREVIEW_BYTES
+  )
+}
 
 type RecoveryOptions = {
   serverUrl: string
@@ -37,13 +48,18 @@ export function isExecutionRecoveryMarker(
       candidate.status === 'stopped' ||
       candidate.status === 'failed' ||
       candidate.status === 'interrupted') &&
-    typeof candidate.completedAt === 'string'
+    typeof candidate.completedAt === 'string' &&
+    (candidate.responsePreview === undefined ||
+      (candidate.status === 'interrupted' &&
+        isBoundedResponsePreview(candidate.responsePreview) &&
+        !containsCredentialShapedText(candidate.responsePreview)))
   )
 }
 
 interface TerminalRunSnapshot {
   runId: string
   status: ExecutionRecoveryMarker['status']
+  responsePreview?: string
 }
 
 function terminalTaskStatusFromSnapshot(
@@ -66,7 +82,16 @@ function terminalTaskStatusFromSnapshot(
     case 'completed':
     case 'failed':
     case 'interrupted':
-      return { runId: candidate.runId, status: candidate.status }
+      return {
+        runId: candidate.runId,
+        status: candidate.status,
+        ...(candidate.status === 'interrupted' &&
+          isBoundedResponsePreview(candidate.partialTranscript) &&
+          !containsCredentialShapedText(candidate.partialTranscript) &&
+          candidate.partialTranscript.length > 0 && {
+            responsePreview: candidate.partialTranscript,
+          }),
+      }
     case 'aborted':
       return { runId: candidate.runId, status: 'stopped' }
     default:
@@ -91,8 +116,16 @@ export async function reconcileInterruptedExecutionTasks(
   ]
   const terminalRuns = new Map<
     string,
-    | { status: 'interrupted'; runId?: undefined }
-    | { status: ExecutionRecoveryMarker['status']; runId: string }
+    | {
+        status: 'interrupted'
+        runId?: undefined
+        responsePreview?: undefined
+      }
+    | {
+        status: ExecutionRecoveryMarker['status']
+        runId: string
+        responsePreview?: string
+      }
   >()
 
   await Promise.all(
@@ -136,6 +169,10 @@ export async function reconcileInterruptedExecutionTasks(
         conversationId: conversation.conversationId,
         status: terminalRun.status,
         completedAt,
+        ...(terminalRun.status === 'interrupted' &&
+          terminalRun.responsePreview && {
+            responsePreview: terminalRun.responsePreview,
+          }),
       }))
   })
 }
@@ -166,6 +203,10 @@ export function applyExecutionRecoveryMarkers(
         ...task,
         status: marker.status,
         completedAt: marker.completedAt,
+        ...(task.responsePreview === undefined &&
+          marker.responsePreview !== undefined && {
+            responsePreview: marker.responsePreview,
+          }),
       }
     })
     next[key] = tasks.some((task, index) => task !== conversation.tasks[index])

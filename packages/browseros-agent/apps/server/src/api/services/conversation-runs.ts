@@ -19,10 +19,15 @@ import {
   transitionAgentTask,
 } from '../../agent/task-contract'
 import type { ConversationRunLifecycleStore } from '../../lib/conversations/conversation-run-lifecycle-store'
+import {
+  capPartialAssistantTextUtf8,
+  MAX_PARTIAL_ASSISTANT_TEXT_BYTES,
+} from '../../lib/conversations/partial-assistant-text'
 
 export type { ConversationRunStatus } from '@browseros/shared/schemas/conversation-panels'
 
 const DEFAULT_PANEL_ASSIGNMENTS_HEARTBEAT_MS = 5_000
+const PARTIAL_TEXT_CHECKPOINT_BATCH_BYTES = 256
 
 export interface ConversationRunSnapshot {
   conversationId: string
@@ -30,6 +35,8 @@ export interface ConversationRunSnapshot {
   status: ConversationRunStatus
   /** Omitted when only lifecycle metadata survived a restart. */
   messages?: UIMessage[]
+  /** Opt-in assistant display text from an interrupted run; never model input. */
+  partialTranscript?: string
   chunkCount: number
   startedAt?: number
   finishedAt?: number | null
@@ -51,6 +58,8 @@ export interface ConversationTabGroupPresentation {
 export interface StartConversationRunInput {
   conversationId: string
   messages: UIMessage[]
+  /** Persist only bounded assistant text deltas for interrupted-run display. */
+  persistPartialTranscript?: boolean
   /** Chrome tab ids whose panels should display this run immediately. */
   panelTabIds?: readonly number[]
   /** Scheduled work executes normally but must not open or group visible tabs. */
@@ -114,6 +123,10 @@ interface ConversationRunRecord {
   taskStatus: AgentTaskStatus
   traceEvents: AgentTaskTraceEvent[]
   tracePersistenceDegraded: boolean
+  persistPartialTranscript: boolean
+  pendingPartialTranscript: string
+  pendingPartialTranscriptBytes: number
+  queuedPartialTranscriptBytes: number
   toolTraceIds: Map<string, { traceId: string; toolName: string }>
   approvalToolCalls: Map<
     string,
@@ -243,6 +256,10 @@ export class ConversationRuns {
       taskStatus: 'queued',
       traceEvents: [],
       tracePersistenceDegraded: false,
+      persistPartialTranscript: input.persistPartialTranscript === true,
+      pendingPartialTranscript: '',
+      pendingPartialTranscriptBytes: 0,
+      queuedPartialTranscriptBytes: 0,
       toolTraceIds: new Map(),
       approvalToolCalls: new Map(),
     }
@@ -255,6 +272,7 @@ export class ConversationRuns {
         record.conversationId,
         record.runId,
         record.startedAt,
+        input.persistPartialTranscript === true,
       )
     } catch (error) {
       this.runs.delete(input.conversationId)
@@ -612,6 +630,10 @@ export class ConversationRuns {
         ? this.recoverInterruptionEvent(durable, recoveryAt)
         : undefined
     const interruptionEvent = interruptionRecovery?.event
+    const partialAssistantText =
+      status === 'interrupted'
+        ? this.readPartialAssistantText(durable)
+        : undefined
 
     tracePersistenceDegraded ||= interruptionRecovery?.degraded === true
     if (
@@ -633,9 +655,25 @@ export class ConversationRuns {
           ? (interruptionEvent?.at ?? recoveryAt)
           : null),
       traceEvents,
+      ...(partialAssistantText !== undefined && {
+        partialTranscript: partialAssistantText,
+      }),
       ...(tracePersistenceDegraded && {
         tracePersistenceDegraded: true as const,
       }),
+    }
+  }
+
+  private readPartialAssistantText(
+    durable: NonNullable<ReturnType<ConversationRunLifecycleStore['get']>>,
+  ): string | undefined {
+    try {
+      return this.deps.lifecycleStore?.getPartialAssistantText?.(
+        durable.conversationId,
+        durable.runId,
+      )
+    } catch {
+      return undefined
     }
   }
 
@@ -843,6 +881,8 @@ export class ConversationRuns {
         const { done, value } = await reader.read()
         if (done) break
         if (value.type === 'error') record.sawErrorChunk = true
+        if (value.type === 'text-delta')
+          this.queuePartialTranscript(record, value.delta)
         this.recordTraceChunk(record, value)
         record.chunks.push(value)
         for (const subscriber of [...record.subscribers]) {
@@ -879,6 +919,7 @@ export class ConversationRuns {
     record.ended = true
     record.status = status
     record.finishedAt = Date.now()
+    this.flushPartialTranscript(record)
     record.humanWait?.abort()
     this.finishTaskTrace(record, status)
     // Setup failures have no stream-return point, but panel hydration must still
@@ -909,6 +950,46 @@ export class ConversationRuns {
       } finally {
         record.resolveFinished()
       }
+    }
+  }
+
+  private queuePartialTranscript(
+    record: ConversationRunRecord,
+    delta: string,
+  ): void {
+    if (!record.persistPartialTranscript || !delta) return
+    const remaining =
+      MAX_PARTIAL_ASSISTANT_TEXT_BYTES - record.queuedPartialTranscriptBytes
+    if (remaining <= 0) return
+    const boundedDelta = capPartialAssistantTextUtf8(delta, remaining)
+    if (!boundedDelta) return
+    const bytes = Buffer.byteLength(boundedDelta, 'utf8')
+    record.pendingPartialTranscript += boundedDelta
+    record.pendingPartialTranscriptBytes += bytes
+    record.queuedPartialTranscriptBytes += bytes
+    if (
+      record.pendingPartialTranscriptBytes >=
+      PARTIAL_TEXT_CHECKPOINT_BATCH_BYTES
+    ) {
+      this.flushPartialTranscript(record)
+    }
+  }
+
+  private flushPartialTranscript(record: ConversationRunRecord): void {
+    const pending = record.pendingPartialTranscript
+    if (!pending) return
+    // Clear before the best-effort DB write: a failed/uncertain commit must not
+    // cause a later retry to duplicate text in the persisted display checkpoint.
+    record.pendingPartialTranscript = ''
+    record.pendingPartialTranscriptBytes = 0
+    try {
+      this.deps.lifecycleStore?.appendPartialAssistantText?.(
+        record.conversationId,
+        record.runId,
+        pending,
+      )
+    } catch {
+      // Display checkpoint failures must never interrupt provider or tool execution.
     }
   }
 

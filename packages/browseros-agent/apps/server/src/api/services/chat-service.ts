@@ -150,6 +150,7 @@ export class ChatService {
       const startedRun = await this.conversationRuns.start({
         conversationId: request.conversationId,
         messages: [],
+        persistPartialTranscript: shouldPersist(request),
         panelTabIds: browserContextTabIds(request.browserContext),
         panelsVisible: !request.isScheduledTask,
         tabGroup: request.isScheduledTask

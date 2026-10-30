@@ -1,4 +1,8 @@
 import { describe, expect, it, mock } from 'bun:test'
+import {
+  flattenExecutionHistory,
+  getTaskTranscriptResponse,
+} from '@/screens/task-history/task-history'
 import type { ExecutionRecoveryMarker } from './recovery'
 import {
   applyExecutionRecoveryMarkers,
@@ -121,6 +125,141 @@ describe('interrupted execution recovery', () => {
         completedAt: '2026-10-27T02:00:00.000Z',
       },
     ])
+  })
+
+  it('attaches a bounded interrupted transcript only to the exact run and preserves local previews', async () => {
+    const serverPreview = 'Partial answer from interrupted run.'
+    const markers = await reconcileInterruptedExecutionTasks(
+      singleRunningHistory,
+      {
+        serverUrl: 'http://127.0.0.1:9000',
+        fetchImpl: async () =>
+          response(200, {
+            conversationId: 'conversation/one',
+            runId: 'run-1',
+            status: 'interrupted',
+            chunkCount: 1,
+            partialTranscript: serverPreview,
+          }),
+        now: () => '2026-10-27T02:00:00.000Z',
+      },
+    )
+
+    expect(markers[0]?.responsePreview).toBe(serverPreview)
+    const recovered = applyExecutionRecoveryMarkers(
+      singleRunningHistory,
+      markers,
+    )
+    const [visibleTask] = flattenExecutionHistory(recovered)
+    expect(visibleTask?.status).toBe('interrupted')
+    if (visibleTask) {
+      expect(getTaskTranscriptResponse(visibleTask)).toBe(serverPreview)
+    }
+
+    const mismatch = await reconcileInterruptedExecutionTasks(
+      {
+        first: {
+          ...singleRunningHistory.first,
+          tasks: [
+            { ...task('running-1', 'running'), serverRunId: 'different-run' },
+          ],
+        },
+      },
+      {
+        serverUrl: 'http://127.0.0.1:9000',
+        fetchImpl: async () =>
+          response(200, {
+            conversationId: 'conversation/one',
+            runId: 'run-1',
+            status: 'interrupted',
+            chunkCount: 1,
+            partialTranscript: serverPreview,
+          }),
+      },
+    )
+    expect(mismatch).toEqual([])
+
+    const existingPreviewHistory: ExecutionHistoryByConversation = {
+      first: {
+        ...singleRunningHistory.first,
+        tasks: [
+          {
+            ...task('running-1', 'running'),
+            serverRunId: 'run-1',
+            responsePreview: 'Newer local preview.',
+          },
+        ],
+      },
+    }
+    const preserved = applyExecutionRecoveryMarkers(
+      existingPreviewHistory,
+      markers,
+    )
+    expect(preserved.first.tasks[0]?.responsePreview).toBe(
+      'Newer local preview.',
+    )
+  })
+
+  it('rejects interrupted transcript previews above 16 KiB UTF-8', async () => {
+    const markers = await reconcileInterruptedExecutionTasks(
+      singleRunningHistory,
+      {
+        serverUrl: 'http://127.0.0.1:9000',
+        fetchImpl: async () =>
+          response(200, {
+            conversationId: 'conversation/one',
+            runId: 'run-1',
+            status: 'interrupted',
+            chunkCount: 1,
+            partialTranscript: '🙂'.repeat(4097),
+          }),
+      },
+    )
+
+    expect(markers[0]?.status).toBe('interrupted')
+    expect(markers[0]?.responsePreview).toBeUndefined()
+  })
+
+  it('omits credential-shaped interrupted previews before local marker persistence', async () => {
+    const markers = await reconcileInterruptedExecutionTasks(
+      singleRunningHistory,
+      {
+        serverUrl: 'http://127.0.0.1:9000',
+        fetchImpl: async () =>
+          response(200, {
+            conversationId: 'conversation/one',
+            runId: 'run-1',
+            status: 'interrupted',
+            chunkCount: 1,
+            partialTranscript: 'API key: fixture-shaped-secret',
+          }),
+      },
+    )
+
+    expect(markers).toEqual([
+      {
+        taskId: 'running-1',
+        conversationId: 'conversation/one',
+        status: 'interrupted',
+        completedAt: expect.any(String),
+      },
+    ])
+    expect(
+      isExecutionRecoveryMarker({
+        ...markers[0],
+        responsePreview: 'API key: fixture-shaped-secret',
+      }),
+    ).toBe(false)
+
+    const recovered = applyExecutionRecoveryMarkers(
+      singleRunningHistory,
+      markers,
+    )
+
+    const visibleTasks = flattenExecutionHistory(recovered)
+    expect(visibleTasks.map((item) => item.id)).toEqual(['running-1', 'done'])
+    expect(visibleTasks[0]?.status).toBe('interrupted')
+    expect(visibleTasks[0]?.responsePreview).toBeUndefined()
   })
 
   it.each([

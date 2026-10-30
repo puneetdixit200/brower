@@ -738,6 +738,141 @@ describe('ConversationRuns', () => {
     expect(await runs.delete('durable-run')).toBe(true)
   })
 
+  it('checkpoints only text deltas when enabled and exposes them only on interrupted durable snapshots', async () => {
+    let durable:
+      | {
+          conversationId: string
+          runId: string
+          status: 'running' | 'interrupted'
+          startedAt: number
+          finishedAt: number | null
+          tracePersistenceDegraded: boolean
+        }
+      | undefined
+    let enabled = false
+    let partial = ''
+    const events: AgentTaskTraceEvent[] = []
+    const lifecycleStore = {
+      start: (
+        conversationId: string,
+        runId: string,
+        startedAt: number,
+        persist: boolean,
+      ) => {
+        enabled = persist
+        partial = ''
+        durable = {
+          conversationId,
+          runId,
+          status: 'running',
+          startedAt,
+          finishedAt: null,
+          tracePersistenceDegraded: false,
+        }
+      },
+      finish: () => {},
+      get: () => durable,
+      appendTraceEvent: (
+        _conversationId: string,
+        _runId: string,
+        event: AgentTaskTraceEvent,
+      ) => events.push(event),
+      markTracePersistenceDegraded: () => {},
+      ensureInterruptionTraceEvent: (
+        _conversationId: string,
+        runId: string,
+        at: number,
+      ) => {
+        const event: AgentTaskTraceEvent = {
+          version: 1,
+          taskId: runId,
+          eventId: crypto.randomUUID(),
+          at,
+          kind: 'task_interrupted',
+        }
+        events.push(event)
+        return event
+      },
+      getTraceEvents: () => events,
+      appendPartialAssistantText: (
+        _conversationId: string,
+        _runId: string,
+        delta: string,
+      ) => {
+        if (enabled) partial += delta
+      },
+      getPartialAssistantText: () => (enabled ? partial : undefined),
+      delete: () => true,
+    }
+    const source = controlledSource()
+    const runs = new ConversationRuns({ lifecycleStore })
+    const started = await runs.start({
+      conversationId: 'checkpoint-run',
+      messages: [],
+      persistPartialTranscript: true,
+      createStream: () => source.stream,
+    })
+    source.write({ type: 'text-start', id: 'assistant' })
+    source.write({ type: 'reasoning-start', id: 'reasoning' })
+    source.write({
+      type: 'reasoning-delta',
+      id: 'reasoning',
+      delta: 'private reasoning',
+    })
+    source.write({
+      type: 'text-delta',
+      id: 'assistant',
+      delta: 'visible answer',
+    })
+    source.write({
+      type: 'tool-input-start',
+      toolCallId: 'call-1',
+      toolName: 'search',
+    })
+    expect(partial).toBe('')
+    source.write({
+      type: 'text-delta',
+      id: 'assistant',
+      delta: 'x'.repeat(250),
+    })
+    const thresholdText = `visible answer${'x'.repeat(250)}`
+    await eventually(() => expect(partial).toBe(thresholdText))
+    source.write({ type: 'text-delta', id: 'assistant', delta: ' tail' })
+    expect(partial).toBe(thresholdText)
+    source.close()
+    await eventually(() => expect(partial).toBe(`${thresholdText} tail`))
+
+    if (!durable) throw new Error('Expected persisted run')
+    durable = { ...durable, status: 'interrupted', finishedAt: Date.now() }
+    const restarted = new ConversationRuns({ lifecycleStore })
+    expect(await restarted.getPreparedSnapshot('checkpoint-run')).toMatchObject(
+      {
+        runId: started.runId,
+        status: 'interrupted',
+        partialTranscript: `${thresholdText} tail`,
+      },
+    )
+
+    const stopSource = controlledSource()
+    await runs.start({
+      conversationId: 'checkpoint-stop',
+      messages: [],
+      persistPartialTranscript: true,
+      createStream: () => stopSource.stream,
+    })
+    stopSource.write({
+      type: 'text-delta',
+      id: 'assistant',
+      delta: 'stopped pending',
+    })
+    await eventually(() =>
+      expect(runs.getSnapshot('checkpoint-stop')?.chunkCount).toBe(1),
+    )
+    expect(partial).toBe('')
+    expect(await runs.stop('checkpoint-stop')).toBe(true)
+    expect(partial).toBe('stopped pending')
+  })
+
   it('normalizes a still-running durable row and persists one stable recovery event across parallel reads', async () => {
     const runId = crypto.randomUUID()
     const row = {

@@ -5,7 +5,14 @@
  */
 
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm'
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { sql } from 'drizzle-orm'
+import {
+  check,
+  index,
+  integer,
+  sqliteTable,
+  text,
+} from 'drizzle-orm/sqlite-core'
 
 export const conversationRunState = sqliteTable(
   'conversation_run_state',
@@ -22,6 +29,22 @@ export const conversationRunState = sqliteTable(
       .default(false),
   },
   (table) => [index('conversation_run_state_status_idx').on(table.status)],
+)
+
+/** Opt-in, bounded display-only recovery text; never used as conversation input. */
+export const conversationRunTextCheckpoints = sqliteTable(
+  'conversation_run_text_checkpoints',
+  {
+    conversationId: text('conversation_id').primaryKey().notNull(),
+    runId: text('run_id').notNull(),
+    text: text('text').notNull().default(''),
+  },
+  (table) => [
+    check(
+      'conversation_run_text_checkpoints_text_bytes_check',
+      sql`length(CAST(${table.text} AS BLOB)) <= 16384`,
+    ),
+  ],
 )
 
 export type ConversationRunStateRow = InferSelectModel<

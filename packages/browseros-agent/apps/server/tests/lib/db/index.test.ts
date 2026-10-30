@@ -221,6 +221,12 @@ describe('database initialization', () => {
       dropHeartbeatColumns(old.sqlite)
       old.sqlite.exec('DROP TABLE conversation_run_state')
       old.sqlite.exec('DROP TABLE conversation_run_trace_events')
+      old.sqlite.exec('DROP TABLE conversation_human_waits')
+      old.sqlite.exec('DROP TABLE conversation_run_text_checkpoints')
+      old.sqlite.exec('DROP TABLE scheduled_job_occurrence_claims')
+      old.sqlite.exec('DROP TABLE tool_operation_claims')
+      old.sqlite.exec('DROP TABLE memory_revisions')
+      old.sqlite.exec('DROP TABLE approval_operation_grants')
       old.sqlite.exec('DROP TABLE action_policy_rules')
       old.sqlite.exec('DROP INDEX scheduled_job_runs_one_running_per_job')
       // Drizzle replays from the newest recorded marker, so rewinding to
@@ -558,6 +564,12 @@ describe('database initialization', () => {
     dropHeartbeatColumns(old.sqlite)
     old.sqlite.exec('DROP TABLE conversation_run_state')
     old.sqlite.exec('DROP TABLE conversation_run_trace_events')
+    old.sqlite.exec('DROP TABLE conversation_human_waits')
+    old.sqlite.exec('DROP TABLE conversation_run_text_checkpoints')
+    old.sqlite.exec('DROP TABLE scheduled_job_occurrence_claims')
+    old.sqlite.exec('DROP TABLE tool_operation_claims')
+    old.sqlite.exec('DROP TABLE memory_revisions')
+    old.sqlite.exec('DROP TABLE approval_operation_grants')
     // Stand the database up as it was before the hosted provider was retired,
     // by undoing the migration that removes it and re-inserting the row.
     old.sqlite

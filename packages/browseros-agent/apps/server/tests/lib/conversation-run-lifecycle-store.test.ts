@@ -60,6 +60,80 @@ describe('conversation run lifecycle trace persistence', () => {
     expect(store.getTraceEvents('conversation-a', RUN_A)).toEqual([first])
   })
 
+  it('stores only opted-in text, caps UTF-8 bytes, scopes it to the run, and recovers it after reopen', () => {
+    const store = createStore()
+    store.start('opted-out', RUN_A, 100)
+    store.appendPartialAssistantText('opted-out', RUN_A, 'private')
+    expect(store.getPartialAssistantText('opted-out', RUN_A)).toBeUndefined()
+
+    store.start('conversation-a', RUN_A, 110, true)
+    store.appendPartialAssistantText(
+      'conversation-a',
+      RUN_A,
+      'a'.repeat(16_383),
+    )
+    store.appendPartialAssistantText('conversation-a', RUN_A, '🙂ignored')
+    expect(
+      Buffer.byteLength(
+        store.getPartialAssistantText('conversation-a', RUN_A) ?? '',
+        'utf8',
+      ),
+    ).toBe(16_383)
+    expect(
+      store.getPartialAssistantText('conversation-a', RUN_B),
+    ).toBeUndefined()
+
+    const dbPath = getDbHandle().path
+    closeDb()
+    initializeDb({ dbPath })
+    const recovered = new DbConversationRunLifecycleStore()
+    expect(recovered.get('conversation-a')?.status).toBe('interrupted')
+    expect(recovered.getPartialAssistantText('conversation-a', RUN_A)).toBe(
+      'a'.repeat(16_383),
+    )
+    expect(
+      recovered.getPartialAssistantText('conversation-a', RUN_B),
+    ).toBeUndefined()
+  })
+
+  it('clears checkpoints on completed and replacement runs and leaves canonical conversation messages unchanged', async () => {
+    const store = createStore()
+    const { DbConversationStore } = await import(
+      '../../src/lib/conversations/conversation-store'
+    )
+    const conversations = new DbConversationStore()
+    const canonicalMessages = [
+      {
+        id: 'user-1',
+        role: 'user' as const,
+        parts: [{ type: 'text' as const, text: 'canonical' }],
+      },
+    ]
+    await conversations.save({
+      id: 'conversation-a',
+      messages: canonicalMessages,
+      targetType: 'browseros',
+    })
+
+    store.start('conversation-a', RUN_A, 100, true)
+    store.appendPartialAssistantText('conversation-a', RUN_A, 'display only')
+    expect((await conversations.get('conversation-a'))?.messages).toEqual(
+      canonicalMessages,
+    )
+    store.finish('conversation-a', RUN_A, 'completed', 120)
+    expect(
+      store.getPartialAssistantText('conversation-a', RUN_A),
+    ).toBeUndefined()
+
+    store.start('conversation-a', RUN_B, 130, true)
+    expect(
+      store.getPartialAssistantText('conversation-a', RUN_A),
+    ).toBeUndefined()
+    expect((await conversations.get('conversation-a'))?.messages).toEqual(
+      canonicalMessages,
+    )
+  })
+
   it('persists trace degradation per run and resets it when a replacement run starts', () => {
     const store = createStore()
     store.start('conversation-a', RUN_A, 100)

@@ -1,0 +1,24 @@
+{
+  "status": "passed",
+  "integrationLevel": "compiled Aster sidecar process fixture",
+  "mode": "partial-transcript-restart",
+  "command": "bun tests/integration/process-approval-fixture.ts --execute --partial-restart",
+  "serverArtifact": "packages/browseros-agent/dist/prod/aster-server/linux-x64/resources/bin/aster_server",
+  "serverSha256": "34abe0b0907ff01e7c18e3e030cc367c1f8484fe94785510f0bf7c39059518ed",
+  "state": {
+    "disposableProfile": true,
+    "loopbackFixturesOnly": true,
+    "assistantTextBytes": 360,
+    "recoveredStatus": "interrupted",
+    "recoveredTranscriptMatchesCheckpoint": true,
+    "replayableMessagesExposed": false,
+    "providerRequests": 1,
+    "postRestartProviderRequests": 0,
+    "mcpDispatches": 0
+  },
+  "limits": [
+    "Synthetic local provider output only; no live provider was exercised.",
+    "This kills and restarts the sidecar, not Chromium or the browser process.",
+    "No browser UI, packaged Aster binary, native Chromium build, or release runtime was exercised."
+  ]
+}

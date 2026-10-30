@@ -11,6 +11,7 @@ import {
   createAgentTaskTraceEvent,
 } from '../../agent/task-contract'
 import { getDbHandle } from '../db'
+import { capPartialAssistantTextUtf8 } from './partial-assistant-text'
 
 const MAX_TRACE_EVENTS_PER_RUN = 500
 const MAX_TRACE_EVENTS_TOTAL = 10_000
@@ -41,9 +42,23 @@ export interface DurableHumanWait {
   version: number
 }
 
-/** Stores lifecycle metadata only; prompts, messages, credentials, and tool I/O stay transient. */
+/** Stores lifecycle metadata and opt-in, bounded assistant display text only; prompts, user messages, credentials, reasoning, and tool I/O stay transient. */
 export interface ConversationRunLifecycleStore {
-  start(conversationId: string, runId: string, startedAt: number): void
+  start(
+    conversationId: string,
+    runId: string,
+    startedAt: number,
+    persistPartialTranscript?: boolean,
+  ): void
+  appendPartialAssistantText?(
+    conversationId: string,
+    runId: string,
+    delta: string,
+  ): void
+  getPartialAssistantText?(
+    conversationId: string,
+    runId: string,
+  ): string | undefined
   finish(
     conversationId: string,
     runId: string,
@@ -175,7 +190,12 @@ export class DbConversationRunLifecycleStore
     })()
   }
 
-  start(conversationId: string, runId: string, startedAt: number): void {
+  start(
+    conversationId: string,
+    runId: string,
+    startedAt: number,
+    persistPartialTranscript = false,
+  ): void {
     const sqlite = getDbHandle().sqlite
     sqlite.transaction(() => {
       sqlite
@@ -191,7 +211,65 @@ export class DbConversationRunLifecycleStore
          WHERE conversation_id = ? AND phase = 'waiting' AND run_id <> ?`,
         )
         .run(startedAt, conversationId, runId)
+      try {
+        sqlite
+          .prepare(
+            'DELETE FROM conversation_run_text_checkpoints WHERE conversation_id = ?',
+          )
+          .run(conversationId)
+        if (persistPartialTranscript) {
+          sqlite
+            .prepare(
+              'INSERT INTO conversation_run_text_checkpoints (conversation_id, run_id, text) VALUES (?, ?, ?)',
+            )
+            .run(conversationId, runId, '')
+        }
+      } catch {
+        // Checkpoint storage is optional and must not block run startup.
+      }
     })()
+  }
+
+  appendPartialAssistantText(
+    conversationId: string,
+    runId: string,
+    delta: string,
+  ): void {
+    if (!delta) return
+    const sqlite = getDbHandle().sqlite
+    sqlite.transaction(() => {
+      const row = sqlite
+        .query<{ text: string }, [string, string]>(
+          `SELECT c.text FROM conversation_run_text_checkpoints c
+           JOIN conversation_run_state s ON s.conversation_id = c.conversation_id AND s.run_id = c.run_id
+           WHERE c.conversation_id = ? AND c.run_id = ? AND s.status = 'running'`,
+        )
+        .get(conversationId, runId)
+      if (!row) return
+      const next = capPartialAssistantTextUtf8(row.text + delta)
+      sqlite
+        .prepare(
+          `UPDATE conversation_run_text_checkpoints SET text = ?
+           WHERE conversation_id = ? AND run_id = ?
+             AND EXISTS (SELECT 1 FROM conversation_run_state s
+               WHERE s.conversation_id = ? AND s.run_id = ? AND s.status = 'running')`,
+        )
+        .run(next, conversationId, runId, conversationId, runId)
+    })()
+  }
+
+  getPartialAssistantText(
+    conversationId: string,
+    runId: string,
+  ): string | undefined {
+    const row = getDbHandle()
+      .sqlite.query<{ text: string }, [string, string]>(
+        `SELECT c.text FROM conversation_run_text_checkpoints c
+         JOIN conversation_run_state s ON s.conversation_id = c.conversation_id AND s.run_id = c.run_id
+         WHERE c.conversation_id = ? AND c.run_id = ?`,
+      )
+      .get(conversationId, runId)
+    return row?.text || undefined
   }
 
   markTracePersistenceDegraded(conversationId: string, runId: string): void {
@@ -222,6 +300,17 @@ export class DbConversationRunLifecycleStore
            WHERE conversation_id = ? AND run_id = ? AND phase = 'waiting'`,
           )
           .run(finishedAt, conversationId, runId)
+        if (status !== 'interrupted') {
+          try {
+            sqlite
+              .prepare(
+                'DELETE FROM conversation_run_text_checkpoints WHERE conversation_id = ? AND run_id = ?',
+              )
+              .run(conversationId, runId)
+          } catch {
+            // Keep execution completion independent of optional checkpoint cleanup.
+          }
+        }
       }
     })()
   }
@@ -522,7 +611,12 @@ export class DbConversationRunLifecycleStore
           'DELETE FROM conversation_human_waits WHERE conversation_id = ?',
         )
         .run(conversationId).changes
-      return traces + state + waits > 0
+      const text = sqlite
+        .prepare(
+          'DELETE FROM conversation_run_text_checkpoints WHERE conversation_id = ?',
+        )
+        .run(conversationId).changes
+      return traces + state + waits + text > 0
     })()
   }
 }

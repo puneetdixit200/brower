@@ -36,6 +36,8 @@ const CHILD_ENV_KEYS = ['PATH', 'HOME', 'LANG', 'LC_ALL', 'TMPDIR'] as const
 const BROWSER_FIXTURE_MARKER = 'ASTER_BROWSER_FIXTURE_NAVIGATE'
 const BROWSER_SENTINEL = 'ASTER_LOCAL_PAGE_SENTINEL_71C4'
 const BROWSER_PAGE_TITLE = 'Aster Local Fixture'
+const PARTIAL_TRANSCRIPT_MARKER = 'ASTER_PARTIAL_TRANSCRIPT_FIXTURE'
+const PARTIAL_TRANSCRIPT_TEXT = 'Synthetic partial transcript. '.repeat(12)
 
 type FixtureCall = { destination: string; body: string }
 type BrowserToolStep = {
@@ -425,7 +427,8 @@ function persistedPendingApproval(
 async function main() {
   const execute = process.argv.includes('--execute')
   const browserMode = process.argv.includes('--browser')
-  const restartMode = process.argv.includes('--restart')
+  const partialRestartMode = process.argv.includes('--partial-restart')
+  const restartMode = process.argv.includes('--restart') || partialRestartMode
   assert(
     !(browserMode && restartMode),
     '--browser and --restart are separate fixture modes',
@@ -433,13 +436,15 @@ async function main() {
   if (
     process.argv.some(
       (arg) =>
-        !['--execute', '--browser', '--restart'].includes(arg) &&
+        !['--execute', '--browser', '--restart', '--partial-restart'].includes(
+          arg,
+        ) &&
         arg !== process.argv[0] &&
         arg !== process.argv[1],
     )
   ) {
     throw new Error(
-      'Usage: bun tests/integration/process-approval-fixture.ts [--execute] [--browser] [--restart]\nDefault --execute runs approval/deny/replay only. --browser adds local-page navigation and requires BrowserOS Chromium with Browser.getTabs CDP support. --restart tests pending-approval failure after SIGKILL/restart. Set ASTER_SERVER_BINARY and CHROMIUM_BINARY to select binaries.',
+      'Usage: bun tests/integration/process-approval-fixture.ts [--execute] [--browser] [--restart|--partial-restart]\nDefault --execute runs approval/deny/replay only. --browser adds local-page navigation and requires BrowserOS Chromium with Browser.getTabs CDP support. --restart tests pending-approval failure after SIGKILL/restart. --partial-restart kills a streaming run and verifies bounded transcript recovery without replay. Set ASTER_SERVER_BINARY and CHROMIUM_BINARY to select binaries.',
     )
   }
   const binary = resolve(process.env.ASTER_SERVER_BINARY ?? DEFAULT_SERVER)
@@ -495,11 +500,13 @@ async function main() {
     'about:blank',
   ]
   const plan = {
-    mode: restartMode
-      ? 'approval-restart'
-      : browserMode
-        ? 'approval-and-browser'
-        : 'approval-only',
+    mode: partialRestartMode
+      ? 'partial-transcript-restart'
+      : restartMode
+        ? 'approval-restart'
+        : browserMode
+          ? 'approval-and-browser'
+          : 'approval-only',
     browserPrerequisite: browserMode
       ? 'BrowserOS Chromium exposing the Browser.getTabs CDP extension; stock Chromium is insufficient.'
       : undefined,
@@ -620,12 +627,12 @@ async function main() {
         advertisedToolNames.push(toolNames)
         modelCall++
         const responseId = `chatcmpl-process-fixture-${modelCall}`
-        const selection = selectModelStep(
-          messages,
-          toolNames,
-          ports.page,
-          browserToolSteps,
-        )
+        const partialTranscriptScenario =
+          partialRestartMode &&
+          JSON.stringify(messages).includes(PARTIAL_TRANSCRIPT_MARKER)
+        const selection = partialTranscriptScenario
+          ? { toolName: null, finalText: PARTIAL_TRANSCRIPT_TEXT }
+          : selectModelStep(messages, toolNames, ports.page, browserToolSteps)
         if (selection.toolName)
           assertAdvertisedToolSchema(tools, selection.toolName)
         const toolCall = selection.toolName
@@ -659,6 +666,35 @@ async function main() {
           selection.input,
           selection.finalText,
         )
+        if (partialTranscriptScenario) {
+          const partialChunk = {
+            id: responseId,
+            object: 'chat.completion.chunk',
+            created: 1,
+            model: 'fixture-model',
+            choices: [
+              {
+                index: 0,
+                delta: { role: 'assistant', content: PARTIAL_TRANSCRIPT_TEXT },
+                finish_reason: null,
+              },
+            ],
+          }
+          syntheticModelResponses.push(partialChunk)
+          const encoder = new TextEncoder()
+          return new Response(
+            new ReadableStream<Uint8Array>({
+              start(controller) {
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify(partialChunk)}\n\n`),
+                )
+                // Deliberately keep the fixture provider response open until
+                // the parent kills the sidecar after its DB checkpoint.
+              },
+            }),
+            { headers: { 'Content-Type': 'text/event-stream' } },
+          )
+        }
         syntheticModelResponses.push(...chunks)
         return new Response(
           `${chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join('')}data: [DONE]\n\n`,
@@ -749,6 +785,7 @@ async function main() {
       conversationId: string,
       approvalResponse?: { id: string; approved: boolean },
       userMessage = 'Send the fixture message.',
+      readBody = true,
     ) => {
       const response = await fetch(base, {
         method: 'POST',
@@ -778,8 +815,149 @@ async function main() {
       })
       return {
         response,
-        text: response.ok ? await readSse(response) : await response.text(),
+        text: readBody
+          ? response.ok
+            ? await readSse(response)
+            : await response.text()
+          : '',
       }
+    }
+
+    const runPartialTranscriptRestart = async () => {
+      const conversationId = crypto.randomUUID()
+      const initial = await makeRequest(
+        conversationId,
+        undefined,
+        `${PARTIAL_TRANSCRIPT_MARKER}: return a partial answer and keep streaming.`,
+        false,
+      )
+      assert(
+        initial.response.status === 200,
+        `Initial partial-transcript chat failed: ${initial.response.status}`,
+      )
+      const pendingClientRead = readSse(initial.response).catch(() => '')
+      const stateDbPath = join(paths.state, 'db', 'browseros.sqlite')
+      const stateDb = new Database(stateDbPath, { readonly: true })
+      const deadline = Date.now() + 15_000
+      let checkpoint: { text?: string } | null = null
+      try {
+        while (Date.now() < deadline) {
+          checkpoint = stateDb
+            .query(
+              'SELECT text FROM conversation_run_text_checkpoints WHERE conversation_id = ?',
+            )
+            .get(conversationId) as { text?: string } | null
+          if (checkpoint?.text === PARTIAL_TRANSCRIPT_TEXT) break
+          await Bun.sleep(50)
+        }
+        assert(
+          checkpoint?.text === PARTIAL_TRANSCRIPT_TEXT,
+          'Partial assistant text was not durably checkpointed before sidecar interruption',
+        )
+      } finally {
+        stateDb.close()
+      }
+
+      const interruptedProcess = serverProcess
+      assert(interruptedProcess, 'Sidecar process has no PID for SIGKILL case')
+      const interruptedPid = interruptedProcess.pid
+      assert(interruptedPid, 'Sidecar process has no PID for SIGKILL case')
+      interruptedProcess.kill('SIGKILL')
+      await waitForExit(interruptedProcess, 5_000)
+      assert(
+        interruptedProcess.signalCode === 'SIGKILL',
+        `Expected SIGKILL, received ${interruptedProcess.signalCode ?? interruptedProcess.exitCode}`,
+      )
+      await pendingClientRead
+
+      const restartedProcess = spawn(binary, ['--config', paths.config], {
+        env,
+        stdio: ['ignore', serverLogFd, serverLogFd],
+      })
+      serverProcess = restartedProcess
+      serverSpawnError = undefined
+      restartedProcess.on('error', (error) => {
+        serverSpawnError = error
+      })
+      await waitForHealth(
+        `http://127.0.0.1:${ports.server}/system/health`,
+        restartedProcess,
+        paths.serverLog,
+        () => serverSpawnError,
+      )
+      const stateResponse = await fetch(
+        `${base}/${encodeURIComponent(conversationId)}/state`,
+        {
+          headers: { Origin: `chrome-extension://${APP_ID}` },
+          signal: AbortSignal.timeout(5_000),
+        },
+      )
+      assert(
+        stateResponse.status === 200,
+        `Recovered state returned HTTP ${stateResponse.status}`,
+      )
+      const snapshot = (await stateResponse.json()) as Record<string, unknown>
+      assert(
+        snapshot.status === 'interrupted',
+        'Recovered run is not interrupted',
+      )
+      assert(
+        snapshot.partialTranscript === PARTIAL_TRANSCRIPT_TEXT,
+        'Recovered state did not expose the exact durable partial transcript',
+      )
+      assert(
+        !('messages' in snapshot),
+        'Interrupted recovery exposed replayable messages',
+      )
+      assert(
+        modelRequests.length === 1,
+        `Expected no post-restart provider replay; observed ${modelRequests.length} requests`,
+      )
+      assertDispatchCount(
+        dispatches,
+        0,
+        'Interrupted transcript recovery dispatched an MCP action',
+      )
+      const evidence = {
+        status: 'passed',
+        mode: 'partial-transcript-restart',
+        serverBinary: binary,
+        serverSha256: createHash('sha256')
+          .update(new Uint8Array(await Bun.file(binary).arrayBuffer()))
+          .digest('hex'),
+        config,
+        ports,
+        stateDirectory: paths.state,
+        stateDbPath,
+        conversationId,
+        interruptedPid,
+        restartedPid: restartedProcess.pid,
+        requestCount: modelRequests.length,
+        postRestartModelRequests: 0,
+        partialTranscriptBytes: Buffer.byteLength(
+          String(snapshot.partialTranscript),
+          'utf8',
+        ),
+        modelMessages: capturedModelMessages(modelRequests),
+        syntheticModelResponses,
+        dispatches,
+        zeroDispatchesAfterRestart: dispatches.length === 0,
+        evidencePath: paths.evidence,
+      }
+      await writeFile(
+        paths.evidence,
+        `${JSON.stringify(evidence, null, 2)}\n`,
+        {
+          mode: 0o600,
+        },
+      )
+      console.log(JSON.stringify(evidence, null, 2))
+      return
+    }
+
+    if (partialRestartMode) {
+      await runPartialTranscriptRestart()
+      return
     }
 
     if (restartMode) {
@@ -1099,7 +1277,7 @@ async function main() {
   } catch (error) {
     await writeFile(
       paths.evidence,
-      `${JSON.stringify({ status: 'failed', mode: restartMode ? 'approval-restart' : browserMode ? 'approval-and-browser' : 'approval-only', browserPrerequisite: browserMode ? 'BrowserOS Chromium exposing the Browser.getTabs CDP extension; stock Chromium is insufficient.' : undefined, error: error instanceof Error ? error.message : String(error), ports, config, requestCount: modelRequests.length, modelMessages: capturedModelMessages(modelRequests), advertisedToolNames, syntheticModelResponses, browserToolSteps, browserPageRequests, browserResponseSse: browserSseOutput, restartEvidence, dispatches }, null, 2)}\n`,
+      `${JSON.stringify({ status: 'failed', mode: partialRestartMode ? 'partial-transcript-restart' : restartMode ? 'approval-restart' : browserMode ? 'approval-and-browser' : 'approval-only', browserPrerequisite: browserMode ? 'BrowserOS Chromium exposing the Browser.getTabs CDP extension; stock Chromium is insufficient.' : undefined, error: error instanceof Error ? error.message : String(error), ports, config, requestCount: modelRequests.length, modelMessages: capturedModelMessages(modelRequests), advertisedToolNames, syntheticModelResponses, browserToolSteps, browserPageRequests, browserResponseSse: browserSseOutput, restartEvidence, dispatches }, null, 2)}\n`,
       { mode: 0o600 },
     )
     throw error
