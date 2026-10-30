@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'bun:test'
-import { loadRecentHistory, selectRecentHistory } from './history-items'
+import {
+  loadRecentHistory,
+  RECENT_HISTORY_QUERY_LIMIT,
+  selectRecentHistory,
+} from './history-items'
 
 describe('selectRecentHistory', () => {
   it('keeps HTTP and HTTPS entries and falls back to the URL for an empty title', () => {
@@ -47,52 +51,30 @@ describe('selectRecentHistory', () => {
     )
   })
 
-  it('pages past more than 24 non-web entries and preserves newest-first order', async () => {
-    const firstPage = Array.from({ length: 32 }, (_, index) => ({
-      id: `internal-${index}`,
-      lastVisitTime: 500 - index,
-      url: 'chrome://history',
-    }))
-    const secondPage = Array.from({ length: 8 }, (_, index) => ({
-      id: `web-${index}`,
-      lastVisitTime: 400 - index,
-      url: `https://example.com/${index}`,
-    }))
-    const endTimes: (number | undefined)[] = []
+  it('finds recent web entries beyond 32 non-web rows without timestamp paging', async () => {
+    const entries = [
+      ...Array.from({ length: 248 }, (_, index) => ({
+        id: `internal-${index}`,
+        lastVisitTime: 100,
+        url: 'file:///tmp/page.html',
+      })),
+      ...Array.from({ length: 8 }, (_, index) => ({
+        id: `web-${index}`,
+        lastVisitTime: 100,
+        url: `https://example.com/${index}`,
+      })),
+    ]
+    let calls = 0
 
-    const rows = await loadRecentHistory(async (endTime) => {
-      endTimes.push(endTime)
-      return endTime === undefined ? firstPage : secondPage
+    const rows = await loadRecentHistory(async () => {
+      calls += 1
+      return entries
     })
 
-    expect(endTimes).toEqual([undefined, 469])
+    expect(RECENT_HISTORY_QUERY_LIMIT).toBe(256)
+    expect(calls).toBe(1)
     expect(rows.map(({ id }) => id)).toEqual(
       Array.from({ length: 8 }, (_, index) => `web-${index}`),
     )
-  })
-
-  it('stops on a repeated boundary and enforces the hard page cap', async () => {
-    const repeatedPage = Array.from({ length: 32 }, (_, index) => ({
-      id: `internal-${index}`,
-      lastVisitTime: 100,
-      url: 'chrome://history',
-    }))
-    let repeatedCalls = 0
-    await loadRecentHistory(async () => {
-      repeatedCalls += 1
-      return repeatedPage
-    })
-    expect(repeatedCalls).toBe(2)
-
-    let cappedCalls = 0
-    await loadRecentHistory(async () => {
-      cappedCalls += 1
-      return Array.from({ length: 32 }, (_, index) => ({
-        id: `page-${cappedCalls}-${index}`,
-        lastVisitTime: 1000 - cappedCalls * 32 - index,
-        url: 'chrome://history',
-      }))
-    })
-    expect(cappedCalls).toBe(8)
   })
 })

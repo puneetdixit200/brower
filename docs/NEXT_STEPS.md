@@ -1,5 +1,9 @@
 # Aster next steps
 
+### T10.2 / B06 recent-history timestamp boundary — 2026-10-30
+
+The recent-history path now makes one bounded 256-result query and selects eight valid HTTP(S) rows locally, preventing equal-timestamp `endTime` boundaries from hiding the rest of a batch. Focused history test 4/4 (6 assertions), app typecheck and targeted compatible-Biome check pass; the repository Biome config is incompatible with installed Biome 2.6.4. Independent Luna review found no implementation defect; the helper test does not spy on the component API call or assert order. Next verify the history and nested-bookmark UI in headed Aster, then native import/export and profile/restart behavior. Keep B06 PARTIAL. Full test/evidence details are in `docs/PROGRESS.md` under this checkpoint.
+
 ### A01 headed BrowserOS UI-to-page-read checkpoint — 2026-10-30
 
 The disposable headed smoke now passes a user prompt through the BrowserOS side panel, local sidecar and Browser MCP `tabs` → `read`, then verifies the final assistant text contains the local page title and sentinel. The hardened rerun passed after independent review tightened the final-message assertion and cleanup logic. This remains fixture-only evidence: semantic comprehension, external egress policy, and Aster-native acceptance are unverified. Keep A01 PARTIAL. Details: `docs/evidence/aster-a01-headed-ui-page-read-2026-10-30.md`.

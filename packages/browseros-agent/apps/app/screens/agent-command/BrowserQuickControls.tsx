@@ -32,7 +32,7 @@ import {
   mergeDownloadUpdate,
   performDownloadAction,
 } from './downloads-progress'
-import { loadRecentHistory } from './history-items'
+import { loadRecentHistory, RECENT_HISTORY_QUERY_LIMIT } from './history-items'
 import { resolveHomeSearchUrl } from './home-search'
 import { selectRecentlyClosedTabSessionId } from './recently-closed-tab'
 import { captureVisibleTabContext } from './screenshot-context'
@@ -470,12 +470,11 @@ export function BrowserQuickControls({
     void action(async () => {
       if (privateWindow) throw new Error('Unavailable in private windows')
       setHistory(
-        await loadRecentHistory((endTime) =>
+        await loadRecentHistory(() =>
           chrome.history.search({
             text: '',
             startTime: 0,
-            maxResults: 32,
-            ...(endTime === undefined ? {} : { endTime }),
+            maxResults: RECENT_HISTORY_QUERY_LIMIT,
           }),
         ),
       )

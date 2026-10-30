@@ -12,8 +12,7 @@ export type RecentHistoryRow = {
 }
 
 const MAX_RECENT_HISTORY = 8
-const HISTORY_PAGE_SIZE = 32
-const MAX_HISTORY_PAGES = 8
+export const RECENT_HISTORY_QUERY_LIMIT = 256
 
 export function selectRecentHistory(
   items: RecentHistoryEntry[],
@@ -37,37 +36,12 @@ export function selectRecentHistory(
   return rows
 }
 
+/**
+ * Use one bounded query so Chromium timestamp ties cannot strand results
+ * between endTime-based pages. The caller requests at most 256 rows.
+ */
 export async function loadRecentHistory(
-  searchPage: (endTime?: number) => Promise<RecentHistoryEntry[]>,
+  search: () => Promise<RecentHistoryEntry[]>,
 ): Promise<RecentHistoryRow[]> {
-  const rows: RecentHistoryRow[] = []
-  const seenIds = new Set<string>()
-  let endTime: number | undefined
-
-  for (let pageNumber = 0; pageNumber < MAX_HISTORY_PAGES; pageNumber += 1) {
-    const items = await searchPage(endTime)
-    if (items.length === 0) break
-
-    const oldestTime = items.reduce<number | undefined>(
-      (oldest, item) =>
-        typeof item.lastVisitTime === 'number' &&
-        (oldest === undefined || item.lastVisitTime < oldest)
-          ? item.lastVisitTime
-          : oldest,
-      undefined,
-    )
-
-    for (const row of selectRecentHistory(items)) {
-      if (seenIds.has(row.id)) continue
-      seenIds.add(row.id)
-      rows.push(row)
-      if (rows.length === MAX_RECENT_HISTORY) return rows
-    }
-
-    if (items.length < HISTORY_PAGE_SIZE || oldestTime === undefined) break
-    if (endTime !== undefined && oldestTime >= endTime) break
-    endTime = oldestTime
-  }
-
-  return rows
+  return selectRecentHistory(await search())
 }
