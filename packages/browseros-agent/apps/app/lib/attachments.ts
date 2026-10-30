@@ -14,6 +14,9 @@ const MAX_ATTACHMENT_REQUEST_DATA_LENGTH = 70 * 1024 * 1024
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB after compression
 const MAX_IMAGE_DATA_URL_LENGTH = 8 * 1024 * 1024
 const MAX_FILE_TEXT_BYTES = 1 * 1024 * 1024 // 1 MB extracted text
+// Bound memory use before File.text(); UTF-8 text needs at most 4 bytes per
+// UTF-16 code unit, including supplementary characters and a leading BOM.
+const MAX_FILE_SOURCE_BYTES = MAX_FILE_TEXT_BYTES * 4
 const IMAGE_LONG_EDGE_CAP = 2048
 
 const ALLOWED_IMAGE_MEDIA_TYPES = [
@@ -145,6 +148,17 @@ export async function stageAttachment(
   }
 
   if (isAllowedFileMediaType(mediaType)) {
+    if (file.size > MAX_FILE_SOURCE_BYTES) {
+      return {
+        ok: false,
+        error: {
+          code: 'too_large',
+          message: `File "${file.name}" is too large (max ${humanBytes(
+            MAX_FILE_TEXT_BYTES,
+          )} extracted text).`,
+        },
+      }
+    }
     let text: string
     try {
       text = await file.text()

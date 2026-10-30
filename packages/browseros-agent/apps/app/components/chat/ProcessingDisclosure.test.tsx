@@ -110,7 +110,7 @@ describe('side-panel disclosure plumbing', () => {
         onPermissionModeChange: () => {},
         input: '',
         onInputChange: () => {},
-        onSubmit: () => {},
+        onSubmit: () => true,
         status: 'ready',
         onStop: () => {},
         attachedTabs: [],

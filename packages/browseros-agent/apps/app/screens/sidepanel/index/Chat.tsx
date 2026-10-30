@@ -2,6 +2,7 @@ import { Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { HumanInterventionResume } from '@/components/chat/HumanInterventionResume'
 import { NoProviderNotice } from '@/components/chat/NoProviderNotice'
+import type { StagedAttachment } from '@/lib/attachments'
 import { isIncognitoWindow } from '@/lib/browseros/incognito'
 import { panelTabIdFromUrl } from '@/lib/browseros/panelTab'
 import { sidePanelDraftsStorage } from '@/lib/browseros/sidePanelDraftStorage'
@@ -24,6 +25,10 @@ import { track } from '@/lib/metrics/track'
 import { useChatSessionContext } from '@/modules/chat/chat-session-context'
 import type { ChatMode } from '@/modules/chat/chat-types'
 import { resumeHumanIntervention } from '@/modules/chat/human-intervention-client'
+import {
+  buildChatSendParams,
+  toSidepanelFileParts,
+} from '@/modules/chat-actions/chat-send-params'
 import { useJtbdPopup } from '@/modules/jtbd-popup/jtbd-popup.hooks'
 import { buildChatErrorProps } from './Chat.helpers'
 import { ChatEmptyState } from './ChatEmptyState'
@@ -96,6 +101,7 @@ export const Chat = () => {
   const queueGeneration = useRef(0)
   const queueAwaitingRun = useRef(false)
   const [attachedTabs, setAttachedTabs] = useState<chrome.tabs.Tab[]>([])
+  const [attachments, setAttachments] = useState<StagedAttachment[]>([])
   const [assessResearchSupport, setAssessResearchSupport] = useState(false)
   const selectedProviderId = selectedProvider?.id
   const previousSelectedProviderId = useRef(selectedProviderId)
@@ -294,29 +300,27 @@ export const Chat = () => {
     setAttachedTabs((prev) => prev.filter((t) => t.id !== tabId))
   }
 
-  const executeMessage = (customMessageText?: string) => {
+  const executeMessage = (customMessageText?: string): boolean => {
     const messageText = customMessageText ? customMessageText : input.trim()
-    if (!messageText) return
-
+    if (!messageText) return false
     recordMessageSent()
-
-    const sent = attachedTabs.length
-      ? sendMessage({
-          text: messageText,
-          action: createBrowserOSAction({
-            mode,
-            message: messageText,
-            tabs: attachedTabs,
-          }),
-        })
-      : sendMessage({ text: messageText })
+    const sent = sendMessage(
+      buildChatSendParams({
+        text: messageText,
+        mode,
+        attachedTabs,
+        files: toSidepanelFileParts(attachments),
+      }),
+    )
 
     // Keep the draft when the send did not happen. Clearing unconditionally
     // threw away what the user typed whenever sendMessage refused, which is
     // every send made with nothing connected.
-    if (!sent) return
+    if (!sent) return false
     setInput('')
     setAttachedTabs([])
+    setAttachments([])
+    return true
   }
 
   const researchWithSources = () => {
@@ -343,7 +347,7 @@ export const Chat = () => {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent): boolean => {
     e.preventDefault()
     if (messages.length === 0) {
       track(SIDEPANEL_AI_TRIGGERED_EVENT, {
@@ -351,7 +355,7 @@ export const Chat = () => {
         tabs_count: attachedTabs.length,
       })
     }
-    executeMessage()
+    return executeMessage()
   }
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -524,6 +528,8 @@ export const Chat = () => {
         attachedTabs={attachedTabs}
         onToggleTab={toggleTabSelection}
         onRemoveTab={removeTab}
+        attachments={attachments}
+        onAttachmentsChange={setAttachments}
       />
     </>
   )

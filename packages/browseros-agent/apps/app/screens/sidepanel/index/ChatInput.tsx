@@ -1,4 +1,4 @@
-import { Send, SquareStop } from 'lucide-react'
+import { FileText, Paperclip, Send, SquareStop, X } from 'lucide-react'
 import type { FormEvent, KeyboardEvent } from 'react'
 import {
   forwardRef,
@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react'
 import { TabPickerPopover } from '@/components/elements/tab-picker-popover'
+import { type StagedAttachment, stageAttachments } from '@/lib/attachments'
 import type { ChatMode } from '@/modules/chat/chat-types'
 
 interface MentionState {
@@ -28,6 +29,8 @@ interface ChatInputProps {
   selectedTabs: chrome.tabs.Tab[]
   onToggleTab: (tab: chrome.tabs.Tab) => void
   onTabMentionOpenChange?: (isOpen: boolean) => void
+  attachments?: StagedAttachment[]
+  onAttachmentsChange?: (attachments: StagedAttachment[]) => void
 }
 
 export interface ChatInputHandle {
@@ -50,6 +53,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       selectedTabs,
       onToggleTab,
       onTabMentionOpenChange,
+      attachments = [],
+      onAttachmentsChange,
     },
     ref,
   ) => {
@@ -59,6 +64,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       filterText: '',
       startPosition: 0,
     })
+    const [attachmentError, setAttachmentError] = useState<string | null>(null)
+    const [isStagingAttachments, setIsStagingAttachments] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     const inputRef = useRef(input)
     const mentionStateRef = useRef(mentionState)
@@ -157,11 +165,40 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         closeMention()
         return
       }
-      if (isSubmitDisabled) {
+      if (isSubmitDisabled || isStagingAttachments) {
         e.preventDefault()
         return
       }
       onSubmitProp(e)
+    }
+
+    const handleFilesSelected = async (files: File[]) => {
+      if (!files.length) return
+      setIsStagingAttachments(true)
+      setAttachmentError(null)
+      try {
+        const result = await stageAttachments(files, attachments)
+        if (result.staged.length) {
+          onAttachmentsChange?.([...attachments, ...result.staged])
+        }
+        if (result.errors.length) {
+          setAttachmentError(
+            result.errors.map((error) => error.message).join(' • '),
+          )
+        }
+      } catch {
+        setAttachmentError('Could not read the selected attachments.')
+      } finally {
+        setIsStagingAttachments(false)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+    }
+
+    const removeAttachment = (id: string) => {
+      onAttachmentsChange?.(
+        attachments.filter((attachment) => attachment.id !== id),
+      )
+      setAttachmentError(null)
     }
 
     const handleInputChange = (value: string) => {
@@ -278,7 +315,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       return (
         <button
           type="submit"
-          disabled={isSubmitDisabled || !input.trim()}
+          disabled={isSubmitDisabled || isStagingAttachments || !input.trim()}
           className="cursor-pointer rounded-full bg-[var(--accent-orange)] p-2 text-white shadow-sm transition-all duration-200 hover:bg-[var(--accent-orange-bright)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Send className="h-3.5 w-3.5" />
@@ -292,6 +329,63 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         onSubmit={handleSubmit}
         className="relative mt-2 flex w-full items-end gap-2"
       >
+        {onAttachmentsChange && (
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/png,image/jpeg,image/webp,image/gif,text/*,application/json"
+            className="sr-only"
+            aria-label="Choose files to attach"
+            onChange={(event) =>
+              void handleFilesSelected(
+                Array.from(event.currentTarget.files ?? []),
+              )
+            }
+          />
+        )}
+        {attachments.length > 0 && (
+          <fieldset
+            className="absolute right-0 bottom-full left-0 m-0 mb-2 flex min-w-0 flex-wrap gap-1.5 border-0 p-0"
+            aria-label="Attached files"
+          >
+            <legend className="sr-only">Attached files</legend>
+            {attachments.map((attachment) => (
+              <span
+                key={attachment.id}
+                className="inline-flex max-w-full items-center gap-1 rounded-md border border-border/60 bg-background px-2 py-1 text-xs"
+              >
+                {attachment.kind === 'image' && attachment.dataUrl ? (
+                  <img
+                    src={attachment.dataUrl}
+                    alt=""
+                    className="h-5 w-5 rounded object-cover"
+                  />
+                ) : (
+                  <FileText className="h-3.5 w-3.5 shrink-0" />
+                )}
+                <span className="max-w-40 truncate">{attachment.name}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${attachment.name}`}
+                  disabled={isStagingAttachments}
+                  onClick={() => removeAttachment(attachment.id)}
+                  className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </fieldset>
+        )}
+        {attachmentError && (
+          <p
+            role="alert"
+            className="absolute right-0 bottom-full left-0 mb-2 text-destructive text-xs"
+          >
+            {attachmentError}
+          </p>
+        )}
         <TabPickerPopover
           variant="mention"
           isOpen={mentionState.isOpen}
@@ -304,7 +398,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         {/* Reserve right padding for the overlaid send/stop button. */}
         <textarea
           ref={textareaRef}
-          className="field-sizing-content max-h-60 min-h-[42px] flex-1 resize-none overflow-hidden rounded-2xl border border-border/50 bg-muted/50 py-2.5 pr-11 pl-4 text-sm outline-none transition-colors placeholder:text-muted-foreground/70 hover:border-border focus:border-[var(--accent-orange)]"
+          className="field-sizing-content max-h-60 min-h-[42px] flex-1 resize-none overflow-hidden rounded-2xl border border-border/50 bg-muted/50 py-2.5 pr-20 pl-4 text-sm outline-none transition-colors placeholder:text-muted-foreground/70 hover:border-border focus:border-[var(--accent-orange)]"
           value={input}
           onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -314,6 +408,18 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           rows={1}
         />
         <div className="absolute right-1.5 bottom-1.5 flex items-center gap-1">
+          {onAttachmentsChange && (
+            <button
+              type="button"
+              aria-label="Attach files"
+              title="Attach files"
+              disabled={isStagingAttachments || isSubmitDisabled}
+              onClick={() => fileInputRef.current?.click()}
+              className="cursor-pointer rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Paperclip className="h-3.5 w-3.5" />
+            </button>
+          )}
           {renderSendButton()}
         </div>
       </form>

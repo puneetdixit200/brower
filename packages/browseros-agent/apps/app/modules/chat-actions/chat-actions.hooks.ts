@@ -1,8 +1,9 @@
+import type { FileUIPart } from 'ai'
 import { useEffect, useState } from 'react'
-import { createBrowserOSAction } from '@/lib/chat-actions/types'
 import { track } from '@/lib/metrics/track'
 import { useChatSessionContext } from '@/modules/chat/chat-session-context'
 import type { ChatMode } from '@/modules/chat/chat-types'
+import { buildChatSendParams } from './chat-send-params'
 
 export interface ChatActionsConfig {
   /** Analytics event names scoped to the origin */
@@ -69,29 +70,28 @@ export function useChatActions(config: ChatActionsConfig) {
     setAttachedTabs((prev) => prev.filter((t) => t.id !== tabId))
   }
 
-  const executeMessage = (customMessageText?: string) => {
+  const executeMessage = (customMessageText?: string, files?: FileUIPart[]) => {
     const messageText = customMessageText ? customMessageText : input.trim()
-    if (!messageText) return
+    if (!messageText) return false
 
-    const sent = attachedTabs.length
-      ? sendMessage({
-          text: messageText,
-          action: createBrowserOSAction({
-            mode,
-            message: messageText,
-            tabs: attachedTabs,
-          }),
-        })
-      : sendMessage({ text: messageText })
+    const sent = sendMessage(
+      buildChatSendParams({
+        text: messageText,
+        mode,
+        attachedTabs,
+        files,
+      }),
+    )
 
     // Keep the draft when the send did not happen, so a refusal does not cost
     // the user what they typed.
-    if (!sent) return
+    if (!sent) return false
     setInput('')
     setAttachedTabs([])
+    return true
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent, files?: FileUIPart[]): boolean => {
     e.preventDefault()
     if (messages.length === 0) {
       track(config.events.aiTriggered, {
@@ -99,12 +99,15 @@ export function useChatActions(config: ChatActionsConfig) {
         tabs_count: attachedTabs.length,
       })
     }
-    executeMessage()
+    return executeMessage(undefined, files)
   }
 
-  const handleSuggestionClick = (suggestion: string) => {
+  const handleSuggestionClick = (
+    suggestion: string,
+    files?: FileUIPart[],
+  ): boolean => {
     track(config.events.suggestionClicked, { mode })
-    executeMessage(suggestion)
+    return executeMessage(suggestion, files)
   }
 
   const { stop: _stop, ...restSession } = session

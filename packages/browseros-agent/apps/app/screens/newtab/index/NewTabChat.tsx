@@ -1,8 +1,10 @@
+import type { FileUIPart } from 'ai'
 import { Loader2 } from 'lucide-react'
-import { type FC, useEffect, useRef } from 'react'
+import { type FC, type FormEvent, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { HumanInterventionResume } from '@/components/chat/HumanInterventionResume'
 import { NoProviderNotice } from '@/components/chat/NoProviderNotice'
+import type { StagedAttachment } from '@/lib/attachments'
 import {
   createAITabAction,
   createBrowserOSAction,
@@ -20,6 +22,7 @@ import { track } from '@/lib/metrics/track'
 import { resumeHumanIntervention } from '@/modules/chat/human-intervention-client'
 import { consumePendingHomeMessage } from '@/modules/chat/pending-home-message'
 import { useChatActions } from '@/modules/chat-actions/chat-actions.hooks'
+import { toSidepanelFileParts } from '@/modules/chat-actions/chat-send-params'
 import { useActiveConversation } from '@/modules/conversations/active-conversation-context'
 import { conversationTitle } from '@/modules/conversations/history-list'
 import { ChatEmptyState } from '@/screens/sidepanel/index/ChatEmptyState'
@@ -32,6 +35,7 @@ import { hasPendingHumanWait } from '@/screens/sidepanel/index/getMessageSegment
 export const NewTabChat: FC = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const hasSentInitialRef = useRef(false)
+  const [attachments, setAttachments] = useState<StagedAttachment[]>([])
   const { setId: setActiveConversationId } = useActiveConversation()
 
   const {
@@ -71,8 +75,8 @@ export const NewTabChat: FC = () => {
     handleStop,
     toggleTabSelection,
     removeTab,
-    handleSubmit,
-    handleSuggestionClick,
+    handleSubmit: submitChatMessage,
+    handleSuggestionClick: submitSuggestedMessage,
     retryLastTurn,
     hasAnyTarget,
     isSettled,
@@ -87,6 +91,20 @@ export const NewTabChat: FC = () => {
       aiTriggered: NEWTAB_AI_TRIGGERED_EVENT,
     },
   })
+
+  const handleSubmit = (event: FormEvent, files?: FileUIPart[]) => {
+    const sent = submitChatMessage(event, files)
+    if (sent) setAttachments([])
+    return sent
+  }
+
+  const handleSuggestionClick = (suggestion: string) => {
+    const sent = submitSuggestedMessage(
+      suggestion,
+      toSidepanelFileParts(attachments),
+    )
+    if (sent) setAttachments([])
+  }
 
   const resumeHumanWait = (requestId: string) =>
     serverRunId
@@ -300,6 +318,8 @@ export const NewTabChat: FC = () => {
           attachedTabs={attachedTabs}
           onToggleTab={toggleTabSelection}
           onRemoveTab={removeTab}
+          attachments={attachments}
+          onAttachmentsChange={setAttachments}
         />
       </div>
     </div>

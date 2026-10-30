@@ -1,3 +1,4 @@
+import type { FileUIPart } from 'ai'
 import { ChevronDown, Folder, Layers, PlugZap } from 'lucide-react'
 import type { FC, FormEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
@@ -6,6 +7,7 @@ import { ProcessingDisclosure } from '@/components/chat/ProcessingDisclosure'
 import { AppSelector } from '@/components/elements/AppSelector'
 import { WorkspaceSelector } from '@/components/elements/workspace-selector'
 import { McpServerIcon } from '@/components/mcp/McpServerIcon'
+import type { StagedAttachment } from '@/lib/attachments'
 import { useMcpServers } from '@/lib/mcp/mcpServerStorage'
 import {
   RuntimeMessageType,
@@ -17,6 +19,7 @@ import {
 } from '@/lib/selected-text/selectedTextStorage'
 import { cn } from '@/lib/utils'
 import type { ChatMode, PermissionMode } from '@/modules/chat/chat-types'
+import { toSidepanelFileParts } from '@/modules/chat-actions/chat-send-params'
 import { useWorkspace } from '@/modules/workspace/workspace.hooks'
 import { ChatAttachedTabs } from './ChatAttachedTabs'
 import { ChatInput, type ChatInputHandle } from './ChatInput'
@@ -31,7 +34,7 @@ export interface ChatFooterProps {
   onPermissionModeChange: (mode: PermissionMode) => void
   input: string
   onInputChange: (value: string) => void
-  onSubmit: (e: FormEvent) => void
+  onSubmit: (e: FormEvent, files?: FileUIPart[]) => boolean | undefined
   status: 'streaming' | 'submitted' | 'ready' | 'error'
   onStop: () => void
   sendDisabled?: boolean
@@ -39,6 +42,8 @@ export interface ChatFooterProps {
   attachedTabs: chrome.tabs.Tab[]
   onToggleTab: (tab: chrome.tabs.Tab) => void
   onRemoveTab: (tabId?: number) => void
+  attachments?: StagedAttachment[]
+  onAttachmentsChange?: (attachments: StagedAttachment[]) => void
 }
 
 export const ChatFooter: FC<ChatFooterProps> = ({
@@ -56,6 +61,8 @@ export const ChatFooter: FC<ChatFooterProps> = ({
   attachedTabs,
   onToggleTab,
   onRemoveTab,
+  attachments = [],
+  onAttachmentsChange,
 }) => {
   const { selectedFolder } = useWorkspace()
   const { servers: mcpServers } = useMcpServers()
@@ -259,11 +266,15 @@ export const ChatFooter: FC<ChatFooterProps> = ({
           mode={mode}
           sendDisabled={sendDisabled}
           onInputChange={onInputChange}
-          onSubmit={onSubmit}
+          onSubmit={(event) =>
+            onSubmit(event, toSidepanelFileParts(attachments))
+          }
           onStop={onStop}
           selectedTabs={attachedTabs}
           onToggleTab={onToggleTab}
           onTabMentionOpenChange={setIsTabMentionOpen}
+          attachments={attachments}
+          onAttachmentsChange={onAttachmentsChange}
           ref={chatInputRef}
         />
       </div>

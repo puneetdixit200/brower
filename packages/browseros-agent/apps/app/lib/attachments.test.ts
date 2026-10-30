@@ -10,6 +10,29 @@ function restoreGlobal(name: string, value: unknown) {
 }
 
 describe('stageAttachment', () => {
+  it('rejects oversized text files before reading their contents', async () => {
+    const file = new File(
+      [new Uint8Array(4 * 1024 * 1024 + 1)],
+      'too-large.txt',
+      { type: 'text/plain' },
+    )
+    let read = false
+    Object.defineProperty(file, 'text', {
+      value: async () => {
+        read = true
+        return ''
+      },
+    })
+
+    const result = await stageAttachment(file)
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'too_large' },
+    })
+    expect(read).toBe(false)
+  })
+
   it('uses the recompressed blob media type for large images', async () => {
     const originalCreateImageBitmap = Reflect.get(
       globalThis,
