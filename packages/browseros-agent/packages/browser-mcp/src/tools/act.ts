@@ -85,6 +85,7 @@ export const act = defineTool({
     const input = ctx.session.input(args.page)
 
     const err = await runKind(args, input, ctx.signal)
+    throwIfAborted(ctx.signal)
     if (err) return err
 
     response.data({ kind: args.kind })
@@ -156,9 +157,11 @@ async function runKind(
   signal?: AbortSignal,
 ): Promise<ToolResult | undefined> {
   const handler = ACT_HANDLERS[args.kind]
-  return handler
-    ? handler(args, input, signal)
-    : errorResult(`act: unknown kind "${args.kind}".`)
+  if (!handler) return errorResult(`act: unknown kind "${args.kind}".`)
+  throwIfAborted(signal)
+  const result = await handler(args, input, signal)
+  throwIfAborted(signal)
+  return result
 }
 
 async function clickRef(

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import type { BrowserSession } from '@browseros/browser-core/core/session'
 import type { SnapshotDiff } from '@browseros/browser-core/core/snapshot/diff'
+import { ToolResponse } from '../response'
 import { act } from './act'
 import { executeTool } from './framework'
 
@@ -117,5 +118,103 @@ describe('act fill cancellation', () => {
     releaseFirstFill()
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(fillCalls).toEqual(['e1'])
+  })
+})
+
+describe('act cancellation across action kinds', () => {
+  const actions: { args: Record<string, unknown> }[] = [
+    { args: { kind: 'click', ref: 'e1' } },
+    { args: { kind: 'click_at', x: 1, y: 2 } },
+    { args: { kind: 'type', text: 'hello' } },
+    { args: { kind: 'type_at', x: 1, y: 2, text: 'hello' } },
+    { args: { kind: 'fill', ref: 'e1', value: 'hello' } },
+    { args: { kind: 'press', key: 'Enter' } },
+    { args: { kind: 'hover', ref: 'e1' } },
+    { args: { kind: 'hover_at', x: 1, y: 2 } },
+    { args: { kind: 'focus', ref: 'e1' } },
+    { args: { kind: 'check', ref: 'e1' } },
+    { args: { kind: 'uncheck', ref: 'e1' } },
+    { args: { kind: 'select', ref: 'e1', value: 'option' } },
+    { args: { kind: 'scroll' } },
+    { args: { kind: 'drag', ref: 'e1', targetRef: 'e2' } },
+    {
+      args: { kind: 'drag_at', startX: 1, startY: 2, endX: 3, endY: 4 },
+    },
+  ]
+
+  for (const { args } of actions) {
+    it(`does not dispatch ${args.kind} when cancelled before dispatch`, async () => {
+      const calls: string[] = []
+      const controller = new AbortController()
+      const session = {
+        input: () => {
+          // Abort after executeTool has entered the handler, immediately before
+          // runKind dispatches the selected action.
+          controller.abort()
+          return new Proxy(
+            {},
+            {
+              get: (_target, property: string) => async () =>
+                calls.push(property),
+            },
+          )
+        },
+        observe: () => ({ diff: async () => DIFF }),
+        pages: { getInfo: () => ({ url: 'https://example.com/act' }) },
+      } as unknown as BrowserSession
+
+      let thrown: unknown
+      try {
+        await act.handler(
+          { page: 0, diff: 'none', ...args },
+          { session, signal: controller.signal },
+          new ToolResponse(),
+        )
+      } catch (error) {
+        thrown = error
+      }
+      expect(thrown).toMatchObject({ name: 'AbortError' })
+      expect(calls).toEqual([])
+    })
+  }
+
+  it('does not read back or return success when aborted during an action', async () => {
+    let releaseClick!: () => void
+    const pendingClick = new Promise<void>((resolve) => {
+      releaseClick = resolve
+    })
+    const controller = new AbortController()
+    const calls: string[] = []
+    const session = {
+      input: () => ({
+        click: async () => {
+          calls.push('click')
+          await pendingClick
+        },
+      }),
+      observe: () => ({
+        diff: async () => {
+          calls.push('diff')
+          return DIFF
+        },
+      }),
+      pages: { getInfo: () => ({ url: 'https://example.com/act' }) },
+    } as unknown as BrowserSession
+    const execution = executeTool(
+      act,
+      { page: 0, kind: 'click', ref: 'e1' },
+      { session, signal: controller.signal },
+    )
+
+    await Promise.resolve()
+    expect(calls).toEqual(['click'])
+    controller.abort()
+    await expect(execution).rejects.toMatchObject({ name: 'AbortError' })
+
+    // The in-flight CDP action cannot be recalled; when it settles, cancellation
+    // must still prevent success and the automatic diff readback.
+    releaseClick()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(calls).toEqual(['click'])
   })
 })
