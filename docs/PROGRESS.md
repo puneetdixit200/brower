@@ -1,5 +1,9 @@
 # Progress
 
+### T04.1 / S04 server log metadata redaction — 2026-10-30
+
+Server structured log metadata now passes through a recursive key-based redactor before both console and file sinks. It covers common password, API/access key, token, auth, cookie, bearer, credential and private-key labels; handles arrays, class instances, maps, sets and cycles; binary values are omitted and Error messages/stacks are replaced with a generic detail marker. Focused logger tests pass 6/6 (12 assertions), including synthetic sentinels and the real file sink; server typecheck, pinned Biome and `git diff --check` pass. Independent Luna review found no remaining blocker. This is one local-log source fix, not the full T04.1 outbound-data audit: arbitrary secrets under innocuous keys/free-form strings, provider request boundaries, native logging, network traffic and remote retention remain open. S04 remains PARTIAL.
+
 ### Current status report — 2026-10-30 (T23.2)
 
 T23.2 adds opt-in persistence of assistant `text-delta` display text for persistent runs only, with 16 KiB UTF-8 cap, 256-byte checkpoint batching, interrupted-only exposure, and no canonical-history or model-input replay. Task History accepts the bounded transcript only for the exact interrupted conversation/run and rejects credential-shaped text before local recovery-marker persistence; the detector remains heuristic. A compiled Linux x64 sidecar process fixture streams 360 synthetic bytes, confirms a durable SQLite checkpoint, SIGKILLs/restarts the sidecar against the same disposable state, then verifies exact interrupted text, no replayable messages, zero post-restart provider calls and zero MCP dispatches. Evidence: [T23.2 process restart](evidence/aster-partial-transcript-restart-2026-10-30.md) and its [sanitized record](evidence/aster-partial-transcript-restart-2026-10-30.json).

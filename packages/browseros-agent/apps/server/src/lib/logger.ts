@@ -105,6 +105,122 @@ function parseCallerInfo(stack: string): string | null {
   return null
 }
 
+const SENSITIVE_METADATA_KEYS = new Set([
+  'password',
+  'passwd',
+  'secret',
+  'secretaccesskey',
+  'accesskey',
+  'apikey',
+  'token',
+  'authorization',
+  'cookie',
+  'bearer',
+  'credential',
+  'credentials',
+  'privatekey',
+])
+
+function isSensitiveMetadataKey(key: string): boolean {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '')
+  return (
+    SENSITIVE_METADATA_KEYS.has(normalized) ||
+    normalized.includes('apikey') ||
+    normalized.includes('accesskey') ||
+    normalized.includes('auth') ||
+    normalized.includes('authorization') ||
+    normalized.includes('cookie') ||
+    normalized.includes('bearer') ||
+    normalized.includes('credential') ||
+    normalized.includes('password') ||
+    normalized.includes('passwd') ||
+    normalized.includes('privatekey') ||
+    normalized.includes('token') ||
+    normalized.includes('secret')
+  )
+}
+
+/** Redact credential and private-key metadata without changing caller data. */
+export function redactSensitiveMetadata(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  return redactValue(value, new WeakSet()) as Record<string, unknown>
+}
+
+function redactValue(item: unknown, ancestors: WeakSet<object>): unknown {
+  if (!item || typeof item !== 'object') return item
+  if (ancestors.has(item)) return '[Circular]'
+  ancestors.add(item)
+
+  if (item instanceof Date) {
+    ancestors.delete(item)
+    return Number.isNaN(item.getTime()) ? '[Invalid Date]' : item.toISOString()
+  }
+  if (item instanceof Error) {
+    ancestors.delete(item)
+    return { name: item.name, message: '[Error details omitted]' }
+  }
+  if (ArrayBuffer.isView(item)) {
+    ancestors.delete(item)
+    return `[Binary data omitted: ${item.byteLength} bytes]`
+  }
+  if (Array.isArray(item)) return redactArray(item, ancestors)
+  if (item instanceof Set) return redactSet(item, ancestors)
+  if (item instanceof Map) return redactMap(item, ancestors)
+  return redactRecord(item, ancestors)
+}
+
+function redactArray(item: unknown[], ancestors: WeakSet<object>): unknown[] {
+  try {
+    return item.map((child) => redactValue(child, ancestors))
+  } finally {
+    ancestors.delete(item)
+  }
+}
+
+function redactSet(item: Set<unknown>, ancestors: WeakSet<object>): unknown[] {
+  try {
+    return Array.from(item, (child) => redactValue(child, ancestors))
+  } finally {
+    ancestors.delete(item)
+  }
+}
+
+function redactMap(
+  item: Map<unknown, unknown>,
+  ancestors: WeakSet<object>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+  try {
+    for (const [key, child] of item) {
+      if (typeof key !== 'string') continue
+      result[key] = isSensitiveMetadataKey(key)
+        ? '[REDACTED]'
+        : redactValue(child, ancestors)
+    }
+    return result
+  } finally {
+    ancestors.delete(item)
+  }
+}
+
+function redactRecord(
+  item: object,
+  ancestors: WeakSet<object>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+  try {
+    for (const [key, child] of Object.entries(item)) {
+      result[key] = isSensitiveMetadataKey(key)
+        ? '[REDACTED]'
+        : redactValue(child, ancestors)
+    }
+    return result
+  } finally {
+    ancestors.delete(item)
+  }
+}
+
 /**
  * Truncate long string values in an object for console output.
  */
@@ -161,7 +277,7 @@ function createConsoleTransport(): pino.TransportSingleOptions | null {
   return null
 }
 
-class Logger implements LoggerInterface {
+export class Logger implements LoggerInterface {
   private consoleLogger: pino.Logger
   private fileLogger: pino.Logger | null = null
   private fileDestination: LogDestination | null = null
@@ -228,6 +344,21 @@ class Logger implements LoggerInterface {
     this.startRotationWatch()
   }
 
+  async closeFile(): Promise<void> {
+    if (this.rotationTimer) clearInterval(this.rotationTimer)
+    this.rotationTimer = null
+    const destination = this.fileDestination
+    this.fileLogger = null
+    this.fileDestination = null
+    this.logPath = null
+    if (destination) {
+      await new Promise<void>((resolve) => {
+        destination.once('close', resolve)
+        destination.end()
+      })
+    }
+  }
+
   private startRotationWatch(): void {
     if (this.rotationTimer) clearInterval(this.rotationTimer)
     this.rotationTimer = setInterval(
@@ -268,24 +399,25 @@ class Logger implements LoggerInterface {
   ): void {
     const logFn = this.consoleLogger[level].bind(this.consoleLogger)
     const fileLogFn = this.fileLogger?.[level].bind(this.fileLogger)
+    const safeMeta = meta ? redactSensitiveMetadata(meta) : undefined
 
     // Console: truncate large values in dev (skip for error/warn so full context is visible)
-    if (meta && isDev && level !== 'error' && level !== 'warn') {
+    if (safeMeta && isDev && level !== 'error' && level !== 'warn') {
       const truncated = truncateForConsole(
-        meta,
+        safeMeta,
         CONTENT_LIMITS.CONSOLE_META_CHAR,
       )
       logFn(truncated, message)
-    } else if (meta) {
-      logFn(meta, message)
+    } else if (safeMeta) {
+      logFn(safeMeta, message)
     } else {
       logFn(message)
     }
 
     // File: always log full data, no truncation
     if (fileLogFn) {
-      if (meta) {
-        fileLogFn(meta, message)
+      if (safeMeta) {
+        fileLogFn(safeMeta, message)
       } else {
         fileLogFn(message)
       }
