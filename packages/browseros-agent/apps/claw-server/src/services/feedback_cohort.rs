@@ -111,9 +111,7 @@ impl FeedbackCohort {
     pub fn new() -> Self {
         Self {
             state: Arc::new(RwLock::new(CohortCache {
-                // The production AppState replaces this test-friendly initial value with
-                // persisted analytics consent before exposing the routes.
-                enabled: true,
+                enabled: false,
                 state: None,
             })),
         }
@@ -442,6 +440,12 @@ mod tests {
         .unwrap_or_else(|error| panic!("fixture: {error}"))
     }
 
+    async fn enabled_cohort() -> FeedbackCohort {
+        let cohort = FeedbackCohort::new();
+        cohort.set_enabled(true).await;
+        cohort
+    }
+
     async fn fetch_once_consented(
         cohort: &FeedbackCohort,
         source: &CohortSource,
@@ -454,7 +458,7 @@ mod tests {
     #[tokio::test]
     async fn membership_is_answered_from_the_adopted_document() {
         let now = 1_700_000_000_000;
-        let cohort = FeedbackCohort::new();
+        let cohort = enabled_cohort().await;
         assert!(
             cohort.invitation_url("install-a", now).await.is_none(),
             "empty until adopted"
@@ -473,13 +477,27 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn a_new_cohort_refuses_adoption_and_invitations_until_enabled() {
+        let now = 1_700_000_000_000;
+        let cohort = FeedbackCohort::new();
+
+        assert!(!cohort.adopt(document(now, &["install-a"]), now).await);
+        assert!(!cohort.is_loaded().await);
+        assert!(cohort.invitation_url("install-a", now).await.is_none());
+
+        cohort.set_enabled(true).await;
+        assert!(cohort.adopt(document(now, &["install-a"]), now).await);
+        assert!(cohort.invitation_url("install-a", now).await.is_some());
+    }
+
     /// A cohort is a claim about who was active recently. If the job publishing it has been
     /// broken for a fortnight, inviting nobody is the right answer.
     #[tokio::test]
     async fn a_document_past_the_freshness_window_is_refused() {
         let now = 1_700_000_000_000;
         let stale = now - i64::try_from(MAX_AGE.as_millis()).unwrap_or(i64::MAX) - 1;
-        let cohort = FeedbackCohort::new();
+        let cohort = enabled_cohort().await;
 
         assert!(!cohort.adopt(document(stale, &["install-a"]), now).await);
         assert!(cohort.invitation_url("install-a", now).await.is_none());
@@ -494,7 +512,7 @@ mod tests {
     #[tokio::test]
     async fn an_adopted_document_lapses_as_it_ages() {
         let now = 1_700_000_000_000;
-        let cohort = FeedbackCohort::new();
+        let cohort = enabled_cohort().await;
         assert!(cohort.adopt(document(now, &["install-a"]), now).await);
         assert!(cohort.invitation_url("install-a", now).await.is_some());
 
@@ -511,7 +529,7 @@ mod tests {
     #[tokio::test]
     async fn a_document_stamped_in_the_future_is_refused() {
         let now = 1_700_000_000_000;
-        let cohort = FeedbackCohort::new();
+        let cohort = enabled_cohort().await;
         assert!(
             !cohort
                 .adopt(document(now + 60_000, &["install-a"]), now)
@@ -535,7 +553,7 @@ mod tests {
         ))
         .await?;
 
-        let cohort = FeedbackCohort::new();
+        let cohort = enabled_cohort().await;
         assert!(fetch_once_consented(&cohort, &CohortSource::Document(url), now).await);
         assert!(cohort.invitation_url("install-a", now).await.is_some());
         Ok(())
@@ -570,7 +588,7 @@ mod tests {
             let _ = socket.shutdown().await;
         });
 
-        let cohort = FeedbackCohort::new();
+        let cohort = enabled_cohort().await;
         let (consent_sender, mut consent) = watch::channel(true);
         let refresh = tokio::spawn({
             let cohort = cohort.clone();
@@ -672,7 +690,7 @@ mod tests {
     #[tokio::test]
     async fn an_unreadable_body_leaves_the_previous_cohort_in_place() -> anyhow::Result<()> {
         let now = now_ms();
-        let cohort = FeedbackCohort::new();
+        let cohort = enabled_cohort().await;
         assert!(cohort.adopt(document(now, &["install-a"]), now).await);
 
         let body = "not json at all";
@@ -695,7 +713,7 @@ mod tests {
             "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n".to_string(),
         )
         .await?;
-        let cohort = FeedbackCohort::new();
+        let cohort = enabled_cohort().await;
         assert!(!fetch_once_consented(&cohort, &CohortSource::Document(url), now_ms()).await);
         assert!(!cohort.is_loaded().await);
         Ok(())
@@ -715,7 +733,7 @@ mod tests {
             body.len()
         ))
         .await?;
-        let cohort = FeedbackCohort::new();
+        let cohort = enabled_cohort().await;
         assert!(!fetch_once_consented(&cohort, &CohortSource::Document(url), now_ms()).await);
         assert!(!cohort.is_loaded().await);
         Ok(())
@@ -734,7 +752,7 @@ mod tests {
         ))
         .await?;
 
-        let cohort = FeedbackCohort::new();
+        let cohort = enabled_cohort().await;
         assert!(fetch_once_consented(&cohort, &CohortSource::Document(url), now).await);
         assert!(cohort.invitation_url("install-a", now).await.is_some());
         Ok(())
@@ -903,7 +921,7 @@ mod tests {
             ),
         );
         let server = tokio::spawn(async move { axum::serve(listener, app).await });
-        let cohort = FeedbackCohort::new();
+        let cohort = enabled_cohort().await;
         let adopted = fetch_once_consented(&cohort, &source, now).await;
         server.abort();
 
@@ -941,7 +959,7 @@ mod tests {
     #[tokio::test]
     async fn a_document_without_copy_falls_back_to_the_default_link() {
         let now = 1_700_000_000_000;
-        let cohort = FeedbackCohort::new();
+        let cohort = enabled_cohort().await;
         let document: CohortDocument = serde_json::from_value(json!({
             "generated_at_ms": now,
             "installs": ["install-a"],
@@ -967,7 +985,7 @@ mod tests {
         ))
         .await?;
 
-        let cohort = FeedbackCohort::new();
+        let cohort = enabled_cohort().await;
         assert!(!fetch_once_consented(&cohort, &CohortSource::Document(url), now_ms()).await);
         assert!(!cohort.is_loaded().await);
         Ok(())
@@ -987,7 +1005,7 @@ mod tests {
         ))
         .await?;
 
-        let cohort = FeedbackCohort::new();
+        let cohort = enabled_cohort().await;
         assert!(fetch_once_consented(&cohort, &CohortSource::Document(url), now).await);
         assert!(cohort.invitation_url("install-a", now).await.is_some());
         Ok(())
@@ -996,7 +1014,7 @@ mod tests {
     #[tokio::test]
     async fn a_refresh_replaces_the_previous_cohort() {
         let now = 1_700_000_000_000;
-        let cohort = FeedbackCohort::new();
+        let cohort = enabled_cohort().await;
         assert!(cohort.adopt(document(now, &["install-a"]), now).await);
         assert!(cohort.adopt(document(now, &["install-b"]), now).await);
 
