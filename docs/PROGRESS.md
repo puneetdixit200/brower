@@ -1,5 +1,9 @@
 # Progress
 
+### T20a.3 / B03 native patch reconciliation — 2026-10-30
+
+Reconciled the already-dirty native Chromium checkout only where repository-patch intent was unambiguous: added the two BrowserOS buildflag dependencies to the matching devtools targets and added stopTabLoading histogram ID 2019 plus its matching metadata entry (the actual histogram header is `extensions/browser/extension_function_histogram_value.h`). Native HEAD stayed `16c3e55476d3564bea713314b2fff638749ce3e6`; ordinary status stayed 319 rows and expanded dirty paths stayed 595. The read-only doctor now passes all 48 selected `cdp-api` patches. Across all 424 patches it reports 2 clean, 419 already applied, and 3 failures: the existing untracked BrowserOS API `.cc`, `.h`, and IDL files already exist but omit the newer stopTabLoading patch. Those files were preserved because their omission may be intentional. No compile or GN generation ran; `.ninja_log` and linked browser/test binaries are still absent. B03/T20a remain PARTIAL.
+
 ### T04.1 / S04 server log metadata redaction — 2026-10-30
 
 Server structured log metadata now passes through a recursive key-based redactor before both console and file sinks. It covers common password, API/access key, token, auth, cookie, bearer, credential and private-key labels; handles arrays, class instances, maps, sets and cycles; binary values are omitted and Error messages/stacks are replaced with a generic detail marker. Focused logger tests pass 6/6 (12 assertions), including synthetic sentinels and the real file sink; server typecheck, pinned Biome and `git diff --check` pass. Independent Luna review found no remaining blocker. This is one local-log source fix, not the full T04.1 outbound-data audit: arbitrary secrets under innocuous keys/free-form strings, provider request boundaries, native logging, network traffic and remote retention remain open. S04 remains PARTIAL.
