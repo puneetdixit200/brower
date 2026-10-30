@@ -1,0 +1,38 @@
+{"level":30,"time":1793324347607,"pid":"<pid>","hostname":"<local-host>","msg":"Starting BrowserOS Server v0.0.168"}
+{"level":30,"time":1793324347627,"pid":"<pid>","hostname":"<local-host>","browserosId":"c1fbff2c-453","durable":true,"msg":"BrowserOS ID initialized"}
+{"level":30,"time":1793324347627,"pid":"<pid>","hostname":"<local-host>","msg":"Telemetry disabled: user consent is off"}
+{"level":30,"time":1793324347629,"pid":"<pid>","hostname":"<local-host>","msg":"Connected to CDP on port 34759"}
+{"level":30,"time":1793324347638,"pid":"<pid>","hostname":"<local-host>","port":"<ephemeral>","host":"127.0.0.1","msg":"Consolidated HTTP Server started"}
+{"level":30,"time":1793324347642,"pid":"<pid>","hostname":"<local-host>","msg":"HTTP server listening on http://127.0.0.1:<ephemeral>"}
+{"level":30,"time":1793324347643,"pid":"<pid>","hostname":"<local-host>","msg":"Health endpoint: http://127.0.0.1:<ephemeral>/system/health"}
+{"level":30,"time":1793324347643,"pid":"<pid>","hostname":"<local-host>","msg":""}
+{"level":30,"time":1793324347643,"pid":"<pid>","hostname":"<local-host>","msg":"Services running:"}
+{"level":30,"time":1793324347643,"pid":"<pid>","hostname":"<local-host>","msg":"  HTTP Server: http://127.0.0.1:<ephemeral>"}
+{"level":30,"time":1793324347643,"pid":"<pid>","hostname":"<local-host>","msg":""}
+{"level":30,"time":1793324347784,"pid":"<pid>","hostname":"<local-host>","conversationId":"<fixture-id>","provider":"openai-compatible","model":"fixture-model","msg":"Chat request received"}
+{"level":30,"time":1793324347813,"pid":"<pid>","hostname":"<local-host>","count":15,"toolNames":["tabs","tab_groups","history","navigate","snapshot","diff","act","download","upload","read","grep","screenshot","pdf","wait","windows"],"source":"chat","msg":"Registered browser MCP tools"}
+{"level":40,"time":1793324347883,"pid":"<pid>","hostname":"<local-host>","count":2,"toolNames":["act","wait_for_human"],"msg":"Restricted tools excluded from agent catalog"}
+{"level":30,"time":1793324347883,"pid":"<pid>","hostname":"<local-host>","contextWindow":200000,"threshold":180000,"overhead":12000,"keepRecentMessages":6,"msg":"Compaction configured"}
+{"level":30,"time":1793324347883,"pid":"<pid>","hostname":"<local-host>","conversationId":"<fixture-id>","provider":"openai-compatible","model":"fixture-model","toolCount":19,"msg":"Agent session created (v2)"}
+{"level":30,"time":1793324347883,"pid":"<pid>","hostname":"<local-host>","conversationId":"<fixture-id>","totalSessions":1,"msg":"Session added to store"}
+{"level":30,"time":1793324347918,"pid":"<pid>","hostname":"<local-host>","conversationId":"<fixture-id>","totalMessages":2,"turnCompleted":true,"msg":"Agent execution complete"}
+{"level":30,"time":1793324348330,"pid":"<pid>","hostname":"<local-host>","msg":"Starting BrowserOS Server v0.0.168"}
+{"level":30,"time":1793324348338,"pid":"<pid>","hostname":"<local-host>","browserosId":"c1fbff2c-453","durable":true,"msg":"BrowserOS ID initialized"}
+{"level":30,"time":1793324348338,"pid":"<pid>","hostname":"<local-host>","msg":"Telemetry disabled: user consent is off"}
+{"level":30,"time":1793324348341,"pid":"<pid>","hostname":"<local-host>","msg":"Connected to CDP on port 34759"}
+{"level":30,"time":1793324348347,"pid":"<pid>","hostname":"<local-host>","port":"<ephemeral>","host":"127.0.0.1","msg":"Consolidated HTTP Server started"}
+{"level":30,"time":1793324348350,"pid":"<pid>","hostname":"<local-host>","msg":"HTTP server listening on http://127.0.0.1:<ephemeral>"}
+{"level":30,"time":1793324348350,"pid":"<pid>","hostname":"<local-host>","msg":"Health endpoint: http://127.0.0.1:<ephemeral>/system/health"}
+{"level":30,"time":1793324348350,"pid":"<pid>","hostname":"<local-host>","msg":""}
+{"level":30,"time":1793324348350,"pid":"<pid>","hostname":"<local-host>","msg":"Services running:"}
+{"level":30,"time":1793324348350,"pid":"<pid>","hostname":"<local-host>","msg":"  HTTP Server: http://127.0.0.1:<ephemeral>"}
+{"level":30,"time":1793324348350,"pid":"<pid>","hostname":"<local-host>","msg":""}
+{"level":30,"time":1793324348549,"pid":"<pid>","hostname":"<local-host>","conversationId":"<fixture-id>","provider":"openai-compatible","model":"fixture-model","msg":"Chat request received"}
+{"level":30,"time":1793324348577,"pid":"<pid>","hostname":"<local-host>","count":15,"toolNames":["tabs","tab_groups","history","navigate","snapshot","diff","act","download","upload","read","grep","screenshot","pdf","wait","windows"],"source":"chat","msg":"Registered browser MCP tools"}
+{"level":40,"time":1793324348627,"pid":"<pid>","hostname":"<local-host>","count":2,"toolNames":["act","wait_for_human"],"msg":"Restricted tools excluded from agent catalog"}
+{"level":30,"time":1793324348627,"pid":"<pid>","hostname":"<local-host>","contextWindow":200000,"threshold":180000,"overhead":12000,"keepRecentMessages":6,"msg":"Compaction configured"}
+{"level":30,"time":1793324348627,"pid":"<pid>","hostname":"<local-host>","conversationId":"<fixture-id>","provider":"openai-compatible","model":"fixture-model","toolCount":19,"msg":"Agent session created (v2)"}
+{"level":30,"time":1793324348627,"pid":"<pid>","hostname":"<local-host>","conversationId":"<fixture-id>","totalSessions":1,"msg":"Session added to store"}
+{"level":30,"time":1793324348630,"pid":"<pid>","hostname":"<local-host>","conversationId":"<fixture-id>","messageCount":2,"expiredApprovals":true,"msg":"Hydrated conversation history from database"}
+{"level":30,"time":1793324348634,"pid":"<pid>","hostname":"<local-host>","conversationId":"<fixture-id>","provider":"openai-compatible","model":"fixture-model","msg":"Chat request received"}
+{"level":30,"time":1793324348729,"pid":"<pid>","hostname":"<local-host>","reason":"SIGTERM","msg":"Shutting down server..."}

@@ -14,7 +14,7 @@ import * as researchSupportModule from '../../../src/agent/research-support-asse
 import type { KlavisProxyStatus } from '../../../src/api/services/klavis'
 import { consumeApprovalOperation } from '../../../src/lib/conversations/approval-operation-ledger'
 import { DbConversationStore } from '../../../src/lib/conversations/conversation-store'
-import { closeDb, initializeDb } from '../../../src/lib/db'
+import { closeDb, getDbHandle, initializeDb } from '../../../src/lib/db'
 
 interface MockMessage {
   id: string
@@ -1679,6 +1679,82 @@ describe('ChatService history persistence', () => {
       | undefined
     expect(saved?.id).toBe(conversationId)
     expect(saved?.targetType).toBe('browseros')
+  })
+
+  it('expires persisted approvals during hydration before a stale response can issue a grant', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'browseros-stale-approval-'))
+    tempDirs.push(dir)
+    initializeDb({ dbPath: join(dir, 'browseros.sqlite') })
+
+    const conversationId = crypto.randomUUID()
+    const approvalId = 'persisted-approval-before-restart'
+    const storedMessages = [
+      {
+        id: 'assistant-pending-approval',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'dynamic-tool',
+            toolName: 'filesystem_write',
+            toolCallId: 'persisted-tool-call',
+            input: { path: '/tmp/stale-approval.txt', content: 'unsafe' },
+            state: 'approval-requested',
+            approval: { id: approvalId },
+          },
+        ],
+      },
+    ]
+    const conversationStore = {
+      get: mock(async () => ({
+        id: conversationId,
+        messages: storedMessages,
+        targetType: 'browseros',
+        origin: 'sidepanel',
+        lastMessagedAt: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      })),
+      save: mock(async (input: unknown) => input),
+    }
+    const agent = createFakeAgent()
+    agentToReturn = agent
+    createAgentUIStreamSpy.mockClear()
+    const service = new ChatService({
+      sessionStore: createSessionStore() as never,
+      klavis: createKlavisStub() as never,
+      browser: persistenceBrowser() as never,
+      conversationStore: conversationStore as never,
+    })
+
+    const response = await service.processMessage(
+      {
+        ...browserOsRequest(conversationId, true),
+        message: '',
+        approvalResponse: { id: approvalId, approved: true },
+      } as never,
+      new AbortController().signal,
+    )
+
+    expect(response.status).toBe(409)
+    expect(createAgentUIStreamSpy).not.toHaveBeenCalled()
+    const saved = conversationStore.save.mock.calls.at(-1)?.[0] as
+      | { messages: Array<{ parts: Array<Record<string, unknown>> }> }
+      | undefined
+    const restoredApproval = saved?.messages
+      .flatMap((message) => message.parts)
+      .find((part) => part.approval !== undefined)
+    expect(restoredApproval).toMatchObject({
+      state: 'approval-responded',
+      approval: {
+        id: approvalId,
+        approved: false,
+        reason: expect.stringContaining('expired'),
+      },
+    })
+    const grantCount = getDbHandle()
+      .sqlite.prepare('SELECT COUNT(*) AS count FROM approval_operation_grants')
+      .get() as { count: number }
+    expect(grantCount.count).toBe(0)
   })
 
   it('does not persist and drops the dangling user message when a turn errors', async () => {

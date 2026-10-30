@@ -1,6 +1,10 @@
 # Progress
 
-Allowance checkpoint — 2026-10-30: actual short-window usage reached 95% (5% remaining); weekly usage was 77%. New work stopped under the user quota rule. Reviewed work and evidence are committed/pushed; full goal remains incomplete. Resume with the executable next steps below after allowance/user direction permits.
+Prior allowance stop — 2026-10-30: the short window reached 95% used (5% remaining), and that batch was stopped. The user has since resumed the goal. At this resumed batch start the live meter showed 4% primary-window usage and 78% weekly usage (96% and 22% remaining); the 5%-remaining stop gate has not been reached.
+
+### T19/T23 stale approval after sidecar restart — 2026-10-30
+
+The freshly built Linux x64 Aster sidecar persisted a pending synthetic `send_message` approval, was SIGKILLed, and restarted against the same disposable SQLite state. The stale approval and its replay both returned HTTP 409; read-only SQLite inspection confirmed the approval was persisted as rejected with the restart-expiry reason. There were zero post-restart model requests and zero MCP dispatches. Biome, standalone fixture TypeScript, server typecheck, the focused ChatService suite (24/24), and `git diff --check` pass. [Sanitized runtime evidence and sidecar log](evidence/aster-process-approval-2026-10-30/restart-pass/). This is compiled-sidecar process evidence, not a headed BrowserOS/Aster-native run or task execution resumption. A05/A06 remain PARTIAL.
 
 ### T19/T30 compiled-sidecar transport fixture — 2026-10-30
 

@@ -1,8 +1,13 @@
 # Aster continuation handoff and full implementation plan
 
-Allowance checkpoint — 2026-10-30: actual short-window usage reached 95% (5% remaining); weekly usage was 77%. New work stopped under the user quota rule. Reviewed work and evidence are committed/pushed; full goal remains incomplete. Resume with the executable next steps below after allowance/user direction permits.
+Prior allowance stop — 2026-10-30: the short window reached 95% used (5% remaining), and that batch was stopped. The user has since resumed the goal. At this resumed batch start the live meter showed 4% primary-window usage and 78% weekly usage (96% and 22% remaining); the 5%-remaining stop gate has not been reached.
 
 ### Latest verified checkpoint — 2026-10-30
+
+**Latest local implementation — 2026-10-30.**
+
+The local uncommitted ChatService fix expires persisted pending approvals during cold hydration, writes a rejected approval state, and returns 409 before any model/tool execution. A newly built Linux x64 sidecar passed the opt-in SIGKILL/restart fixture against the same disposable SQLite database: persisted pending approval → restart → stale response 409 → replay 409, with the denial read back from SQLite, zero post-restart model requests and zero MCP dispatches. Evidence is in `docs/evidence/aster-process-approval-2026-10-30/restart-pass/`. Focused server tests pass 24/24; server typecheck, targeted Biome and standalone fixture TypeScript pass. This closes only the approval-expiry boundary; A05/A06 and overall native/browser acceptance remain PARTIAL. Matrix remains 2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, 1 NOT_STARTED (72 total). The current meter at resumed batch start showed 96% primary and 22% weekly allowance remaining.
+
 
 Source milestones: explicit pinned Ninja selection `df77a7571`, production approval pipeline fixture `4470195d3`, pinned native Stop API syntax evidence `fdbe8038e`, guarded Downloads controls `39e18df1f`, bounded headed diagnostic `1dc23e01b`, and refused-send draft preservation `b1561b021`. Final `bun tests/integration/process-approval-fixture.ts --execute` passes; add `--browser` only with a compatible binary. Compiled-sidecar real HTTP/custom-MCP approval evidence is now retained under `docs/evidence/aster-process-approval-2026-10-30/`. Approve-once/replay409/deny pass; browser navigation does not: stock Chromium lacks BrowserOS `Browser.getTabs`. The Downloads fixture asserts sandbox status but Puppeteer click dispatch times out; do not infer API success or repeat that dependency unchanged. Composer changes have typecheck/lint/review only, no DOM interaction test.
 

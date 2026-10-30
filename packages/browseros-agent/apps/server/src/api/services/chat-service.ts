@@ -471,10 +471,20 @@ export class ChatService {
         // Only reuse a record this target owns; a conversationId shared with an
         // ACP agent must not bleed its history into the BrowserOS agent.
         if (stored?.messages.length && stored.targetType === 'browseros') {
-          session.agent.messages = stored.messages
+          const restored = expirePersistedToolApprovals(stored.messages)
+          session.agent.messages = restored.messages
+          if (restored.changed) {
+            await this.persistConversation({
+              id: request.conversationId,
+              messages: restored.messages,
+              targetType: 'browseros',
+              origin: stored.origin ?? request.origin,
+            })
+          }
           logger.info('Hydrated conversation history from database', {
             conversationId: request.conversationId,
-            messageCount: stored.messages.length,
+            messageCount: restored.messages.length,
+            expiredApprovals: restored.changed,
           })
         }
       } else if (request.previousConversation?.length) {
@@ -1209,6 +1219,36 @@ function findServerPendingApproval(
     }
   }
   return null
+}
+
+/** Approvals are process-local capabilities; a persisted card cannot outlive its server run. */
+function expirePersistedToolApprovals(messages: UIMessage[]): {
+  messages: UIMessage[]
+  changed: boolean
+} {
+  let changed = false
+  const restoredMessages = messages.map((message) => ({
+    ...message,
+    parts: message.parts.map((part) => {
+      const approvalPart = part as {
+        state?: string
+        approval?: { id?: string; approved?: boolean; reason?: string }
+      }
+      if (approvalPart.state !== 'approval-requested') return part
+      changed = true
+      return {
+        ...part,
+        state: 'approval-responded',
+        approval: {
+          ...approvalPart.approval,
+          approved: false,
+          reason:
+            'This approval expired when the server restarted. Review the action and request it again.',
+        },
+      } as UIMessage['parts'][number]
+    }),
+  }))
+  return { messages: restoredMessages, changed }
 }
 
 /** Carries an intentional HTTP result through the run's stream factory. */

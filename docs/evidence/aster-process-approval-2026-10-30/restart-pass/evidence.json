@@ -1,0 +1,158 @@
+{
+  "status": "passed",
+  "mode": "approval-restart",
+  "serverBinary": "aster-server-linux-x64",
+  "serverSha256": "b8f86ec981680944885b13024fd578a8ff792876ab5e8c0d52dd1a294652e4e9",
+  "config": {
+    "ports": {
+      "server": "127.0.0.1:<ephemeral>",
+      "cdp": "127.0.0.1:<ephemeral>"
+    },
+    "directories": {
+      "resources": "<Aster sidecar resources>",
+      "execution": "<temporary execution directory>"
+    },
+    "flags": {
+      "allow_remote_in_mcp": false
+    },
+    "instance": {
+      "client_id": "process-approval-fixture",
+      "install_id": "process-approval-fixture",
+      "browseros_version": "integration-fixture",
+      "chromium_version": "system-chromium"
+    }
+  },
+  "ports": {
+    "server": "127.0.0.1:<ephemeral>",
+    "cdp": "127.0.0.1:<ephemeral>",
+    "model": "127.0.0.1:<ephemeral>",
+    "mcp": "127.0.0.1:<ephemeral>",
+    "page": "127.0.0.1:<ephemeral>"
+  },
+  "stateDirectory": "<temporary ASTER_DIR>",
+  "stateDbPath": "<temporary ASTER_DIR>/db/browseros.sqlite",
+  "persistedPendingApproval": {
+    "type": "dynamic-tool",
+    "toolName": "send_message",
+    "toolCallId": "fixture-call-chatcmpl-process-fixture-1",
+    "state": "approval-requested",
+    "input": {
+      "destination": "sink@example.test",
+      "body": "fixture body"
+    },
+    "toolMetadata": {
+      "clientName": "ai-sdk-mcp-client",
+      "toolName": "send_message"
+    },
+    "approval": {
+      "id": "aitxt-tGjK3EzPR5De2qdDDKzILtLE",
+      "requestReason": "This tool may cause an external or destructive side effect. Review its destination and details before it runs."
+    }
+  },
+  "conversationId": "ce51e456-e42f-458a-af4a-69009c87b48d",
+  "approvalId": "aitxt-tGjK3EzPR5De2qdDDKzILtLE",
+  "acceptedApprovalStatus": 409,
+  "requestCountBeforeRestart": 1,
+  "postRestartApproval": {
+    "type": "dynamic-tool",
+    "toolName": "send_message",
+    "toolCallId": "fixture-call-chatcmpl-process-fixture-1",
+    "state": "approval-responded",
+    "input": {
+      "destination": "sink@example.test",
+      "body": "fixture body"
+    },
+    "toolMetadata": {
+      "clientName": "ai-sdk-mcp-client",
+      "toolName": "send_message"
+    },
+    "approval": {
+      "id": "aitxt-tGjK3EzPR5De2qdDDKzILtLE",
+      "requestReason": "This tool may cause an external or destructive side effect. Review its destination and details before it runs.",
+      "approved": false,
+      "reason": "This approval expired when the server restarted. Review the action and request it again."
+    }
+  },
+  "replayStatus": 409,
+  "requestCount": 1,
+  "postRestartModelRequests": 0,
+  "modelMessages": [
+    {
+      "requestIndex": 0,
+      "messages": [
+        {
+          "role": "user",
+          "content": "<USER_QUERY>\nSend the fixture message.\n</USER_QUERY>"
+        }
+      ]
+    }
+  ],
+  "advertisedToolNames": [
+    [
+      "tabs",
+      "tab_groups",
+      "history",
+      "navigate",
+      "snapshot",
+      "diff",
+      "download",
+      "upload",
+      "read",
+      "grep",
+      "screenshot",
+      "pdf",
+      "wait",
+      "windows",
+      "connector_mcp_servers",
+      "send_message",
+      "filesystem_read",
+      "suggest_schedule",
+      "suggest_app_connection"
+    ]
+  ],
+  "syntheticModelResponses": [
+    {
+      "id": "chatcmpl-process-fixture-1",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "index": 0,
+                "id": "fixture-call-chatcmpl-process-fixture-1",
+                "type": "function",
+                "function": {
+                  "name": "send_message",
+                  "arguments": "{\"destination\":\"sink@example.test\",\"body\":\"fixture body\"}"
+                }
+              }
+            ]
+          },
+          "finish_reason": null
+        }
+      ]
+    },
+    {
+      "id": "chatcmpl-process-fixture-1",
+      "object": "chat.completion.chunk",
+      "created": 1,
+      "model": "fixture-model",
+      "choices": [
+        {
+          "index": 0,
+          "delta": {},
+          "finish_reason": "tool_calls"
+        }
+      ]
+    }
+  ],
+  "mcpEndpoint": "http://127.0.0.1:<ephemeral>/mcp",
+  "dispatches": [],
+  "zeroDispatchesAfterRestart": true,
+  "evidencePath": "evidence.json"
+}

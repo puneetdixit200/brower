@@ -3,9 +3,11 @@
  *
  * This deliberately starts only loopback fixtures and an isolated headless
  * Chromium. It requires `--execute` so reviewing the launch plan never starts
- * a child process by accident.
+ * a child process by accident. `--restart` checks that pending approvals cannot
+ * be accepted or replayed after a forced server restart.
  */
 
+import { Database } from 'bun:sqlite'
 import { type ChildProcess, spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { closeSync, openSync } from 'node:fs'
@@ -382,19 +384,62 @@ function approvalIdFromSse(raw: string): string {
   throw new Error(`No approval id in SSE; first bytes: ${raw.slice(0, 1200)}`)
 }
 
+function persistedPendingApproval(
+  messages: unknown,
+  approvalId: string,
+): Record<string, unknown> {
+  assert(Array.isArray(messages), 'Persisted conversation messages are invalid')
+  const matches = messages.flatMap((message) => {
+    if (!message || typeof message !== 'object') return []
+    const object = message as { role?: unknown; parts?: unknown }
+    if (object.role !== 'assistant' || !Array.isArray(object.parts)) return []
+    return object.parts.flatMap((part) => {
+      if (!part || typeof part !== 'object') return []
+      const toolPart = part as {
+        type?: unknown
+        toolCallId?: unknown
+        state?: unknown
+        approval?: { id?: unknown }
+      }
+      const isToolPart =
+        toolPart.type === 'dynamic-tool' ||
+        (typeof toolPart.type === 'string' && toolPart.type.startsWith('tool-'))
+      return isToolPart &&
+        toolPart.state === 'approval-requested' &&
+        toolPart.approval?.id === approvalId
+        ? [toolPart as Record<string, unknown>]
+        : []
+    })
+  })
+  assert(
+    matches.length === 1,
+    `Expected exactly one assistant tool part with approval ${approvalId} in approval-requested state; found ${matches.length}`,
+  )
+  assert(
+    typeof matches[0].toolCallId === 'string',
+    'Persisted pending approval has no toolCallId',
+  )
+  return matches[0]
+}
+
 async function main() {
   const execute = process.argv.includes('--execute')
   const browserMode = process.argv.includes('--browser')
+  const restartMode = process.argv.includes('--restart')
+  assert(
+    !(browserMode && restartMode),
+    '--browser and --restart are separate fixture modes',
+  )
   if (
     process.argv.some(
       (arg) =>
-        !['--execute', '--browser'].includes(arg) &&
+        !['--execute', '--browser', '--restart'].includes(arg) &&
         arg !== process.argv[0] &&
         arg !== process.argv[1],
     )
   ) {
     throw new Error(
-      'Usage: bun tests/integration/process-approval-fixture.ts [--execute] [--browser]\nDefault --execute runs approval/deny/replay only. --browser adds local-page navigation and requires BrowserOS Chromium with Browser.getTabs CDP support. Set ASTER_SERVER_BINARY and CHROMIUM_BINARY to select binaries.',
+      'Usage: bun tests/integration/process-approval-fixture.ts [--execute] [--browser] [--restart]\nDefault --execute runs approval/deny/replay only. --browser adds local-page navigation and requires BrowserOS Chromium with Browser.getTabs CDP support. --restart tests pending-approval failure after SIGKILL/restart. Set ASTER_SERVER_BINARY and CHROMIUM_BINARY to select binaries.',
     )
   }
   const binary = resolve(process.env.ASTER_SERVER_BINARY ?? DEFAULT_SERVER)
@@ -450,7 +495,11 @@ async function main() {
     'about:blank',
   ]
   const plan = {
-    mode: browserMode ? 'approval-and-browser' : 'approval-only',
+    mode: restartMode
+      ? 'approval-restart'
+      : browserMode
+        ? 'approval-and-browser'
+        : 'approval-only',
     browserPrerequisite: browserMode
       ? 'BrowserOS Chromium exposing the Browser.getTabs CDP extension; stock Chromium is insufficient.'
       : undefined,
@@ -499,6 +548,7 @@ async function main() {
   let browserLogFd: number | undefined
   let serverLogFd: number | undefined
   let cleanupPromise: Promise<void> | undefined
+  let restartEvidence: Record<string, unknown> | undefined
   const cleanup = (): Promise<void> => {
     if (cleanupPromise) return cleanupPromise
     cleanupPromise = (async () => {
@@ -715,7 +765,8 @@ async function main() {
           baseUrl: `http://127.0.0.1:${ports.model}/v1`,
           apiKey: 'fixture-only-key',
           mode: 'agent',
-          persist: false,
+          // The restart mode must restore the pending approval from SQLite.
+          persist: restartMode,
           browserContext: {
             customMcpServers: [
               { name: 'fixture', url: `http://127.0.0.1:${ports.mcp}/mcp` },
@@ -729,6 +780,193 @@ async function main() {
         response,
         text: response.ok ? await readSse(response) : await response.text(),
       }
+    }
+
+    if (restartMode) {
+      const conversationId = crypto.randomUUID()
+      const initial = await makeRequest(conversationId)
+      assert(
+        initial.response.status === 200,
+        `Initial chat failed: ${initial.response.status}`,
+      )
+      const approvalId = approvalIdFromSse(initial.text)
+      assertDispatchCount(dispatches, 0, 'Tool dispatched before approval')
+      const requestCountBeforeRestart = modelRequests.length
+      const stateDbPath = join(paths.state, 'db', 'browseros.sqlite')
+      const stateDb = new Database(stateDbPath, { readonly: true })
+      try {
+        const row = stateDb
+          .query('SELECT messages FROM conversations WHERE id = ?')
+          .get(conversationId) as { messages?: unknown } | null
+        assert(
+          typeof row?.messages === 'string',
+          'Pending approval was not persisted',
+        )
+        restartEvidence = {
+          persistedPendingApproval: persistedPendingApproval(
+            JSON.parse(row.messages),
+            approvalId,
+          ),
+        }
+      } finally {
+        stateDb.close()
+      }
+
+      const interruptedPid = serverProcess.pid
+      assert(
+        interruptedPid,
+        'Server process has no PID for SIGKILL restart case',
+      )
+      serverProcess.kill('SIGKILL')
+      await waitForExit(serverProcess, 5_000)
+      assert(
+        serverProcess.signalCode === 'SIGKILL',
+        `Expected SIGKILL, received ${serverProcess.signalCode ?? serverProcess.exitCode}`,
+      )
+
+      serverProcess = spawn(binary, ['--config', paths.config], {
+        env,
+        stdio: ['ignore', serverLogFd, serverLogFd],
+      })
+      serverSpawnError = undefined
+      serverProcess.on('error', (error) => {
+        serverSpawnError = error
+      })
+      await waitForHealth(
+        `http://127.0.0.1:${ports.server}/system/health`,
+        serverProcess,
+        paths.serverLog,
+        () => serverSpawnError,
+      )
+
+      const staleApproval = await makeRequest(conversationId, {
+        id: approvalId,
+        approved: true,
+      })
+      restartEvidence = {
+        ...restartEvidence,
+        conversationId,
+        approvalId,
+        interruptedPid,
+        restartedPid: serverProcess.pid,
+        acceptedApprovalStatus: staleApproval.response.status,
+        requestCountBeforeRestart,
+      }
+      assert(
+        staleApproval.response.status === 409,
+        `Expected stale approval to fail closed with 409, got ${staleApproval.response.status}`,
+      )
+      const stateDbAfterRestart = new Database(stateDbPath, { readonly: true })
+      try {
+        const row = stateDbAfterRestart
+          .query('SELECT messages FROM conversations WHERE id = ?')
+          .get(conversationId) as { messages?: unknown } | null
+        assert(
+          typeof row?.messages === 'string',
+          'Expired approval conversation was not persisted after restart',
+        )
+        const messages = JSON.parse(row.messages) as unknown[]
+        const originalPart = restartEvidence?.persistedPendingApproval as
+          | { toolCallId?: unknown }
+          | undefined
+        const matchingParts = messages.flatMap((message) => {
+          if (!message || typeof message !== 'object') return []
+          const item = message as { role?: unknown; parts?: unknown }
+          if (item.role !== 'assistant' || !Array.isArray(item.parts)) return []
+          return item.parts.filter((part) => {
+            if (!part || typeof part !== 'object') return false
+            const toolPart = part as {
+              type?: unknown
+              toolCallId?: unknown
+              approval?: { id?: unknown }
+            }
+            const isToolPart =
+              toolPart.type === 'dynamic-tool' ||
+              (typeof toolPart.type === 'string' &&
+                toolPart.type.startsWith('tool-'))
+            return (
+              isToolPart &&
+              toolPart.approval?.id === approvalId &&
+              toolPart.toolCallId === originalPart?.toolCallId
+            )
+          })
+        }) as Array<Record<string, unknown>>
+        assert(
+          matchingParts.length === 1,
+          `Expected exactly one persisted assistant part for the expired approval; found ${matchingParts.length}`,
+        )
+        const approval = matchingParts[0].approval as
+          | { id?: unknown; approved?: unknown; reason?: unknown }
+          | undefined
+        assert(
+          matchingParts[0].state === 'approval-responded' &&
+            approval?.id === approvalId &&
+            approval.approved === false &&
+            approval.reason ===
+              'This approval expired when the server restarted. Review the action and request it again.',
+          'Persisted approval was not rewritten to the exact restart-expiry denial',
+        )
+        restartEvidence.postRestartApproval = matchingParts[0]
+      } finally {
+        stateDbAfterRestart.close()
+      }
+      assertDispatchCount(
+        dispatches,
+        0,
+        'Pending approval dispatched an MCP tool after server restart',
+      )
+
+      const replay = await makeRequest(conversationId, {
+        id: approvalId,
+        approved: true,
+      })
+      restartEvidence.replayStatus = replay.response.status
+      assert(
+        replay.response.status === 409,
+        `Expected stale approval replay to fail closed with 409, got ${replay.response.status}`,
+      )
+      assertDispatchCount(
+        dispatches,
+        0,
+        'Stale approval replay dispatched an MCP tool after server restart',
+      )
+      assert(
+        modelRequests.length === requestCountBeforeRestart,
+        'Stale approval or replay unexpectedly contacted the model provider',
+      )
+
+      const evidence = {
+        status: 'passed',
+        mode: 'approval-restart',
+        serverBinary: binary,
+        serverSha256: createHash('sha256')
+          .update(new Uint8Array(await Bun.file(binary).arrayBuffer()))
+          .digest('hex'),
+        config,
+        ports,
+        stateDirectory: paths.state,
+        stateDbPath,
+        ...restartEvidence,
+        requestCount: modelRequests.length,
+        postRestartModelRequests:
+          modelRequests.length - requestCountBeforeRestart,
+        modelMessages: capturedModelMessages(modelRequests),
+        advertisedToolNames,
+        syntheticModelResponses,
+        mcpEndpoint: `http://127.0.0.1:${ports.mcp}/mcp`,
+        dispatches,
+        zeroDispatchesAfterRestart: dispatches.length === 0,
+        evidencePath: paths.evidence,
+      }
+      await writeFile(
+        paths.evidence,
+        `${JSON.stringify(evidence, null, 2)}\n`,
+        {
+          mode: 0o600,
+        },
+      )
+      console.log(JSON.stringify(evidence, null, 2))
+      return
     }
 
     const approvedConversation = crypto.randomUUID()
@@ -861,7 +1099,7 @@ async function main() {
   } catch (error) {
     await writeFile(
       paths.evidence,
-      `${JSON.stringify({ status: 'failed', mode: browserMode ? 'approval-and-browser' : 'approval-only', browserPrerequisite: browserMode ? 'BrowserOS Chromium exposing the Browser.getTabs CDP extension; stock Chromium is insufficient.' : undefined, error: error instanceof Error ? error.message : String(error), ports, config, requestCount: modelRequests.length, modelMessages: capturedModelMessages(modelRequests), advertisedToolNames, syntheticModelResponses, browserToolSteps, browserPageRequests, browserResponseSse: browserSseOutput, dispatches }, null, 2)}\n`,
+      `${JSON.stringify({ status: 'failed', mode: restartMode ? 'approval-restart' : browserMode ? 'approval-and-browser' : 'approval-only', browserPrerequisite: browserMode ? 'BrowserOS Chromium exposing the Browser.getTabs CDP extension; stock Chromium is insufficient.' : undefined, error: error instanceof Error ? error.message : String(error), ports, config, requestCount: modelRequests.length, modelMessages: capturedModelMessages(modelRequests), advertisedToolNames, syntheticModelResponses, browserToolSteps, browserPageRequests, browserResponseSse: browserSseOutput, restartEvidence, dispatches }, null, 2)}\n`,
       { mode: 0o600 },
     )
     throw error
