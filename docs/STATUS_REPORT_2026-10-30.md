@@ -29,6 +29,8 @@ The account allowance meter was not exposed in this batch, so no current percent
 
 ## Current batch — U13 screenshot consent race and T20a bounded object compile
 
+Reviewed implementation and documentation were committed as `1272c9caef22982eb003a0f02a5fd7a4f94f3aa2` (`fix(ui): revalidate screenshot target around capture`) and pushed to `aster/feat/aster-linux-ui`; remote ref verification matched the commit and the tracked worktree is clean.
+
 Both screenshot-to-Downloads and screenshot-for-AI-context now re-read the selected tab after consent, validate its current window and HTTP(S) URL before capture, then validate active tab/window/HTTP(S) again after capture. A mismatch prevents the image from being downloaded or staged in the composer. Focused helper tests pass 8/8 (14 assertions); app typecheck, targeted Biome, `git diff --check`, and independent Luna review pass. No headed screenshot permission test ran; U13 remains PARTIAL.
 
 `browser_os_api.cc` compiled successfully as one translation unit with pinned Clang and current generated graph flags, under a 5 GiB memory cap, one CPU and 240-second timeout. The temporary object `/tmp/aster-b03-t20a-compile-6gohbo63/browser_os_api.o` is 393,432 bytes, SHA256 `0d3939a50b0a01d265dbcf2e275f37eb3b024448420e4ac47ee78ed6599ff470`; source hash matched the staged patch target. Native HEAD remained `16c3e55476d3564bea713314b2fff638749ce3e6`; 319 ordinary status rows / 595 expanded paths are unchanged. `.ninja_log` remains absent. This proves only one object compile; no link, GN regeneration, executable, or runtime acceptance occurred. Keep T20a/B03 PARTIAL.
