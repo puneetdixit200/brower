@@ -31,6 +31,9 @@ export interface TabPickerMentionPopoverProps extends TabPickerCommonProps {
   filterText: string
   onClose: () => void
   anchorRef: React.RefObject<HTMLElement | null>
+  /** Optional file action exposed in the @ mention menu. */
+  onAttachFile?: () => void
+  attachFileDisabled?: boolean
   side?: PopoverSide
 }
 
@@ -58,6 +61,8 @@ const TabPickerMentionPopover: FC<TabPickerMentionPopoverProps> = ({
   onToggleTab,
   onClose,
   anchorRef,
+  onAttachFile,
+  attachFileDisabled = false,
   side,
 }) => {
   const { tabs, allTabs, isLoading } = useAvailableTabs({
@@ -70,6 +75,7 @@ const TabPickerMentionPopover: FC<TabPickerMentionPopoverProps> = ({
   )
   const [focusedIndex, setFocusedIndex] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
+  const itemCount = tabs.length + (onAttachFile ? 1 : 0)
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally reset focus when filter changes
   useEffect(() => {
@@ -94,7 +100,7 @@ const TabPickerMentionPopover: FC<TabPickerMentionPopoverProps> = ({
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault()
-          setFocusedIndex((prev) => (prev < tabs.length - 1 ? prev + 1 : prev))
+          setFocusedIndex((prev) => (prev < itemCount - 1 ? prev + 1 : prev))
           break
         case 'ArrowUp':
           e.preventDefault()
@@ -104,6 +110,9 @@ const TabPickerMentionPopover: FC<TabPickerMentionPopoverProps> = ({
           e.preventDefault()
           if (tabs[focusedIndex]) {
             onToggleTab(tabs[focusedIndex])
+          } else if (onAttachFile && focusedIndex === tabs.length) {
+            if (!attachFileDisabled) onAttachFile()
+            onClose()
           }
           break
         case 'Escape':
@@ -119,11 +128,20 @@ const TabPickerMentionPopover: FC<TabPickerMentionPopoverProps> = ({
 
     document.addEventListener('keydown', handleKeyDown, true)
     return () => document.removeEventListener('keydown', handleKeyDown, true)
-  }, [isOpen, tabs, focusedIndex, onToggleTab, onClose])
+  }, [
+    isOpen,
+    tabs,
+    focusedIndex,
+    onToggleTab,
+    onClose,
+    itemCount,
+    onAttachFile,
+    attachFileDisabled,
+  ])
 
   useEffect(() => {
     if (listRef.current && focusedIndex >= 0) {
-      const items = listRef.current.querySelectorAll('[data-tab-item]')
+      const items = listRef.current.querySelectorAll('[data-mention-item]')
       items[focusedIndex]?.scrollIntoView({ block: 'nearest' })
     }
   }, [focusedIndex])
@@ -141,7 +159,9 @@ const TabPickerMentionPopover: FC<TabPickerMentionPopoverProps> = ({
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
         role="dialog"
-        aria-label="Select tabs to attach"
+        aria-label={
+          onAttachFile ? 'Select tabs or attach files' : 'Select tabs to attach'
+        }
       >
         <Command
           className="[&_svg:not([class*='text-'])]:text-muted-foreground"
@@ -194,7 +214,7 @@ const TabPickerMentionPopover: FC<TabPickerMentionPopoverProps> = ({
               {tabs.map((tab, index) => (
                 <CommandItem
                   key={tab.id}
-                  data-tab-item
+                  data-mention-item
                   value={`${tab.id}`}
                   onSelect={() => onToggleTab(tab)}
                   onMouseEnter={() => setFocusedIndex(index)}
@@ -207,6 +227,26 @@ const TabPickerMentionPopover: FC<TabPickerMentionPopoverProps> = ({
                   />
                 </CommandItem>
               ))}
+              {onAttachFile ? (
+                <CommandItem
+                  data-mention-item
+                  value="attach-file"
+                  disabled={attachFileDisabled}
+                  aria-label="Attach a file"
+                  onSelect={() => {
+                    if (!attachFileDisabled) onAttachFile()
+                    onClose()
+                  }}
+                  onMouseEnter={() => setFocusedIndex(tabs.length)}
+                  className="p-0 data-[selected=true]:bg-transparent"
+                >
+                  <span
+                    className={`flex w-full items-center px-3 py-2 text-sm ${focusedIndex === tabs.length ? 'bg-accent' : ''} ${attachFileDisabled ? 'opacity-50' : ''}`}
+                  >
+                    Attach a file…
+                  </span>
+                </CommandItem>
+              ) : null}
             </CommandGroup>
           </CommandList>
         </Command>

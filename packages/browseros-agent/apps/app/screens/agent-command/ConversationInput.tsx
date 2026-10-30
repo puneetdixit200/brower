@@ -615,6 +615,17 @@ export const ConversationInput: FC<ConversationInputProps> = ({
           onToggleTab={toggleTab}
           onClose={closeTabMention}
           anchorRef={textareaRef}
+          onAttachFile={
+            attachmentsEnabled
+              ? () => {
+                  closeTabMention()
+                  openFilePicker()
+                }
+              : undefined
+          }
+          attachFileDisabled={
+            attachments.length >= 10 || isStaging || !!disabled
+          }
         />
         {attachments.length > 0 || attachmentError ? (
           <AttachmentStrip
