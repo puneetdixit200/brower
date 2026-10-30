@@ -1,5 +1,9 @@
 # Aster next steps
 
+### Current source checkpoint — B09 website-permissions handoff — 2026-10-30
+
+BrowserQuickControls now revalidates the selected tab in the current window, accepts HTTP(S) only, and opens Chromium's `chrome://settings/content/siteDetails` route with the encoded origin. Three focused tests (6 assertions) cover origin extraction, missing/moved/non-web tabs and tab-creation failure; app typecheck, targeted Biome, diff check and independent Luna review pass. Chromium HEAD `16c3e55476d3564bea713314b2fff638749ce3e6` contains the route in its extension-details UI and browser tests. B09 remains PARTIAL pending headed acceptance of settings navigation and real permission changes, plus media/WebRTC/devtools. The native gate remains: preserve the 319-path dirty checkout; `.ninja_log` and `chrome` are absent and about 5 GiB RAM is available.
+
 ### Current source checkpoint — U01 sidebar resize release — 2026-10-30
 
 Sidebar drag completion now evaluates pointer position against the final intended width, even if React has not committed the last width update when pointer-up fires. Four focused helper tests, app typecheck, targeted Biome and the development build pass; independent Luna review found and verified the stale-bounds correction. U01 remains PARTIAL: headed Aster pointer/keyboard behavior, native alignment and real window-resize acceptance are still required. The native gate below remains unchanged: preserve the dirty Chromium checkout and do not launch a full build without matching incremental state or a clean pinned host.

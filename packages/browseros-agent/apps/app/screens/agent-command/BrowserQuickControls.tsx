@@ -36,6 +36,7 @@ import { loadRecentHistory } from './history-items'
 import { resolveHomeSearchUrl } from './home-search'
 import { selectRecentlyClosedTabSessionId } from './recently-closed-tab'
 import { captureVisibleTabContext } from './screenshot-context'
+import { openWebsitePermissions } from './website-permissions'
 
 export function BrowserQuickControls({
   onScreenshotContext,
@@ -487,9 +488,7 @@ export function BrowserQuickControls({
     })
 
   const openNativeSettings = () =>
-    void action(async () => {
-      await chrome.tabs.create({ url: 'chrome://settings/content' })
-    })
+    void action(() => openWebsitePermissions(chrome.tabs, selectedTabId))
 
   return (
     <section
@@ -587,7 +586,7 @@ export function BrowserQuickControls({
             run: screenshotForContext,
           },
           {
-            name: 'Website permissions',
+            name: 'Website permissions for selected site',
             Icon: Settings2,
             run: openNativeSettings,
           },
@@ -600,6 +599,8 @@ export function BrowserQuickControls({
               busy ||
               (name === 'Select screenshot context' &&
                 !screenshotContextEnabled) ||
+              (name === 'Website permissions for selected site' &&
+                selectedTabId === null) ||
               ((name === 'Activate selected tab' ||
                 name === 'Back selected webpage' ||
                 name === 'Forward selected webpage' ||
