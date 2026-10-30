@@ -16,6 +16,24 @@ function containsSourcePath(value: string): boolean {
   )
 }
 
+/** Recent-task cards keep the strict persisted-record gate before projection. */
+export function isSafeTaskForRecentCard(task: ExecutionTaskRecord): boolean {
+  return (
+    isSafeTaskForDisplay(task) &&
+    ![
+      task.promptText,
+      task.responseText ?? '',
+      task.responsePreview ?? '',
+      ...task.steps.flatMap((step) => [
+        step.toolName,
+        step.previewText,
+        step.errorText ?? '',
+        step.approval?.reason ?? '',
+      ]),
+    ].some(containsSourcePath)
+  )
+}
+
 function safeText(value?: string): string | undefined {
   if (!value?.trim()) return undefined
   return containsCredentialShapedText(value) || containsSourcePath(value)

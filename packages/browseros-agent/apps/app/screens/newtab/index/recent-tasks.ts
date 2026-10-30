@@ -3,7 +3,10 @@ import {
   type ExecutionRecoveryMarker,
 } from '@/lib/execution-history/recovery'
 import type { ExecutionHistoryByConversation } from '@/lib/execution-history/types'
-import { flattenExecutionHistory } from '@/screens/task-history/task-history'
+import {
+  flattenExecutionHistory,
+  isSafeTaskForRecentCard,
+} from '@/screens/task-history/task-history'
 
 const MAX_RECENT_TASKS = 3
 
@@ -12,7 +15,15 @@ export function buildRecentTasks(
   history: ExecutionHistoryByConversation,
   markers: ExecutionRecoveryMarker[],
 ) {
-  return flattenExecutionHistory(
-    applyExecutionRecoveryMarkers(history, markers),
-  ).slice(0, MAX_RECENT_TASKS)
+  const markedHistory = applyExecutionRecoveryMarkers(history, markers)
+  const safeHistory = Object.fromEntries(
+    Object.entries(markedHistory).map(([key, conversation]) => [
+      key,
+      {
+        ...conversation,
+        tasks: conversation.tasks.filter(isSafeTaskForRecentCard),
+      },
+    ]),
+  )
+  return flattenExecutionHistory(safeHistory).slice(0, MAX_RECENT_TASKS)
 }

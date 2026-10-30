@@ -124,6 +124,12 @@ describe('buildRecentTasks', () => {
         task('secret-prompt', 'conversation', '2026-10-28T03:00:00Z', {
           promptText: 'Use API key: fixture-not-real',
         }),
+        task('secret-response', 'conversation', '2026-10-28T03:30:00Z', {
+          responseText: 'Bearer abcdefghijklmnopqrstuvwxyz',
+        }),
+        task('path-prompt', 'conversation', '2026-10-28T03:45:00Z', {
+          promptText: 'Open (/workspace/private/notes.txt)',
+        }),
         task('newer-safe', 'conversation', '2026-10-28T04:00:00Z'),
         task('newest-safe', 'conversation', '2026-10-28T05:00:00Z'),
       ]),
@@ -136,5 +142,26 @@ describe('buildRecentTasks', () => {
       'middle-safe',
     ])
     expect(recent.some(({ id }) => id === 'secret-prompt')).toBe(false)
+    expect(recent.some(({ id }) => id === 'secret-response')).toBe(false)
+    expect(recent.some(({ id }) => id === 'path-prompt')).toBe(false)
+  })
+
+  it('preserves matching recovery marker behavior after filtering unsafe cards', () => {
+    const recent = buildRecentTasks(
+      history('conversation', [
+        task('unsafe-running', 'conversation', '2026-10-28T02:00:00Z', {
+          promptText: 'Use password: fixture-secret',
+        }),
+        task('safe-running', 'conversation', '2026-10-28T01:00:00Z'),
+      ]),
+      [
+        marker('unsafe-running', 'conversation'),
+        marker('safe-running', 'conversation'),
+      ],
+    )
+
+    expect(recent.map(({ id, status }) => [id, status])).toEqual([
+      ['safe-running', 'interrupted'],
+    ])
   })
 })
