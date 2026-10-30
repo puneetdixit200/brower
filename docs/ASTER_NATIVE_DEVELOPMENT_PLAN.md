@@ -52,3 +52,7 @@ The build command now accepts `BROWSEROS_NINJA_BINARY` as an explicit absolute, 
 Read-only host inspection still finds 283 modified and 36 untracked native paths, no `.ninja_log` or linked browser, 14 GiB RAM (4.9 GiB available), and 262 GiB free storage. No native build, GN regeneration or graph dry-run was started. The override does not establish artifact provenance or remove the incremental-state and resource gates.
 
 The current B03 API source/header/IDL and histogram enum were subsequently staged only into temporary output. The pinned API generator and clang 24 syntax check passed for `browser_os_api.cc`; the native HEAD/status fingerprint was unchanged. This reuses existing generated dependencies/PCM and produces no object or linked browser. Exact argv, staging script, source hashes and limits are retained in [syntax evidence](evidence/aster-b03-syntax-2026-10-30.json). B03/T20a remain PARTIAL pending actual compilation/link/runtime evidence.
+
+## Read-only native checkout recheck — 2026-10-30
+
+Current recheck confirms pinned HEAD `16c3e55476d3564bea713314b2fff638749ce3e6`, 319 modified/untracked paths, missing `out/Default/.ninja_log`, no active Ninja/autoninja/GN process, 5.7 GiB available memory, and 255 GiB free disk. The generated graph is still documented at 14,252 `.ninja` files / 2.94 GB; prior relevant dry runs planned 3,017 and 12,115 actions. No new dry run, build, or GN regeneration was started. Preserve the native worktree and wait for a safe build-log recovery path or a separate clean build host.

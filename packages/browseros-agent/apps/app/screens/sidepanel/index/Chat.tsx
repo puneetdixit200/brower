@@ -46,6 +46,7 @@ import {
   enqueuePrompt,
   isPromptQueueRetryCurrent,
   MAX_QUEUED_PROMPTS,
+  removeQueuedPrompt,
 } from './prompt-queue'
 import { ResearchSupportConsent } from './ResearchSupportConsent'
 import { prepareSourceResearch } from './research-request'
@@ -255,6 +256,15 @@ export const Chat = () => {
     setQueuedPrompts(cleared.queue)
   }
 
+  const removeQueuedPromptAt = (index: number) => {
+    const next = removeQueuedPrompt(queuedPromptsRef.current, index)
+    if (next === queuedPromptsRef.current) return
+    queueGeneration.current += 1
+    queueAwaitingRun.current = false
+    queuedPromptsRef.current = next
+    setQueuedPrompts(next)
+  }
+
   // Trigger JTBD popup when AI finishes responding
   const previousChatStatus = useRef(status)
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally only trigger on status change
@@ -378,6 +388,15 @@ export const Chat = () => {
         })
       : Promise.resolve(false)
 
+  const queuedPromptRows = queuedPrompts.map((prompt, index) => ({
+    prompt,
+    index,
+    key: `${prompt}-${
+      queuedPrompts.slice(0, index).filter((previous) => previous === prompt)
+        .length
+    }`,
+  }))
+
   return (
     <>
       <main className="mt-4 flex h-full flex-1 flex-col space-y-4 overflow-y-auto">
@@ -441,6 +460,25 @@ export const Chat = () => {
             {queuedPrompts.length} queued prompts (maximum {MAX_QUEUED_PROMPTS},
             this chat only)
           </span>
+          {queuedPrompts.length > 0 && (
+            <ol className="w-full space-y-1">
+              {queuedPromptRows.map(({ prompt, index, key }) => (
+                <li key={key} className="flex min-w-0 items-start gap-2">
+                  <span className="min-w-0 flex-1 break-words">
+                    {index + 1}. {prompt}
+                  </span>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-md border px-2 py-1"
+                    aria-label={`Remove queued prompt ${index + 1}`}
+                    onClick={() => removeQueuedPromptAt(index)}
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
           {(status === 'streaming' || status === 'submitted') && (
             <button
               type="button"

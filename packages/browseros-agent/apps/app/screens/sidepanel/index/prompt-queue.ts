@@ -18,6 +18,13 @@ export function takeNextPrompt(queue: string[]): {
   return { prompt: queue[0], remaining: queue.slice(1) }
 }
 
+export function removeQueuedPrompt(queue: string[], index: number): string[] {
+  if (!Number.isInteger(index) || index < 0 || index >= queue.length) {
+    return queue
+  }
+  return queue.filter((_, queueIndex) => queueIndex !== index)
+}
+
 export function dispatchNextPrompt(
   queue: string[],
   send: (prompt: string) => boolean,

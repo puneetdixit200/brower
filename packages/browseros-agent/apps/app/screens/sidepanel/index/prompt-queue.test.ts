@@ -7,6 +7,7 @@ import {
   isPromptQueueRetryCurrent,
   MAX_QUEUED_PROMPTS,
   normalizeQueuedPrompt,
+  removeQueuedPrompt,
 } from './prompt-queue'
 
 describe('per-chat prompt queue', () => {
@@ -113,5 +114,18 @@ describe('per-chat prompt queue', () => {
     ])
     expect(enqueuePrompt(queue, '   ')).toBe(queue)
     expect(normalizeQueuedPrompt('\n\t')).toBeNull()
+  })
+
+  it('removes one selected prompt without changing the order of the rest', () => {
+    const queue = ['first', 'remove me', 'last']
+    expect(removeQueuedPrompt(queue, 1)).toEqual(['first', 'last'])
+    expect(removeQueuedPrompt(queue, 1)).not.toBe(queue)
+  })
+
+  it('keeps the queue unchanged for an invalid removal index', () => {
+    const queue = ['first', 'last']
+    expect(removeQueuedPrompt(queue, -1)).toBe(queue)
+    expect(removeQueuedPrompt(queue, 2)).toBe(queue)
+    expect(removeQueuedPrompt(queue, 0.5)).toBe(queue)
   })
 })
