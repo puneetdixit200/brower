@@ -18,7 +18,10 @@ export function withSelectedHistoryContext(
   const context = entries.slice(0, 3).map((entry, index) => {
     let site = 'unknown site'
     try {
-      site = new URL(entry.url).origin
+      const url = new URL(entry.url)
+      if (url.protocol === 'http:' || url.protocol === 'https:') {
+        site = url.origin
+      }
     } catch {
       // Invalid/extension URLs are not sent as links.
     }

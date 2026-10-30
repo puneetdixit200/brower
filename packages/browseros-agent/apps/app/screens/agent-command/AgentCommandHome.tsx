@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router'
 import { NoProviderNotice } from '@/components/chat/NoProviderNotice'
 import { ProcessingDisclosure } from '@/components/chat/ProcessingDisclosure'
 import { Feature } from '@/lib/browseros/capabilities'
-import { createBrowserOSAction } from '@/lib/chat-actions/types'
 import { openSidePanelWithSearch } from '@/lib/messaging/sidepanel/openSidepanelWithSearch'
 import { useCapabilities } from '@/modules/browseros/capabilities.hooks'
 import { stagePendingHomeMessage } from '@/modules/chat/pending-home-message'
@@ -22,6 +21,7 @@ import {
 import { withSelectedHistoryContext } from './history-context'
 import { resolveHomeLlmRoutingMode } from './home-compose.helpers'
 import { resolveHomeSearchUrl } from './home-search'
+import { buildHomeSidepanelHandoff } from './home-sidepanel-handoff'
 import { withSelectedMemoryContext } from './memory-context'
 
 export const AgentCommandHome: FC = () => {
@@ -93,16 +93,10 @@ export const AgentCommandHome: FC = () => {
       llmRoutingMode === 'sidepanel' &&
       input.attachments.length === 0
     ) {
-      const action = createBrowserOSAction({
-        mode: 'chat',
-        message,
-        tabs: input.selectedTabs,
-      })
-      await openSidePanelWithSearch('open', {
-        query: input.text,
-        mode: 'chat',
-        action,
-      })
+      await openSidePanelWithSearch(
+        'open',
+        buildHomeSidepanelHandoff(message, input.selectedTabs),
+      )
       return true
     }
     // Never serialize raw prompts, selected contexts or tab IDs into a URL.
