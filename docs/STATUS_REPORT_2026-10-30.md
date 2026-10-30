@@ -4,7 +4,7 @@
 
 - Repository: `/home/puneet/Projects/aster-browser/upstream-browseros`
 - Branch: `feat/aster-linux-ui`
-- Latest committed implementation: `5742d5855` (`feat(agent): recover interrupted partial transcripts`), containing the reviewed T23.2 source, process fixture, sanitized evidence and implementation docs. The report update in this follow-up documentation commit records the exact commit and push verification.
+- Latest committed implementation: `61e84bb1e` (`fix(privacy): redact credential fields in server logs`), following T23.2 commit `5742d5855`. T04.1 now redacts common credential-shaped structured metadata in server console/file logs; the broad outbound sender inventory remains incomplete.
 - Push remote: `aster` → `https://github.com/puneetdixit200/brower.git`. Upstream `origin` remains `https://github.com/browseros-ai/BrowserOS.git`.
 
 ## Overall status
@@ -12,6 +12,8 @@
 The master project remains incomplete. `docs/FEATURE_MATRIX.md` has 72 feature rows: **2 PASS, 68 PARTIAL, 1 PARTIAL / BLOCKED, and 1 NOT_STARTED**. The 2/72 acceptance count (2.8%) is not a measure of engineering effort completed; do not present it as a completion percentage. The detailed scope remains the 103-subtask plan in `docs/IMPLEMENTATION_PLAN.md`.
 
 Recent committed work includes persisted interrupted-task visibility, restart-safe expiry of stale approval requests, compiled-sidecar approval/replay checks, the opt-in file action in the `@` context picker, the T23.1 cancellation guard, and T23.2 bounded partial assistant-text recovery through sidecar SIGKILL/restart. These source and fixture results do not establish full browser or Aster-native acceptance.
+
+The latest T04.1 source slice also redacts common password, API/access key, token, auth, cookie, bearer, credential and private-key metadata fields before either server log sink. Focused logger coverage passes 6/6 (12 assertions), server typecheck and pinned Biome pass, and independent Luna review found no remaining blocker. Error details and binary values are intentionally omitted; arbitrary secret values in innocuously named fields/free-form strings are not covered, so S04 remains PARTIAL.
 
 ## Read-only native build-state audit — 2026-10-30
 
@@ -35,6 +37,7 @@ Recent committed work includes persisted interrupted-task visibility, restart-sa
 - The U06 `@` picker file action has 8/8 focused tests, app typecheck, targeted Biome, and independent Luna review. A headed chooser and verification that selected content reaches only the explicitly submitted request remain open.
 - Browser-MCP `act(fill, fields[])` now checks the run AbortSignal before dispatching each field. Its regression aborts during a deferred first fill, releases that already-dispatched call, and verifies the second fill never dispatches. Focused suite: 4/4; browser-MCP typecheck, targeted Biome and diff-check pass; independent Luna review found no blocker. The first CDP call cannot be recalled, and cancellation for other `act` kinds/provider calls remains unverified. Keep A04 PARTIAL.
 - The approval transport fixture verifies the server/custom-MCP path. Its browser-navigation scenario cannot run with stock Chromium because the required BrowserOS CDP method `Browser.getTabs` is absent.
+- The T04.1 logger regression covers nested credential sentinels, `aws_access_key_id`, `authHeader`/`authTokenValue`, arrays, class instances, maps, cycles and the file sink; the same sanitized metadata object is passed to the console sink. This does not prove that arbitrary free-form strings or every application log call are safe.
 - Downloads controls have source tests and a headed fixture that reaches a real in-progress download row, but Puppeteer click dispatch times out before an action is verified. No Pause/Resume/Cancel runtime success is claimed.
 
 ## Native build and acceptance gate
@@ -43,12 +46,12 @@ Preserve `/home/puneet/Projects/aster-browser/chromium-aster-dev/src` and its 31
 
 ## Recommended next work
 
-1. Complete the read-only native build-state audit in this report: process/lock ownership, disk/memory/swap, source/resource identity, generated graph and Ninja log availability. Find safe incremental-state recovery without modifying the native dirty paths or launching a broad build; if blocked, record exact diagnostics and switch to an independent user-facing slice.
-2. Extend T23.2 to the separate browser-process crash case and verify the headed Task History preview in a disposable Aster profile when a compatible browser is available. Do not replay an uncertain provider/browser mutation; keep A05 PARTIAL until full acceptance.
-3. Keep the BrowserOS/Aster CDP prerequisite visible: browser target selection/navigation requires `Browser.getTabs`; stock Chromium cannot prove that path. Continue headed U06 file-chooser/model-receipt acceptance and the B05 action controls when reliable automation is available.
-4. After resolving the native incremental gate, link and launch a compatible Aster binary in a disposable profile and complete the real extension/new-tab/sidecar/user-task acceptance.
-5. Continue the remaining 103-subtask plan, updating only affected rows with precise evidence. Keep the overall goal active and incomplete.
+1. Continue T04.1 by tracing remaining model, Sentry, connector, sync and update senders and saved logs, adding narrow sentinel tests only where actual code gaps exist. Keep source-level redaction separate from network/native/remote-retention claims.
+2. T20a native audit is complete: no provenance-matching `.ninja_log` was found in searched locations. Preserve all 319 native changes; do not fabricate a log or start a build in the existing output. Assess a clean separate output or suitable build host only after live memory/swap recheck.
+3. Extend T23.2 to the separate browser-process crash case and verify the headed Task History preview in a disposable Aster profile when a compatible browser is available. Do not replay an uncertain provider/browser mutation; keep A05 PARTIAL until full acceptance.
+4. Keep the BrowserOS/Aster CDP prerequisite visible: browser target selection/navigation requires `Browser.getTabs`; stock Chromium cannot prove that path. Continue headed U06 file-chooser/model-receipt acceptance and B05 action controls when reliable automation is available.
+5. After resolving the native incremental gate, link and launch a compatible Aster binary in a disposable profile and complete real extension/new-tab/sidecar/user-task acceptance. Continue the remaining 103-subtask plan; keep the overall goal active and incomplete.
 
 ## Handoff prompt for the next agent
 
-> Continue the Aster Browser goal in `/home/puneet/Projects/aster-browser/upstream-browseros`, branch `feat/aster-linux-ui`. Fetch `aster/feat/aster-linux-ui`, inspect the tree, and check the live quota meter (if unavailable, report that and do not invent a value). T23.2 is committed as `5742d5855`: bounded opt-in assistant display text with a compiled-sidecar SIGKILL/restart fixture proving exact interrupted recovery, no replayable messages, post-restart provider calls, or MCP dispatch. Credential screening is heuristic. Complete the read-only native build-state audit here, preserving the dirty native tree; do not regenerate GN or launch a broad Ninja build while safe incremental-state recovery is unproven. Continue the browser-process crash case and real headed Aster integration as available, then the remaining 103-subtask plan. Add focused checks and request independent Luna-medium review. Keep A04/A05/A06/R02 PARTIAL until their full acceptance gates pass; commit and push reviewed work to `aster`, stopping at 5% remaining in either live quota window. Do not claim a whole-project completion percentage or mark the goal complete. Use Luna-medium agents only, max three concurrent.
+> Continue the Aster Browser goal in `/home/puneet/Projects/aster-browser/upstream-browseros`, branch `feat/aster-linux-ui`. Fetch `aster/feat/aster-linux-ui`, inspect the tree, and check the live quota meter (if unavailable, report that and do not invent a value). T23.2 is committed as `5742d5855`; T04.1 logger metadata redaction is committed as `61e84bb1e`. The native audit found no matching `.ninja_log`; preserve the 319 dirty native paths and do not fabricate state or build in the existing output. Continue the broader T04 sender/log audit with concrete code/tests, then the browser-process crash case and real headed Aster integration as available. Add focused checks and request independent Luna-medium review. Keep A04/A05/A06/R02/S04 PARTIAL until their full acceptance gates pass; commit and push reviewed work to `aster`, stopping at 5% remaining in either live quota window. Do not claim a whole-project completion percentage or mark the goal complete. Use Luna-medium agents only, max three concurrent.
