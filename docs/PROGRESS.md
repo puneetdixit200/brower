@@ -1034,6 +1034,10 @@ Extended and reran `tests/integration/process-approval-fixture.ts --execute --br
 
 The same fixture now parses the actual `/chat` SSE text deltas and asserts the final assistant reply includes the page title and sentinel after `read`; the rerun passed, with captured assistant text `Read Aster Local Fixture; sentinel ASTER_LOCAL_PAGE_SENTINEL_71C4.` This strengthens BrowserOS transport evidence only; the local model is deterministic, so no real-model comprehension is claimed.
 
+### T23.1 / A04 stop failure visibility — 2026-10-30
+
+The chat view now remains attached until the server stop route returns a successful response. A failed HTTP response or fetch therefore leaves the running stream visible and retryable instead of hiding a run that may still be active. A successful `stopped:false` response means the server has no active run and permits detachment. Focused helper tests pass 3/3, covering request-before-detach, retention on HTTP 503, and the no-active-run response; app typecheck, targeted Biome, and `git diff --check` pass. Independent Luna review found no concrete lifecycle defect. This does not undo browser side effects already dispatched before cancellation; A04 remains PARTIAL pending actual runtime failure/retry coverage and provider interruption guarantees.
+
 ### A07 queued-prompt controls — 2026-10-30
 
 The side panel now previews queued prompt text and lets the user remove one queued item without disturbing the remaining FIFO order. Removal updates the local ref/state together and advances the retry generation, preventing a scheduled refused-send retry from dispatching an item after a queue edit. `bun test screens/sidepanel/index/prompt-queue.test.ts` passes 7/7 (23 assertions); app typecheck and targeted Biome pass, and an independent Luna review found no concrete issue. This does not implement live steering or durable queue storage; A07 remains PARTIAL.

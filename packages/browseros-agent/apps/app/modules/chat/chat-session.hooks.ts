@@ -93,6 +93,7 @@ import {
   type SidepanelChatTarget,
   toLlmProviderConfig,
 } from './sidepanel-chat-targets'
+import { stopConversationView } from './stop-conversation'
 import { stripImageToolOutputs } from './tool-output-strip'
 
 const getLastMessageText = (messages: UIMessage[]) => {
@@ -692,20 +693,14 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   }, [detachView, options?.origin])
 
   const stop = useCallback(async () => {
-    // First detach this view so the UI responds immediately, then cancel the
-    // server-owned run explicitly. Aborting the fetch alone is intentionally
-    // no longer a lifecycle signal.
     const stoppedConversationId = conversationIdRef.current
-    const detaching = detachView()
     try {
       const serverUrl = agentUrlRef.current ?? (await resolveAgentServerUrl())
-      const response = await fetch(
-        `${serverUrl}/chat/${encodeURIComponent(stoppedConversationId)}/stop`,
-        { method: 'POST' },
-      )
-      if (!response.ok) {
-        throw new Error(`Conversation stop failed (${response.status})`)
-      }
+      await stopConversationView({
+        serverUrl,
+        conversationId: stoppedConversationId,
+        detachView,
+      })
     } catch (error) {
       sentry.captureException(error, {
         extra: {
@@ -713,8 +708,6 @@ export const useChatSession = (options?: ChatSessionOptions) => {
           operation: 'stop-server-conversation',
         },
       })
-    } finally {
-      await detaching
     }
   }, [detachView])
 
