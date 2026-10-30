@@ -105,10 +105,18 @@ function toolResultText(messages: unknown[]): string[] {
   })
 }
 
-function pageIdFromToolResults(messages: unknown[]): number | null {
+function pageIdFromToolResults(
+  messages: unknown[],
+  expectedUrl = 'about:blank',
+): number | null {
   const text = toolResultText(messages).join('\n')
-  const readable = text.match(/\[(\d+)\]\s+about:blank/i)
-  const structured = text.match(/"page":\s*(\d+)[^}]*"url":\s*"about:blank"/i)
+  const escapedUrl = expectedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const readable = text.match(
+    new RegExp(`\\[(\\d+)\\]\\s+${escapedUrl}(?:\\s|\\()`, 'i'),
+  )
+  const structured = text.match(
+    new RegExp(`"page":\\s*(\\d+)[^}]*"url":\\s*"${escapedUrl}"`, 'i'),
+  )
   const value = Number(readable?.[1] ?? structured?.[1])
   return Number.isSafeInteger(value) && value > 0 ? value : null
 }
@@ -142,7 +150,7 @@ function selectModelStep(
   }
 
   const lastCall = callHistory.at(-1)
-  if (lastCall === 'tabs' && callHistory.includes('navigate')) {
+  if (lastCall === 'read' && callHistory.includes('navigate')) {
     const hasSentinel = resultHistory.some((text) =>
       text.includes(BROWSER_SENTINEL),
     )
@@ -151,7 +159,7 @@ function selectModelStep(
     )
     if (!hasSentinel || !hasTitle)
       throw new Error(
-        'navigate tool output did not include the local page title and sentinel',
+        'read tool output did not include the local page title and sentinel',
       )
     browserToolSteps.push({
       toolName: null,
@@ -169,6 +177,26 @@ function selectModelStep(
     browserToolSteps.push({
       toolName,
       input,
+      observedToolResults: resultHistory,
+    })
+    return {
+      toolName,
+      input,
+      finalText: 'Read the local fixture title and sentinel.',
+    }
+  }
+  if (lastCall === 'tabs' && callHistory.includes('navigate')) {
+    const expectedUrl = `http://127.0.0.1:${pagePort}/fixture`
+    const targetPageId = pageIdFromToolResults(messages, expectedUrl)
+    if (targetPageId === null)
+      throw new Error('tabs list did not return the exact local fixture page')
+    const toolName = toolNames.find((name) => name === 'read')
+    if (!toolName) throw new Error('read tool missing from model advertisement')
+    const input = { page: targetPageId, format: 'text' }
+    browserToolSteps.push({
+      toolName,
+      input,
+      targetPageId,
       observedToolResults: resultHistory,
     })
     return {
@@ -493,6 +521,8 @@ async function main() {
     chromium,
     '--headless=new',
     `--user-data-dir=${paths.profile}`,
+    // Blocks hostname resolution; external IP literal connections remain possible.
+    '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1',
     '--remote-debugging-address=127.0.0.1',
     `--remote-debugging-port=${ports.cdp}`,
     '--no-first-run',
@@ -593,7 +623,7 @@ async function main() {
           return new Response('not found', { status: 404 })
         browserPageRequests.push(url.pathname)
         return new Response(
-          `<!doctype html><html><head><title>${BROWSER_PAGE_TITLE}</title></head><body><main>${BROWSER_SENTINEL}</main></body></html>`,
+          `<!doctype html><html><head><title>${BROWSER_PAGE_TITLE}</title></head><body><h1>${BROWSER_PAGE_TITLE}</h1><main>${BROWSER_SENTINEL}</main></body></html>`,
           { headers: { 'Content-Type': 'text/html; charset=utf-8' } },
         )
       },
@@ -1215,7 +1245,9 @@ async function main() {
       const navigateStep = browserToolSteps.find(
         (step) => step.toolName === 'navigate',
       )
+      const readStep = browserToolSteps.find((step) => step.toolName === 'read')
       assert(navigateStep, 'Model did not select the advertised navigate tool')
+      assert(readStep, 'Model did not select the advertised read tool')
       assert(
         navigateStep.input?.url === `http://127.0.0.1:${ports.page}/fixture`,
         'navigate tool did not target the exact local fixture URL',
@@ -1223,6 +1255,11 @@ async function main() {
       assert(
         navigateStep.targetPageId !== undefined,
         'navigate tool did not target a page returned by tabs list',
+      )
+      assert(
+        readStep.input?.page === navigateStep.targetPageId &&
+          readStep.input?.format === 'text',
+        'read tool did not target the navigated fixture page in text format',
       )
       const navigateResultStep = browserToolSteps.find(
         (step) =>
@@ -1240,6 +1277,11 @@ async function main() {
       assert(
         browserPageRequests.includes('/fixture'),
         'Chromium did not request the local fixture page',
+      )
+      assertDispatchCount(
+        dispatches,
+        1,
+        'Browser scenario dispatched an unexpected side effect',
       )
     }
 
