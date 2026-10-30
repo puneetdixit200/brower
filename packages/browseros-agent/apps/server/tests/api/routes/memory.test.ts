@@ -26,6 +26,93 @@ describe('memory API', () => {
     dirs.length = 0
   })
 
+  test('rejects incognito requests on every route before accessing the store', async () => {
+    const calls: string[] = []
+    const store = Object.fromEntries(
+      [
+        'list',
+        'updateSettings',
+        'settings',
+        'search',
+        'history',
+        'undo',
+        'save',
+        'remove',
+      ].map((method) => [
+        method,
+        () => {
+          calls.push(method)
+          throw new Error(`memory store ${method} must not run in incognito`)
+        },
+      ]),
+    )
+    const app = new Hono<Env>()
+      .use('/memory', requireTrustedAppOrigin())
+      .use('/memory/*', requireTrustedAppOrigin())
+      .route('/memory', createMemoryRoutes({ store: store as never }))
+    const memoryId = crypto.randomUUID()
+    const headers = {
+      Host: 'localhost',
+      Origin: 'chrome-extension://aster-test',
+      'X-Aster-Incognito': 'true',
+    }
+    const jsonHeaders = { ...headers, 'Content-Type': 'application/json' }
+    const json = (body: unknown) => JSON.stringify(body)
+    const taskNote = {
+      content: 'private',
+      sourceId: memoryId,
+      sourceTitle: 'private task',
+    }
+    const requests: Array<[string, RequestInit]> = [
+      ['/memory', { headers }],
+      [
+        '/memory/settings',
+        {
+          method: 'PUT',
+          headers: jsonHeaders,
+          body: json({ enabled: true, retentionDays: 90 }),
+        },
+      ],
+      [
+        '/memory/search',
+        {
+          method: 'POST',
+          headers: jsonHeaders,
+          body: json({ query: 'private' }),
+        },
+      ],
+      [`/memory/${memoryId}/revisions`, { headers }],
+      [`/memory/${memoryId}/undo`, { method: 'POST', headers }],
+      [
+        '/memory',
+        {
+          method: 'POST',
+          headers: jsonHeaders,
+          body: json(taskNote),
+        },
+      ],
+      [
+        `/memory/${memoryId}`,
+        {
+          method: 'PUT',
+          headers: jsonHeaders,
+          body: json(taskNote),
+        },
+      ],
+      [`/memory/${memoryId}`, { method: 'DELETE', headers }],
+    ]
+
+    for (const [path, init] of requests) {
+      const response = await app.request(
+        `http://localhost${path}`,
+        init,
+        localServer,
+      )
+      expect(response.status).toBe(403)
+    }
+    expect(calls).toEqual([])
+  })
+
   test('requires a trusted local origin and supports note retrieval and deletion', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'aster-memory-route-'))
     dirs.push(dir)

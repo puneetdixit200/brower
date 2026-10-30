@@ -445,3 +445,7 @@ A07 now previews/removes individual in-memory queued prompts, but true live stee
 ### P01 generated page-content password-field regression — 2026-10-30
 
 The generated content-Markdown expression now has a fixture regression test covering a password-input value sentinel and a textarea child-text sentinel, which would otherwise be serialized, while preserving ordinary visible text. The full browser-core suite passes 54/54 (150 assertions), both core/MCP package typechecks pass, and the focused browser-MCP password-redaction test passes 1/1 (7 assertions). Installed Biome cannot parse the existing `useSortedClasses` configuration. Next run T07.1/T07.2 with a disposable headed Aster profile and dummy saved-password sentinel, verifying native autofill remains user-mediated and no credential enters model/tool payloads; keep P01/B08 PARTIAL until native and packaged acceptance.
+
+### M05 incognito memory route coverage — 2026-10-30
+
+The incognito marker now has route-level regression coverage across every memory endpoint: GET list, PUT settings, POST search, GET revisions, POST undo, POST create, PUT update, and DELETE all return 403 before any injected store method runs. The focused memory route suite passes 2/2 (35 assertions); server typecheck, targeted Biome, and `git diff --check` pass. Keep M05 PARTIAL because the supported BrowserOS runtime still blocks extension pages in a true off-the-record context; repeat the headed OTR acceptance when a compatible runtime is available.
