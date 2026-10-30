@@ -1,5 +1,9 @@
 # Progress
 
+### T12.1 / U03 Recent Tasks storage loader — 2026-10-30
+
+Extracted persisted history and recovery-marker reads into `loadRecentTasks` behind an injectable storage interface, keeping the component's incognito gate, stale-result protection, and storage-change subscription intact. The loader fails closed for malformed history and validates task, step, artifact, conversation ownership, required counters, and optional IDs before projecting cards. Focused Recent Tasks tests cover startup/server marker precedence, duplicate IDs across conversations, unmarked running tasks, malformed/missing records and storage errors; the combined Recent Tasks and Task History/export/download suites pass 27/27 (68 assertions), app typecheck passes, targeted Biome and `git diff --check` pass. U03 remains PARTIAL pending headed Aster persistence/privacy and restart acceptance.
+
 ### U01 sidebar resize bounds and keyboard source coverage — 2026-10-30
 
 Moved sidebar width bounds/defaults and supported keyboard resize mapping into pure helpers used by the layout. Tests cover pointer-release collapse, clamping/rounding and invalid numeric values, stored-width parsing (null, malformed, empty, fractional and bounds), ArrowLeft/Right, Home/End, unsupported keys, and minimum/maximum width boundaries. Focused suite passes 8/8 (23 assertions), with app typecheck, targeted Biome, and `git diff --check` passing; independent Luna review found no behavior change. U01 remains PARTIAL pending headed Aster pointer/keyboard, native alignment and actual window resize acceptance.

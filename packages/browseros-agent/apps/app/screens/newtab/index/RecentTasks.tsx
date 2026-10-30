@@ -2,16 +2,8 @@ import { CheckCircle2, CircleDashed, Clock3, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { useIncognitoWindow } from '@/lib/browseros/use-incognito-window'
-import {
-  browserStartupRecoveryMarkerKey,
-  executionRecoveryMarkerKey,
-  getExecutionRecoveryMarker,
-} from '@/lib/execution-history/recovery'
-import type {
-  ExecutionHistoryByConversation,
-  ExecutionTaskRecord,
-} from '@/lib/execution-history/types'
-import { buildRecentTasks } from './recent-tasks'
+import type { ExecutionTaskRecord } from '@/lib/execution-history/types'
+import { loadRecentTasks } from './recent-tasks'
 
 const HISTORY_KEY = 'executionHistoryByConversation'
 
@@ -55,36 +47,7 @@ export function RecentTasks() {
     const refresh = async () => {
       const current = ++generation
       try {
-        const initial = await chrome.storage.local.get(HISTORY_KEY)
-        const history = initial[HISTORY_KEY] as
-          | ExecutionHistoryByConversation
-          | undefined
-        if (!history || typeof history !== 'object') {
-          if (active && current === generation) {
-            setTasks([])
-            setError(false)
-          }
-          return
-        }
-        const running = Object.values(history).flatMap((record) =>
-          (record.tasks ?? []).filter((task) => task.status === 'running'),
-        )
-        const keys = running.flatMap((task) => [
-          executionRecoveryMarkerKey(task.id),
-          browserStartupRecoveryMarkerKey(task.id),
-        ])
-        const storedMarkers = keys.length
-          ? await chrome.storage.local.get(keys)
-          : {}
-        const markers = running.flatMap((task) => {
-          const marker = getExecutionRecoveryMarker(
-            task.id,
-            task.conversationId,
-            storedMarkers,
-          )
-          return marker ? [marker] : []
-        })
-        const recent = buildRecentTasks(history, markers)
+        const recent = await loadRecentTasks(chrome.storage.local)
         if (active && current === generation) {
           setTasks(recent)
           setError(false)

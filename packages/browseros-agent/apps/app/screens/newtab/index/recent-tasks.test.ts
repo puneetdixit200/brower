@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'bun:test'
 import type { ExecutionRecoveryMarker } from '@/lib/execution-history/recovery'
+import {
+  browserStartupRecoveryMarkerKey,
+  executionRecoveryMarkerKey,
+} from '@/lib/execution-history/recovery'
 import type {
   ExecutionHistoryByConversation,
   ExecutionTaskRecord,
 } from '@/lib/execution-history/types'
-import { buildRecentTasks } from './recent-tasks'
+import { buildRecentTasks, loadRecentTasks } from './recent-tasks'
 
 function task(
   id: string,
@@ -163,5 +167,183 @@ describe('buildRecentTasks', () => {
     expect(recent.map(({ id, status }) => [id, status])).toEqual([
       ['safe-running', 'interrupted'],
     ])
+  })
+})
+
+describe('loadRecentTasks', () => {
+  it('projects a startup interrupted marker from persisted storage', async () => {
+    const persisted = history('conversation', [
+      task('startup-task', 'conversation', '2026-10-28T10:00:00Z'),
+    ])
+    const storage = {
+      get: async (keys: string | string[]) => {
+        const list = Array.isArray(keys) ? keys : [keys]
+        if (list[0] === 'executionHistoryByConversation') {
+          return { executionHistoryByConversation: persisted }
+        }
+        return {
+          [browserStartupRecoveryMarkerKey('startup-task')]: {
+            ...marker('startup-task', 'conversation'),
+            source: 'browser-startup' as const,
+          },
+        }
+      },
+    }
+    await expect(loadRecentTasks(storage)).resolves.toMatchObject([
+      { id: 'startup-task', status: 'interrupted' },
+    ])
+  })
+
+  it('prefers a matching server terminal marker over startup interruption', async () => {
+    const persisted = history('conversation', [
+      task('server-task', 'conversation', '2026-10-28T10:00:00Z'),
+    ])
+    const storage = {
+      get: async (keys: string | string[]) => {
+        const list = Array.isArray(keys) ? keys : [keys]
+        if (list[0] === 'executionHistoryByConversation') {
+          return { executionHistoryByConversation: persisted }
+        }
+        return {
+          [browserStartupRecoveryMarkerKey('server-task')]: {
+            ...marker('server-task', 'conversation'),
+            source: 'browser-startup' as const,
+          },
+          [executionRecoveryMarkerKey('server-task')]: {
+            ...marker('server-task', 'conversation'),
+            status: 'completed' as const,
+          },
+        }
+      },
+    }
+    await expect(loadRecentTasks(storage)).resolves.toMatchObject([
+      { id: 'server-task', status: 'completed' },
+    ])
+  })
+
+  it('checks duplicate task IDs against their own conversations and leaves unmarked rows running', async () => {
+    const persisted = history('conversation-one', [
+      task('shared-id', 'conversation-one', '2026-10-28T10:00:00Z'),
+    ])
+    persisted.other = {
+      conversationId: 'conversation-two',
+      updatedAt: 1,
+      tasks: [task('shared-id', 'conversation-two', '2026-10-28T09:00:00Z')],
+    }
+    const storage = {
+      get: async (keys: string | string[]) => {
+        const list = Array.isArray(keys) ? keys : [keys]
+        if (list[0] === 'executionHistoryByConversation') {
+          return { executionHistoryByConversation: persisted }
+        }
+        return {
+          [executionRecoveryMarkerKey('shared-id')]: marker(
+            'shared-id',
+            'conversation-one',
+          ),
+        }
+      },
+    }
+    await expect(loadRecentTasks(storage)).resolves.toMatchObject([
+      {
+        id: 'shared-id',
+        conversationId: 'conversation-one',
+        status: 'interrupted',
+      },
+      {
+        id: 'shared-id',
+        conversationId: 'conversation-two',
+        status: 'running',
+      },
+    ])
+  })
+
+  it('returns empty for missing or malformed history and leaves unmarked tasks running', async () => {
+    await expect(loadRecentTasks({ get: async () => ({}) })).resolves.toEqual(
+      [],
+    )
+    await expect(
+      loadRecentTasks({
+        get: async () => ({
+          executionHistoryByConversation: { broken: { tasks: [null] } },
+        }),
+      }),
+    ).resolves.toEqual([])
+    await expect(
+      loadRecentTasks({
+        get: async () => ({
+          executionHistoryByConversation: history('conversation', [
+            task('plain', 'conversation', '2026-10-28T10:00:00Z'),
+          ]),
+        }),
+      }),
+    ).resolves.toMatchObject([{ id: 'plain', status: 'running' }])
+  })
+
+  it('fails closed for unknown task statuses and malformed nested records', async () => {
+    const stored = (record: unknown) =>
+      loadRecentTasks({
+        get: async () => ({ executionHistoryByConversation: record }),
+      })
+    const unknownStatus = history('conversation', [
+      task('invalid-status', 'conversation', '2026-10-28T10:00:00Z', {
+        status: 'queued' as ExecutionTaskRecord['status'],
+      }),
+    ])
+    const nullStep = history('conversation', [
+      task('invalid-step', 'conversation', '2026-10-28T10:00:00Z'),
+    ])
+    ;(nullStep.conversation.tasks[0] as { steps: unknown[] }).steps = [null]
+    const nullArtifact = history('conversation', [
+      task('invalid-artifact', 'conversation', '2026-10-28T10:00:00Z'),
+    ])
+    ;(
+      nullArtifact.conversation.tasks[0] as { artifacts: unknown[] }
+    ).artifacts = [null]
+    const unknownStepState = history('conversation', [
+      task('invalid-step-state', 'conversation', '2026-10-28T10:00:00Z'),
+    ])
+    ;(unknownStepState.conversation.tasks[0] as { steps: unknown[] }).steps = [
+      {
+        id: 'step',
+        toolName: 'tool',
+        order: 0,
+        state: 'queued',
+        startedAt: '2026-10-28T10:00:00Z',
+        previewText: 'preview',
+      },
+    ]
+    const mismatchedConversation = history('conversation', [
+      task('wrong-owner', 'another-conversation', '2026-10-28T10:00:00Z'),
+    ])
+    const malformedResponse = history('conversation', [
+      task('invalid-response', 'conversation', '2026-10-28T10:00:00Z', {
+        responseText: 42 as unknown as string,
+      }),
+    ])
+    const malformedCounter = history('conversation', [
+      task('invalid-counter', 'conversation', '2026-10-28T10:00:00Z', {
+        actionCount: 'one' as unknown as number,
+      }),
+    ])
+
+    await expect(stored(unknownStatus)).resolves.toEqual([])
+    await expect(stored(nullStep)).resolves.toEqual([])
+    await expect(stored(nullArtifact)).resolves.toEqual([])
+    await expect(stored(unknownStepState)).resolves.toEqual([])
+    await expect(stored(mismatchedConversation)).resolves.toEqual([])
+    await expect(stored(malformedResponse)).resolves.toEqual([])
+    await expect(stored(malformedCounter)).resolves.toEqual([])
+  })
+
+  it('rejects storage errors so the component can show its error state', async () => {
+    const failure = new Error('storage unavailable')
+    await expect(
+      loadRecentTasks({
+        get: async () => {
+          throw failure
+        },
+      }),
+    ).rejects.toBe(failure)
   })
 })
