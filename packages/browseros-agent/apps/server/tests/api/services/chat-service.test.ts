@@ -7,7 +7,10 @@ import type { UIMessageChunk } from 'ai'
 import * as _ai from 'ai'
 import { MockLanguageModelV3 } from 'ai/test'
 import { z } from 'zod'
-import { actionPolicyIdForCandidate } from '../../../src/agent/action-policy'
+import {
+  actionPolicyIdForCandidate,
+  DbActionPolicyStore,
+} from '../../../src/agent/action-policy'
 import * as mcpBuilderModule from '../../../src/agent/mcp-builder'
 import * as providerFactoryModule from '../../../src/agent/provider-factory'
 import * as researchSupportModule from '../../../src/agent/research-support-assessment'
@@ -59,20 +62,33 @@ let streamResponseHandler:
 let useProductionAgentFixture = false
 let productionToolDispatches: unknown[] = []
 let productionModelCalls = 0
+let productionModelGate: Promise<void> | undefined
+let productionModelStarted: (() => void) | undefined
+let productionModelToolCallProduced: (() => void) | undefined
+let productionModelToolCallWasAborted = false
+let productionToolCallOverride:
+  | { toolName: string; input: Record<string, unknown> }
+  | undefined
 
 const productionFixtureModel = new MockLanguageModelV3({
-  doStream: async () => {
+  doStream: async ({ abortSignal }) => {
     productionModelCalls += 1
+    if (productionModelGate) {
+      productionModelStarted?.()
+      await productionModelGate
+    }
     const part =
       productionModelCalls % 2 === 1
         ? {
             type: 'tool-call' as const,
             toolCallId: 'provider-send-call-1',
-            toolName: 'send_message',
-            input: JSON.stringify({
-              destination: 'user@example.test',
-              body: 'hello',
-            }),
+            toolName: productionToolCallOverride?.toolName ?? 'send_message',
+            input: JSON.stringify(
+              productionToolCallOverride?.input ?? {
+                destination: 'user@example.test',
+                body: 'hello',
+              },
+            ),
           }
         : {
             type: 'text-delta' as const,
@@ -84,7 +100,7 @@ const productionFixtureModel = new MockLanguageModelV3({
         part.type === 'tool-call' ? ('tool-calls' as const) : ('stop' as const),
       raw: part.type === 'tool-call' ? 'tool_calls' : 'stop',
     }
-    return {
+    const result = {
       stream: new ReadableStream({
         start(controller) {
           controller.enqueue({ type: 'stream-start', warnings: [] })
@@ -106,6 +122,11 @@ const productionFixtureModel = new MockLanguageModelV3({
         },
       }),
     }
+    if (part.type === 'tool-call') {
+      productionModelToolCallWasAborted = abortSignal?.aborted === true
+      productionModelToolCallProduced?.()
+    }
+    return result
   },
 })
 
@@ -219,19 +240,41 @@ mock.module('../../../src/agent/mcp-builder', () => ({
       clients: [],
       tools: specs.some((spec) => spec.name === 'browseros')
         ? {}
-        : {
-            send_message: {
-              description: 'Send a message to the selected recipient.',
-              inputSchema: z.object({
-                destination: z.string(),
-                body: z.string(),
-              }),
-              execute: async (input: { destination: string; body: string }) => {
-                productionToolDispatches.push(input)
-                return { sent: true }
+        : productionToolCallOverride?.toolName === 'tabs'
+          ? {
+              tabs: {
+                description: 'Open a browser tab.',
+                inputSchema: z.object({
+                  action: z.enum(['new']),
+                  url: z.string().optional(),
+                  background: z.boolean().optional(),
+                }),
+                execute: async (input: {
+                  action: string
+                  url?: string
+                  background?: boolean
+                }) => {
+                  productionToolDispatches.push(input)
+                  return { pageId: 42 }
+                },
+              },
+            }
+          : {
+              send_message: {
+                description: 'Send a message to the selected recipient.',
+                inputSchema: z.object({
+                  destination: z.string(),
+                  body: z.string(),
+                }),
+                execute: async (input: {
+                  destination: string
+                  body: string
+                }) => {
+                  productionToolDispatches.push(input)
+                  return { sent: true }
+                },
               },
             },
-          },
     }
   },
 }))
@@ -1571,6 +1614,7 @@ describe('ChatService history persistence', () => {
     useProductionAgentFixture = true
     productionModelCalls = 0
     productionToolDispatches = []
+    productionModelToolCallWasAborted = false
 
     const makeRequest = (
       conversationId: string,
@@ -1660,6 +1704,119 @@ describe('ChatService history persistence', () => {
       ).text()
       expect(productionToolDispatches).toHaveLength(1)
     } finally {
+      useProductionAgentFixture = false
+    }
+  })
+
+  it('stops a live production ToolLoopAgent before its saved-allow mutation dispatches', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'browseros-chat-tool-loop-stop-'))
+    tempDirs.push(dir)
+    initializeDb({ dbPath: join(dir, 'browseros.sqlite') })
+    const policyStore = new DbActionPolicyStore()
+    await policyStore.put('browser.tabs.new', {
+      decision: 'allow',
+      expiresAt: null,
+    })
+    expect(await policyStore.getDecision('browser.tabs.new')).toBe('allow')
+    const sessionStore = createSessionStore()
+    const service = new ChatService({
+      sessionStore: sessionStore as never,
+      klavis: createKlavisStub() as never,
+      browser: persistenceBrowser() as never,
+    })
+    useProductionAgentFixture = true
+    productionModelCalls = 0
+    productionToolDispatches = []
+    productionModelToolCallWasAborted = false
+    productionToolCallOverride = {
+      toolName: 'tabs',
+      input: {
+        action: 'new',
+        url: 'https://mutation.example.test/',
+        background: true,
+      },
+    }
+
+    const makeRequest = (conversationId: string) => ({
+      ...browserOsRequest(conversationId, false),
+      message: 'Open a background tab.',
+      browserContext: {
+        activeTab: { id: 3, url: 'https://example.com', title: 'Example' },
+        customMcpServers: [{ name: 'fixture', url: 'http://fixture.test/mcp' }],
+      },
+    })
+
+    let releaseModel = () => {}
+    try {
+      const baselineConversationId = crypto.randomUUID()
+      const baseline = await service.processMessage(
+        makeRequest(baselineConversationId) as never,
+        new AbortController().signal,
+      )
+      await baseline.text()
+      expect(productionToolDispatches).toEqual([
+        {
+          action: 'new',
+          url: 'https://mutation.example.test/',
+          background: true,
+        },
+      ])
+
+      productionModelCalls = 0
+      productionToolDispatches = []
+
+      const modelGate = new Promise<void>((resolve) => {
+        releaseModel = resolve
+      })
+      let markModelStarted!: () => void
+      const modelStarted = new Promise<void>((resolve) => {
+        markModelStarted = resolve
+      })
+      let markToolCallProduced!: () => void
+      const toolCallProduced = new Promise<void>((resolve) => {
+        markToolCallProduced = resolve
+      })
+      productionModelGate = modelGate
+      productionModelStarted = markModelStarted
+      productionModelToolCallProduced = markToolCallProduced
+
+      const conversationId = crypto.randomUUID()
+      const response = await service.processMessage(
+        makeRequest(conversationId) as never,
+        new AbortController().signal,
+      )
+      const responseText = response.text()
+      await modelStarted
+
+      const runId = response.headers.get('x-browseros-run-id')
+      expect(runId).toMatch(/^[0-9a-f-]{36}$/)
+      expect(productionToolDispatches).toEqual([])
+      expect(await service.stop(conversationId)).toBe(true)
+      releaseModel()
+      await toolCallProduced
+      await responseText
+
+      expect(productionModelToolCallWasAborted).toBe(true)
+      const snapshot = await service.getRunSnapshot(conversationId)
+      expect(snapshot?.status).toBe('aborted')
+      expect(
+        snapshot?.traceEvents?.map(({ taskId, kind, outcome }) => [
+          taskId,
+          kind,
+          outcome,
+        ]),
+      ).toEqual([
+        [runId, 'task_started', undefined],
+        [runId, 'task_finished', 'aborted'],
+      ])
+      expect(productionModelCalls).toBe(1)
+      expect(productionToolDispatches).toEqual([])
+    } finally {
+      releaseModel()
+      productionToolCallOverride = undefined
+      productionModelGate = undefined
+      productionModelStarted = undefined
+      productionModelToolCallProduced = undefined
       useProductionAgentFixture = false
     }
   })
