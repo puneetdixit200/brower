@@ -15,6 +15,7 @@ import { RpcClientProvider } from '@/lib/rpc/RpcClientProvider'
 import { cn } from '@/lib/utils'
 import { ActiveConversationProvider } from '@/modules/conversations/active-conversation-context'
 import { ShortcutsDialog } from '@/screens/newtab/index/ShortcutsDialog'
+import { shouldCollapseSidebarAfterResize } from './sidebar-resize'
 
 const COLLAPSE_DELAY = 150
 const SIDEBAR_WIDTH_KEY = 'aster.sidebar.expandedWidth.v1'
@@ -24,13 +25,18 @@ const DEFAULT_SIDEBAR_WIDTH = 256
 
 function boundedSidebarWidth(value: number): number {
   if (!Number.isFinite(value)) return DEFAULT_SIDEBAR_WIDTH
-  return Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, Math.round(value)))
+  return Math.max(
+    MIN_SIDEBAR_WIDTH,
+    Math.min(MAX_SIDEBAR_WIDTH, Math.round(value)),
+  )
 }
 
 function readSidebarWidth(): number {
   try {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY)
-    return saved === null ? DEFAULT_SIDEBAR_WIDTH : boundedSidebarWidth(Number(saved))
+    return saved === null
+      ? DEFAULT_SIDEBAR_WIDTH
+      : boundedSidebarWidth(Number(saved))
   } catch {
     return DEFAULT_SIDEBAR_WIDTH
   }
@@ -51,7 +57,10 @@ const SidebarLayoutContent: FC = () => {
   const isMobile = useIsMobile()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [expandedWidth, setExpandedWidth] = useState(readSidebarWidth)
-  const resizeSession = useRef<{ initialX: number; initialWidth: number } | null>(null)
+  const resizeSession = useRef<{
+    initialX: number
+    initialWidth: number
+  } | null>(null)
   const lastResizeWidth = useRef(expandedWidth)
   const [resizing, setResizing] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -124,12 +133,25 @@ const SidebarLayoutContent: FC = () => {
       if (!session) return
       const next =
         event instanceof PointerEvent
-          ? boundedSidebarWidth(session.initialWidth + event.clientX - session.initialX)
+          ? boundedSidebarWidth(
+              session.initialWidth + event.clientX - session.initialX,
+            )
           : lastResizeWidth.current
       resizeSession.current = null
       setResizing(false)
       setExpandedWidth(next)
       saveSidebarWidth(next)
+      if (
+        event instanceof PointerEvent &&
+        shouldCollapseSidebarAfterResize(
+          sidebarRef.current?.getBoundingClientRect(),
+          { x: event.clientX, y: event.clientY },
+          Boolean(sidebarRef.current?.contains(document.activeElement)),
+          next,
+        )
+      ) {
+        handleMouseLeave()
+      }
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onStop)
@@ -141,7 +163,7 @@ const SidebarLayoutContent: FC = () => {
       window.removeEventListener('pointercancel', onStop)
       window.removeEventListener('blur', onStop)
     }
-  }, [resizing])
+  }, [handleMouseLeave, resizing])
 
   const resizeWithKeyboard = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     const delta =
@@ -239,8 +261,7 @@ const SidebarLayoutContent: FC = () => {
             onOpenShortcuts={openShortcuts}
           />
           {sidebarOpen && (
-            <div
-              role="separator"
+            <hr
               aria-orientation="vertical"
               aria-label="Resize Aster sidebar"
               aria-valuemin={MIN_SIDEBAR_WIDTH}
@@ -249,7 +270,7 @@ const SidebarLayoutContent: FC = () => {
               tabIndex={0}
               onPointerDown={beginResize}
               onKeyDown={resizeWithKeyboard}
-              className="absolute inset-y-0 right-0 w-2 cursor-col-resize bg-transparent hover:bg-border/70 focus-visible:bg-ring/50 focus-visible:outline-2 focus-visible:outline-ring"
+              className="absolute inset-y-0 right-0 w-2 cursor-col-resize border-0 bg-transparent hover:bg-border/70 focus-visible:bg-ring/50 focus-visible:outline-2 focus-visible:outline-ring"
             />
           )}
         </div>

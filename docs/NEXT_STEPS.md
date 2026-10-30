@@ -1,5 +1,9 @@
 # Aster next steps
 
+### Current source checkpoint — U01 sidebar resize release — 2026-10-30
+
+Sidebar drag completion now evaluates pointer position against the final intended width, even if React has not committed the last width update when pointer-up fires. Four focused helper tests, app typecheck, targeted Biome and the development build pass; independent Luna review found and verified the stale-bounds correction. U01 remains PARTIAL: headed Aster pointer/keyboard behavior, native alignment and real window-resize acceptance are still required. The native gate below remains unchanged: preserve the dirty Chromium checkout and do not launch a full build without matching incremental state or a clean pinned host.
+
 ### Current implementation checkpoint — 2026-10-30 (T23.3/A05, T20a/B03, U13)
 
 T23.3 adds browser-process startup visibility for persisted running tasks. The extension creates local-only interrupted markers for tasks that predate `runtime.onStartup`; malformed history entries are skipped, server-state markers use a separate namespace and take precedence, and no history rewrite, transcript replay, or task resumption occurs. Task History and Recent Tasks read either marker source. Focused recovery/history tests pass 30/30 (57 assertions), app typecheck and targeted Biome pass, and independent Luna review found no actionable issue. The disposable Chromium smoke did not observe a marker, so startup event delivery remains unverified; see [evidence](evidence/aster-browser-startup-recovery-2026-10-30.md). A05 remains PARTIAL.
