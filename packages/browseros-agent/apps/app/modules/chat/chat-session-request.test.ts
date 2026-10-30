@@ -6,6 +6,7 @@ import type { LlmProviderConfig } from '@/lib/llm-providers/types'
 import {
   buildRequestBrowserContext,
   buildSidepanelPreparedSendMessagesRequest,
+  getLastUserMessageFiles,
   getOwnerTabSelection,
   getToolApprovalResponse,
   isSameOwnerTabSelection,
@@ -17,6 +18,51 @@ import type { SidepanelChatTarget } from './sidepanel-chat-targets'
 const conversationId = '00000000-0000-4000-8000-000000000001'
 
 describe('chat request preparation', () => {
+  it('does not replay files from earlier user turns', () => {
+    const earlierFile = {
+      type: 'file' as const,
+      mediaType: 'text/plain',
+      filename: 'previous.txt',
+      url: 'data:text/plain;base64,cHJldmlvdXMtc2VudGluZWw=',
+    }
+    const currentFile = {
+      type: 'file' as const,
+      mediaType: 'text/plain',
+      filename: 'current.txt',
+      url: 'data:text/plain;base64,Y3VycmVudC1zZW50aW5lbA==',
+    }
+    const messages = [
+      {
+        id: 'user-1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'first' }, earlierFile],
+      },
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'first response' }],
+      },
+      {
+        id: 'user-2',
+        role: 'user',
+        parts: [{ type: 'text', text: 'second' }, currentFile],
+      },
+    ] satisfies UIMessage[]
+
+    expect(getLastUserMessageFiles(messages)).toEqual([currentFile])
+    expect(getLastUserMessageFiles(messages.slice(0, 2))).toEqual([earlierFile])
+    expect(getLastUserMessageFiles(messages.slice(0, 1))).toEqual([earlierFile])
+    expect(
+      getLastUserMessageFiles([
+        {
+          id: 'assistant-only',
+          role: 'assistant',
+          parts: [{ type: 'text', text: 'no user turn' }],
+        },
+      ] satisfies UIMessage[]),
+    ).toEqual([])
+  })
+
   it('clears only the exact selected-text snapshot attached to a send', () => {
     const sent = {
       text: 'selected excerpt',
@@ -221,6 +267,41 @@ describe('chat request preparation', () => {
     expect('provider' in request.body).toBe(false)
     expect('model' in request.body).toBe(false)
     expect('reasoningEffort' in request.body).toBe(false)
+  })
+
+  it('sends a selected file once in the chat body and omits it when removed', () => {
+    const selectedFile = {
+      mediaType: 'text/plain',
+      data: 'data:text/plain;base64,c2VsZWN0ZWQtZmlsZS1zZW50aW5lbA==',
+    }
+    const request = buildSidepanelPreparedSendMessagesRequest({
+      agentServerUrl: 'http://127.0.0.1:5151',
+      target: llmTarget,
+      fallbackProvider,
+      message: 'Summarize the attached notes',
+      attachments: [selectedFile],
+      ...commonRequestInput(),
+    })
+
+    expect(request.api).toBe('http://127.0.0.1:5151/chat')
+    expect(request.body.attachments).toEqual([selectedFile])
+    const serializedRequest = JSON.stringify(request.body)
+    expect(serializedRequest.split(selectedFile.data)).toHaveLength(2)
+    expect(request.api).not.toContain('?')
+    expect(request.api).not.toContain(selectedFile.data)
+
+    const removedRequest = buildSidepanelPreparedSendMessagesRequest({
+      agentServerUrl: 'http://127.0.0.1:5151',
+      target: llmTarget,
+      fallbackProvider,
+      message: 'Summarize the attached notes',
+      attachments: [],
+      ...commonRequestInput(),
+    })
+
+    expect(removedRequest.api).toBe('http://127.0.0.1:5151/chat')
+    expect(removedRequest.body.attachments).toBeUndefined()
+    expect(JSON.stringify(removedRequest.body)).not.toContain(selectedFile.data)
   })
 
   it('sends ACP agents to the same endpoint without provider fields', () => {

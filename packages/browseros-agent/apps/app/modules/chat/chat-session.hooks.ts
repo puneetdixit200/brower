@@ -62,6 +62,7 @@ import type {
 } from './chat-session-request'
 import {
   buildRequestBrowserContext,
+  getLastUserMessageFiles,
   getOwnerTabSelection,
   getToolApprovalResponse,
   isSameOwnerTabSelection,
@@ -125,16 +126,6 @@ async function getRequestActiveTab(
   }
   if (ownerTabId === undefined) return undefined
   return chrome.tabs.get(ownerTabId).catch(() => undefined)
-}
-
-const getLastUserMessageFiles = (messages: UIMessage[]) => {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index]
-    if (message?.role === 'user') {
-      return message.parts.filter((part) => part.type === 'file')
-    }
-  }
-  return []
 }
 
 const getApprovalResponseForTarget = (

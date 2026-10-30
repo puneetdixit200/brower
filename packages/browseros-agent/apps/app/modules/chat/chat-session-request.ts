@@ -12,6 +12,17 @@ import {
 
 export type LlmChatRequestBodyInput = Parameters<typeof buildChatRequestBody>[0]
 
+/** Return files from only the active user turn; older attachments must not replay. */
+export function getLastUserMessageFiles(messages: UIMessage[]) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (message?.role === 'user') {
+      return message.parts.filter((part) => part.type === 'file')
+    }
+  }
+  return []
+}
+
 export interface OwnerTabSelection {
   text: string
   url: string

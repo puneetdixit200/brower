@@ -1,5 +1,9 @@
 # Aster next steps
 
+### Current source checkpoint — T13.3/U06 selected-file request serialization — 2026-10-30
+
+The production request path now selects files from only the latest user turn; a regression prevents prior-turn attachments from being replayed. `chat-session-request.test.ts` passes 12/12 (53 assertions), including a selected-file body/empty-attachment serialization case. This is source request-boundary evidence only; it does not prove chooser/remove UI behavior or transport/model receipt. U06 remains PARTIAL. Next exercise chooser → remove/submit → deterministic mock-provider receipt in a disposable headed BrowserOS profile, then repeat on Aster when a linked native binary exists.
+
 ### Current source checkpoint — B09 website-permissions handoff — 2026-10-30
 
 BrowserQuickControls now revalidates the selected tab in the current window, accepts HTTP(S) only, and opens Chromium's `chrome://settings/content/siteDetails` route with the encoded origin. Three focused tests (6 assertions) cover origin extraction, missing/moved/non-web tabs and tab-creation failure; app typecheck, targeted Biome, diff check and independent Luna review pass. Chromium HEAD `16c3e55476d3564bea713314b2fff638749ce3e6` contains the route in its extension-details UI and browser tests. B09 remains PARTIAL pending headed acceptance of settings navigation and real permission changes, plus media/WebRTC/devtools. The native gate remains: preserve the 319-path dirty checkout; `.ninja_log` and `chrome` are absent and about 5 GiB RAM is available.
