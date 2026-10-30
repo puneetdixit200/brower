@@ -6,6 +6,7 @@ import {
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
   shouldCollapseSidebarAfterResize,
+  storedSidebarWidth,
 } from './sidebar-resize'
 
 const bounds = { left: 0, right: 320, top: 0, bottom: 800 }
@@ -51,6 +52,15 @@ describe('sidebar resize completion', () => {
 })
 
 describe('sidebar resize widths', () => {
+  it('parses stored widths with the default, rounding, and bounds', () => {
+    expect(storedSidebarWidth(null)).toBe(DEFAULT_SIDEBAR_WIDTH)
+    expect(storedSidebarWidth('malformed')).toBe(DEFAULT_SIDEBAR_WIDTH)
+    expect(storedSidebarWidth('')).toBe(MIN_SIDEBAR_WIDTH)
+    expect(storedSidebarWidth('300.6')).toBe(301)
+    expect(storedSidebarWidth('100')).toBe(MIN_SIDEBAR_WIDTH)
+    expect(storedSidebarWidth('500')).toBe(MAX_SIDEBAR_WIDTH)
+  })
+
   it('clamps stored and computed widths and rounds to whole pixels', () => {
     expect(boundedSidebarWidth(100)).toBe(MIN_SIDEBAR_WIDTH)
     expect(boundedSidebarWidth(500)).toBe(MAX_SIDEBAR_WIDTH)

@@ -2,7 +2,7 @@
 
 ### U01 sidebar resize bounds and keyboard source coverage — 2026-10-30
 
-Moved sidebar width bounds/defaults and supported keyboard resize mapping into pure helpers used by the layout. Tests cover pointer-release collapse, clamping/rounding and invalid numeric values, ArrowLeft/Right, Home/End, unsupported keys, and minimum/maximum width boundaries. Focused suite passes 7/7 (17 assertions), with app typecheck, targeted Biome, and `git diff --check` passing; independent Luna review found no behavior change. Stored-width conversion was inspected but not tested against localStorage directly. U01 remains PARTIAL pending headed Aster pointer/keyboard, native alignment and actual window resize acceptance.
+Moved sidebar width bounds/defaults and supported keyboard resize mapping into pure helpers used by the layout. Tests cover pointer-release collapse, clamping/rounding and invalid numeric values, stored-width parsing (null, malformed, empty, fractional and bounds), ArrowLeft/Right, Home/End, unsupported keys, and minimum/maximum width boundaries. Focused suite passes 8/8 (23 assertions), with app typecheck, targeted Biome, and `git diff --check` passing; independent Luna review found no behavior change. U01 remains PARTIAL pending headed Aster pointer/keyboard, native alignment and actual window resize acceptance.
 
 ### T24.1 / A07 retry timer lifecycle follow-up — 2026-10-30
 

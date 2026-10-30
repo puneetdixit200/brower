@@ -52,7 +52,7 @@ BrowserQuickControls now revalidates the selected tab in the current window, acc
 
 ### Current source checkpoint — U01 sidebar resize source coverage — 2026-10-30
 
-Sidebar drag completion evaluates pointer position against the final intended width, even if React has not committed the last width update when pointer-up fires. Pure helpers now cover width bounds, persisted-width clamping, keyboard arrows/Home/End and unsupported keys alongside pointer-release behavior. Focused suite passes 7/7 (17 assertions); app typecheck, targeted Biome, and diff check pass. U01 remains PARTIAL: headed Aster pointer/keyboard behavior, native alignment and real window-resize acceptance are still required. The native gate below remains unchanged: preserve the dirty Chromium checkout and do not launch a full build without matching incremental state or a clean pinned host.
+Sidebar drag completion evaluates pointer position against the final intended width, even if React has not committed the last width update when pointer-up fires. Pure helpers now cover width bounds, stored-width parsing (null, malformed, empty, fractional and bounds), keyboard arrows/Home/End and unsupported keys alongside pointer-release behavior. Focused suite passes 8/8 (23 assertions); app typecheck, targeted Biome, and diff check pass. U01 remains PARTIAL: headed Aster pointer/keyboard behavior, native alignment and real window-resize acceptance are still required. The native gate below remains unchanged: preserve the dirty Chromium checkout and do not launch a full build without matching incremental state or a clean pinned host.
 
 ### Current implementation checkpoint — 2026-10-30 (T23.3/A05, T20a/B03, U13)
 

@@ -22,6 +22,7 @@ import {
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
   shouldCollapseSidebarAfterResize,
+  storedSidebarWidth,
 } from './sidebar-resize'
 
 const COLLAPSE_DELAY = 150
@@ -29,9 +30,7 @@ const SIDEBAR_WIDTH_KEY = 'aster.sidebar.expandedWidth.v1'
 function readSidebarWidth(): number {
   try {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY)
-    return saved === null
-      ? DEFAULT_SIDEBAR_WIDTH
-      : boundedSidebarWidth(Number(saved))
+    return storedSidebarWidth(saved)
   } catch {
     return DEFAULT_SIDEBAR_WIDTH
   }

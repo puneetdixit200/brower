@@ -13,6 +13,13 @@ export function boundedSidebarWidth(value: number): number {
   )
 }
 
+/** Parse a saved width with the same Number() and bounds behavior as storage reads. */
+export function storedSidebarWidth(value: string | null): number {
+  return value === null
+    ? DEFAULT_SIDEBAR_WIDTH
+    : boundedSidebarWidth(Number(value))
+}
+
 /** Return the next width for a supported resize key, or null for other keys. */
 export function keyboardSidebarWidth(
   width: number,
