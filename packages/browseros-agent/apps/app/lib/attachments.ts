@@ -10,7 +10,9 @@
  */
 
 const MAX_ATTACHMENTS_PER_MESSAGE = 10
+const MAX_ATTACHMENT_REQUEST_DATA_LENGTH = 70 * 1024 * 1024
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB after compression
+const MAX_IMAGE_DATA_URL_LENGTH = 8 * 1024 * 1024
 const MAX_FILE_TEXT_BYTES = 1 * 1024 * 1024 // 1 MB extracted text
 const IMAGE_LONG_EDGE_CAP = 2048
 
@@ -61,6 +63,7 @@ export type AttachmentValidationError =
   | { code: 'unsupported_type'; message: string; mediaType: string }
   | { code: 'too_large'; message: string }
   | { code: 'read_failed'; message: string }
+  | { code: 'total_too_large'; message: string }
 
 export type StageAttachmentResult =
   | { ok: true; attachment: StagedAttachment }
@@ -100,7 +103,7 @@ export async function stageAttachment(
       const encodedMediaType = compressed.type || mediaType
       // Rough byte ceiling — `data:image/png;base64,...` doubles size with
       // base64. Reject early so we never POST something the route will 400.
-      if (dataUrl.length > MAX_IMAGE_BYTES * 2) {
+      if (dataUrl.length > MAX_IMAGE_DATA_URL_LENGTH) {
         return {
           ok: false,
           error: {
@@ -202,15 +205,21 @@ export async function stageAttachment(
  */
 export async function stageAttachments(
   files: File[],
-  alreadyStaged: number,
+  alreadyStaged: readonly StagedAttachment[],
 ): Promise<{
   staged: StagedAttachment[]
   errors: AttachmentValidationError[]
 }> {
   const remainingSlots = Math.max(
     0,
-    MAX_ATTACHMENTS_PER_MESSAGE - alreadyStaged,
+    MAX_ATTACHMENTS_PER_MESSAGE - alreadyStaged.length,
   )
+  let remainingDataLength =
+    MAX_ATTACHMENT_REQUEST_DATA_LENGTH -
+    alreadyStaged.reduce(
+      (total, attachment) => total + getRequestDataLength(attachment),
+      0,
+    )
   const staged: StagedAttachment[] = []
   const errors: AttachmentValidationError[] = []
 
@@ -233,13 +242,32 @@ export async function stageAttachments(
   for (const file of files.slice(0, remainingSlots)) {
     const result = await stageAttachment(file)
     if (result.ok) {
+      const dataLength = getRequestDataLength(result.attachment)
+      if (dataLength > remainingDataLength) {
+        errors.push({
+          code: 'total_too_large',
+          message:
+            'Selected attachments exceed the 70 MiB total request limit.',
+        })
+        continue
+      }
       staged.push(result.attachment)
+      remainingDataLength -= dataLength
     } else {
       errors.push(result.error)
     }
   }
 
   return { staged, errors }
+}
+
+function getRequestDataLength(attachment: StagedAttachment): number {
+  if (attachment.payload.kind === 'image') {
+    return attachment.payload.dataUrl.length
+  }
+  const byteLength = new TextEncoder().encode(attachment.payload.text).length
+  const encodedLength = 4 * Math.ceil(byteLength / 3)
+  return `data:${attachment.payload.mediaType};base64,`.length + encodedLength
 }
 
 /**

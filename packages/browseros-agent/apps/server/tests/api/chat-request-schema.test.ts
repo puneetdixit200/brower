@@ -121,6 +121,59 @@ describe('ChatRequestSchema agent targets', () => {
     expect(parsed.success).toBe(true)
   })
 
+  it('accepts bounded selected-file metadata and enforces per-file and aggregate limits', () => {
+    const attachment = {
+      mediaType: 'text/plain',
+      data: 'data:text/plain;base64,c2VudGluZWw=',
+      name: 'notes.txt',
+    }
+    const parsed = ChatRequestSchema.parse({
+      conversationId: crypto.randomUUID(),
+      message: 'Read this file',
+      attachments: [attachment],
+    })
+    expect(parsed.attachments?.[0]).toEqual(attachment)
+
+    expect(() =>
+      ChatRequestSchema.parse({
+        conversationId: crypto.randomUUID(),
+        message: 'Read this file',
+        attachments: [
+          { mediaType: 'text/plain', data: 'x'.repeat(8 * 1024 * 1024 + 1) },
+        ],
+      }),
+    ).toThrow()
+    const boundaryData = 'x'.repeat(7 * 1024 * 1024)
+    expect(
+      ChatRequestSchema.safeParse({
+        conversationId: crypto.randomUUID(),
+        message: 'Read these files',
+        attachments: Array.from({ length: 10 }, () => ({
+          mediaType: 'text/plain',
+          data: boundaryData,
+        })),
+      }).success,
+    ).toBe(true)
+    const overLimitData = 'x'.repeat(7_500_000)
+    expect(
+      ChatRequestSchema.safeParse({
+        conversationId: crypto.randomUUID(),
+        message: 'Read these files',
+        attachments: Array.from({ length: 10 }, () => ({
+          mediaType: 'text/plain',
+          data: overLimitData,
+        })),
+      }).success,
+    ).toBe(false)
+    expect(() =>
+      ChatRequestSchema.parse({
+        conversationId: crypto.randomUUID(),
+        message: 'Read these files',
+        attachments: Array.from({ length: 11 }, () => attachment),
+      }),
+    ).toThrow()
+  })
+
   // The smallest body the endpoint accepts: what to say and which conversation
   // it belongs to. Everything about the provider is resolved server side.
   it('accepts a request carrying only a message and a conversation', () => {

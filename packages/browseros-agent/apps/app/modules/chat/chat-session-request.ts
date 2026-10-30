@@ -168,7 +168,7 @@ export interface BuildSidepanelPreparedSendMessagesRequestInput
    */
   fallbackProvider: LlmProviderConfig | undefined
   message?: string
-  attachments?: Array<{ mediaType: string; data: string }>
+  attachments?: Array<{ mediaType: string; data: string; name?: string }>
 }
 
 export interface PrepareSidepanelSendMessagesRequestInput

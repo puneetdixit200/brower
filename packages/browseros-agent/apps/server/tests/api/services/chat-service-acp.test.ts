@@ -131,6 +131,66 @@ function deps(
 }
 
 describe('ChatService ACP dispatch', () => {
+  it('includes selected filenames once in ACP prompts while retaining transcript attachments', async () => {
+    const fixture = deps()
+    const conversationId = crypto.randomUUID()
+    const request = {
+      target: { type: 'claude', agentId: AGENT_ID },
+      conversationId,
+      message: 'Read this file.',
+      attachments: [
+        {
+          mediaType: 'text/plain',
+          data: 'data:text/plain;base64,c2VudGluZWw=',
+          name: 'selected.txt',
+        },
+      ],
+      isScheduledTask: false,
+      mode: 'agent',
+      origin: 'sidepanel',
+    } as const
+
+    const first = await fixture.service.processMessage(
+      request,
+      new AbortController().signal,
+    )
+    await first.text()
+    const firstUser = fixture.calls[0]?.messages.find(
+      (message) => message.role === 'user',
+    )
+    expect(firstUser?.parts).toContainEqual({
+      type: 'file',
+      mediaType: 'text/plain',
+      url: 'data:text/plain;base64,c2VudGluZWw=',
+      filename: 'selected.txt',
+    })
+    const firstSaved = fixture.conversationStore.save.mock.calls[0]?.[0] as
+      | { messages: Array<{ role: string; parts: unknown[] }> }
+      | undefined
+    expect(
+      firstSaved?.messages.find((message) => message.role === 'user')?.parts,
+    ).toContainEqual({
+      type: 'file',
+      mediaType: 'text/plain',
+      url: 'data:text/plain;base64,c2VudGluZWw=',
+      filename: 'selected.txt',
+    })
+
+    const second = await fixture.service.processMessage(
+      {
+        ...request,
+        message: 'Follow up without attaching it.',
+        attachments: [],
+      },
+      new AbortController().signal,
+    )
+    await second.text()
+    const oldUser = fixture.calls[1]?.messages.find(
+      (message) => message.role === 'user',
+    )
+    expect(oldUser?.parts.some((part) => part.type === 'file')).toBe(false)
+  })
+
   it('forces heartbeat continuations through a read-only ACP lease', async () => {
     let continuation = false
     const fixture = deps({ heartbeatContinuation: () => continuation })

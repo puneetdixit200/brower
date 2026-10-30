@@ -546,6 +546,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
           attachments: getLastUserMessageFiles(messages).map((file) => ({
             mediaType: file.mediaType,
             data: file.url,
+            ...(file.filename ? { name: file.filename } : {}),
           })),
         }
 

@@ -70,7 +70,7 @@ export interface ChatRequestBodyParams {
   isScheduledTask?: boolean
   persistScheduledTask?: boolean
   approvalResponse?: { id: string; approved: boolean; reason?: string }
-  attachments?: Array<{ mediaType: string; data: string }>
+  attachments?: Array<{ mediaType: string; data: string; name?: string }>
 }
 
 export const buildChatRequestBody = ({

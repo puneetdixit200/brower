@@ -76,6 +76,10 @@ import type {
   HydratedChatRequest,
 } from '../types'
 import { resolveBrowserContextPageIds } from '../utils/resolve-browser-context-page-ids'
+import {
+  buildModelFacingChatMessages,
+  toChatFileParts,
+} from './chat-message-attachments'
 import { shouldPersist } from './chat-persistence-mode'
 import {
   describeMcpChange,
@@ -594,6 +598,11 @@ export class ChatService {
       session.agent.appendUserMessage(request.message)
       wrappedUserMessageId =
         session.agent.messages[session.agent.messages.length - 1]?.id
+      const files = toChatFileParts(request.attachments)
+      const currentUserMessage = session.agent.messages.at(-1)
+      if (currentUserMessage && files.length > 0) {
+        currentUserMessage.parts.push(...files)
+      }
     }
     const promptUserText = contextPrefix + userContent
     const assessSupport = isEligibleResearchSupportRequest({
@@ -614,15 +623,18 @@ export class ChatService {
     // Strip reasoning from the request copy only. session.agent.messages keeps
     // reasoning so it still persists to SQLite and renders in the client history;
     // the model must not see replayed reasoning (see stripReasoningParts).
-    const promptUiMessages: UIMessage[] = stripReasoningParts(
-      filterValidMessages(session.agent.messages),
-    ).map((message) =>
-      message.id === wrappedUserMessageId && message.role === 'user'
-        ? {
-            ...message,
-            parts: [{ type: 'text' as const, text: promptUserText }],
-          }
-        : message,
+    const promptUiMessages = buildModelFacingChatMessages(
+      stripReasoningParts(filterValidMessages(session.agent.messages)),
+      wrappedUserMessageId,
+      promptUserText,
+    )
+    const transcriptFilesByMessageId = new Map(
+      session.agent.messages
+        .filter((message) => message.role === 'user')
+        .map((message) => [
+          message.id,
+          message.parts.filter((part) => part.type === 'file'),
+        ]),
     )
 
     // Publish canonical display history before model work can call loopback MCP
@@ -677,14 +689,26 @@ export class ChatService {
               wrappedUserMessageId,
             )
           }
-          const restored = messages.map((message) =>
-            message.id === wrappedUserMessageId && message.role === 'user'
-              ? {
-                  ...message,
-                  parts: [{ type: 'text' as const, text: request.message }],
-                }
-              : message,
-          )
+          const restored = messages.map((message) => {
+            if (message.role !== 'user') return message
+            const retainedParts =
+              message.id === wrappedUserMessageId
+                ? [
+                    { type: 'text' as const, text: request.message },
+                    ...message.parts.filter(
+                      (part) => part.type !== 'text' && part.type !== 'file',
+                    ),
+                  ]
+                : message.parts.filter((part) => part.type !== 'file')
+            return {
+              ...message,
+              parts: [
+                ...retainedParts,
+                ...(transcriptFilesByMessageId.get(message.id) ??
+                  message.parts.filter((part) => part.type === 'file')),
+              ],
+            }
+          })
           session.agent.messages = filterValidMessages(restored)
           updateMessages(session.agent.messages)
           finishAssessmentTurn?.()
@@ -874,13 +898,7 @@ export class ChatService {
       (await this.loadAcpDisplayHistory(agent.id, request))
     const priorHistoryLength = history.length
     const messageId = crypto.randomUUID()
-    const files = (request.attachments ?? []).map((attachment) => ({
-      type: 'file' as const,
-      mediaType: attachment.mediaType,
-      url: attachment.data.startsWith('data:')
-        ? attachment.data
-        : `data:${attachment.mediaType};base64,${attachment.data}`,
-    }))
+    const files = toChatFileParts(request.attachments)
     const visibleUserMessage: UIMessage = {
       id: messageId,
       role: 'user',
@@ -894,13 +912,10 @@ export class ChatService {
     history.push(visibleUserMessage)
     this.acpMessages.set(historyKey, history)
     this.acpConversationAgents.set(request.conversationId, agent.id)
-    const promptMessages = history.map((message) =>
-      message.id === messageId
-        ? {
-            ...message,
-            parts: [{ type: 'text' as const, text: promptText }, ...files],
-          }
-        : message,
+    const promptMessages = buildModelFacingChatMessages(
+      history,
+      messageId,
+      promptText,
     )
     const streamInput: AcpAgentStreamInput = {
       agent: {

@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { UIMessageChunk } from 'ai'
+import type { UIMessage, UIMessageChunk } from 'ai'
 import * as _ai from 'ai'
 import { MockLanguageModelV3 } from 'ai/test'
 import { z } from 'zod'
@@ -19,11 +19,7 @@ import { consumeApprovalOperation } from '../../../src/lib/conversations/approva
 import { DbConversationStore } from '../../../src/lib/conversations/conversation-store'
 import { closeDb, getDbHandle, initializeDb } from '../../../src/lib/db'
 
-interface MockMessage {
-  id: string
-  role: 'user' | 'assistant'
-  parts: Array<{ type: 'text'; text: string }>
-}
+type MockMessage = UIMessage
 
 interface MockAgent {
   toolLoopAgent: object
@@ -520,6 +516,128 @@ describe('ChatService research support assessment', () => {
     expect(finishIndex).toBeGreaterThan(assessmentIndex)
     expect(streamText).toContain('The answer is supported.')
     expect(streamText).toContain('captured page evidence')
+  })
+})
+
+describe('ChatService file attachments', () => {
+  beforeEach(() => {
+    resolveLLMConfigSpy.mockImplementation(async () => ({
+      provider: 'openai',
+      model: 'gpt-5',
+      apiKey: 'test-key',
+    }))
+  })
+
+  it('delivers selected files to the current model turn and retains them in completed history only', async () => {
+    const fakeAgent = createFakeAgent()
+    agentToReturn = fakeAgent
+    const modelPrompts: MockMessage[][] = []
+    const service = new ChatService({
+      sessionStore: createSessionStore() as never,
+      klavis: createKlavisStub() as never,
+      browser: {
+        resolveTabIds: mock(async () => new Map<number, number>()),
+        closePage: mock(async () => {}),
+      } as never,
+    })
+    streamResponseHandler = async ({ onFinish, uiMessages }) => {
+      const prompt = uiMessages ?? []
+      modelPrompts.push(prompt)
+      await onFinish({
+        messages: [
+          ...prompt,
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            parts: [{ type: 'text', text: 'File received.' }],
+          },
+        ],
+      })
+      return new Response('ok')
+    }
+
+    const conversationId = crypto.randomUUID()
+    const response = await service.processMessage(
+      {
+        target: BROWSEROS_TARGET,
+        persist: false,
+        conversationId,
+        message: 'Read this selected file.',
+        attachments: [
+          {
+            mediaType: 'text/plain',
+            data: 'data:text/plain;base64,c2VudGluZWw=',
+            name: 'selected.txt',
+          },
+        ],
+        isScheduledTask: false,
+        mode: 'agent',
+        origin: 'sidepanel',
+      } as never,
+      new AbortController().signal,
+    )
+    await response.text()
+
+    const userPrompt = modelPrompts[0]?.find(
+      (message) => message.role === 'user',
+    )
+    expect(userPrompt?.parts).toEqual([
+      {
+        type: 'text',
+        text: '<USER_QUERY>\nRead this selected file.\n</USER_QUERY>',
+      },
+      {
+        type: 'file',
+        mediaType: 'text/plain',
+        url: 'data:text/plain;base64,c2VudGluZWw=',
+        filename: 'selected.txt',
+      },
+    ])
+    const completedUserMessage = fakeAgent.messages.find(
+      (message) => message.role === 'user',
+    )
+    expect(completedUserMessage?.parts).toEqual([
+      { type: 'text', text: 'Read this selected file.' },
+      {
+        type: 'file',
+        mediaType: 'text/plain',
+        url: 'data:text/plain;base64,c2VudGluZWw=',
+        filename: 'selected.txt',
+      },
+    ])
+
+    const nextResponse = await service.processMessage(
+      {
+        target: BROWSEROS_TARGET,
+        persist: false,
+        conversationId,
+        message: 'Now answer a follow-up without resending the file.',
+        isScheduledTask: false,
+        mode: 'agent',
+        origin: 'sidepanel',
+      } as never,
+      new AbortController().signal,
+    )
+    await nextResponse.text()
+
+    const secondTurnUsers = modelPrompts[1]?.filter(
+      (message) => message.role === 'user',
+    )
+    expect(secondTurnUsers).toHaveLength(2)
+    expect(
+      secondTurnUsers?.[0]?.parts.some((part) => part.type === 'file'),
+    ).toBe(false)
+    expect(secondTurnUsers?.[1]?.parts).toEqual([
+      {
+        type: 'text',
+        text: '<USER_QUERY>\nNow answer a follow-up without resending the file.\n</USER_QUERY>',
+      },
+    ])
+    expect(
+      fakeAgent.messages
+        .find((message) => message.role === 'user')
+        ?.parts.some((part) => part.type === 'file'),
+    ).toBe(true)
   })
 })
 

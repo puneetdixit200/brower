@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test'
-import { stageAttachment } from './attachments'
+import { stageAttachment, stageAttachments } from './attachments'
 
 function restoreGlobal(name: string, value: unknown) {
   if (value === undefined) {
@@ -71,6 +71,43 @@ describe('stageAttachment', () => {
       restoreGlobal('createImageBitmap', originalCreateImageBitmap)
       restoreGlobal('OffscreenCanvas', originalOffscreenCanvas)
       restoreGlobal('HTMLCanvasElement', originalHTMLCanvasElement)
+    }
+  })
+})
+
+describe('stageAttachments request limits', () => {
+  it('accepts ten maximum-size images within the shared 70 MiB encoded-data limit', async () => {
+    const originalCreateImageBitmap = Reflect.get(
+      globalThis,
+      'createImageBitmap',
+    )
+    try {
+      Reflect.set(globalThis, 'createImageBitmap', async () => ({
+        width: 1000,
+        height: 1000,
+        close() {},
+      }))
+      const files = Array.from(
+        { length: 10 },
+        (_, index) =>
+          new File([new Uint8Array(5 * 1024 * 1024)], `image-${index}.png`, {
+            type: 'image/png',
+          }),
+      )
+      const result = await stageAttachments(files, [])
+      expect(result.staged).toHaveLength(10)
+      expect(result.errors).toEqual([])
+      const encodedDataLength = result.staged.reduce(
+        (total, attachment) =>
+          total +
+          (attachment.payload.kind === 'image'
+            ? attachment.payload.dataUrl.length
+            : 0),
+        0,
+      )
+      expect(encodedDataLength).toBeLessThanOrEqual(70 * 1024 * 1024)
+    } finally {
+      restoreGlobal('createImageBitmap', originalCreateImageBitmap)
     }
   })
 })

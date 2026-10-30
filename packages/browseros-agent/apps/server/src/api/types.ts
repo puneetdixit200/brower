@@ -94,10 +94,29 @@ const ChatInputSchema = z.object({
   attachments: z
     .array(
       z.object({
-        mediaType: z.string().min(1),
-        data: z.string().min(1),
+        mediaType: z.string().min(1).max(127),
+        // A 5 MiB image expands to under 7 MiB as base64; leave room for the
+        // data URL prefix while bounding untrusted request memory use.
+        data: z
+          .string()
+          .min(1)
+          .max(8 * 1024 * 1024),
+        name: z.string().max(255).optional(),
       }),
     )
+    .max(10)
+    .superRefine((attachments, ctx) => {
+      const totalLength = attachments.reduce(
+        (total, attachment) => total + attachment.data.length,
+        0,
+      )
+      if (totalLength > 70 * 1024 * 1024) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Attachment data exceeds the 70 MiB total limit.',
+        })
+      }
+    })
     .optional(),
 })
 

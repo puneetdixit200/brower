@@ -360,7 +360,7 @@ export const ConversationInput: FC<ConversationInputProps> = ({
     setIsStaging(true)
     setAttachmentError(null)
     try {
-      const result = await stageAttachments(files, attachments.length)
+      const result = await stageAttachments(files, attachments)
       if (result.staged.length > 0) {
         draftRevision.current += 1
         setAttachments((prev) => [...prev, ...result.staged])
@@ -418,7 +418,7 @@ export const ConversationInput: FC<ConversationInputProps> = ({
         const file = new File([blob], 'selected-page-area.png', {
           type: 'image/png',
         })
-        return stageAttachments([file], attachments.length)
+        return stageAttachments([file], attachments)
       })
       .then((result) => {
         if (!active) return
@@ -441,12 +441,7 @@ export const ConversationInput: FC<ConversationInputProps> = ({
     return () => {
       active = false
     }
-  }, [
-    screenshotDataUrl,
-    attachmentsEnabled,
-    onScreenshotConsumed,
-    attachments.length,
-  ])
+  }, [screenshotDataUrl, attachmentsEnabled, onScreenshotConsumed, attachments])
 
   const toggleTab = (tab: chrome.tabs.Tab) => {
     draftRevision.current += 1
