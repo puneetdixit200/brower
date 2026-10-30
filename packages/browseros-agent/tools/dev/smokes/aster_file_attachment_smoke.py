@@ -11,12 +11,14 @@ from __future__ import annotations
 import argparse
 import atexit
 import base64
+from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import sys
 import tempfile
 import threading
 import time
+import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
@@ -37,6 +39,16 @@ def main() -> int:
     provider_id = f"aster-file-smoke-{uuid.uuid4()}"
     marker = f"ASTER_FILE_RECEIPT_{uuid.uuid4().hex}"
     filename = f"aster-file-receipt-{uuid.uuid4().hex[:8]}.txt"
+    history_nonce = uuid.uuid4().hex
+    history_query = f"ASTER_HISTORY_SYNTHETIC_{history_nonce}"
+    selected_title = f"{history_query}_SELECTED_TITLE"
+    unselected_title = f"{history_query}_UNSELECTED_TITLE"
+    selected_path = f"/aster-selected-path-{history_nonce}"
+    unselected_path = f"/aster-unselected-path-{history_nonce}"
+    selected_query_secret = f"selected-query-{history_nonce}"
+    unselected_query_secret = f"unselected-query-{history_nonce}"
+    selected_hash_secret = f"selected-hash-{history_nonce}"
+    unselected_hash_secret = f"unselected-hash-{history_nonce}"
     prompt = "Read the attached fixture and report its receipt status."
     followup_prompt = "Answer this follow-up without using another file."
     response_texts = [
@@ -101,14 +113,40 @@ def main() -> int:
     provider_thread.start()
     atexit.register(provider_server.shutdown)
 
+    class HistoryFixture(ThreadingHTTPServer):
+        pass
+
+    class HistoryHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            title = selected_title if self.path.startswith(selected_path) else unselected_title
+            page = (
+                "<!doctype html><meta charset=utf-8><title>"
+                + title
+                + "</title><p>Synthetic local history fixture.</p>"
+            ).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(page)))
+            self.end_headers()
+            self.wfile.write(page)
+
+        def log_message(self, _format: str, *_args: object) -> None:
+            return
+
+    history_server = HistoryFixture(("127.0.0.1", 0), HistoryHandler)
+    history_port = history_server.server_address[1]
+    history_thread = threading.Thread(target=history_server.serve_forever, daemon=True)
+    history_thread.start()
+
     with tempfile.TemporaryDirectory(prefix="aster-file-smoke-") as tmp:
         file_path = Path(tmp) / filename
         file_path.write_text(f"Synthetic file receipt marker: {marker}\n", encoding="utf-8")
 
-        target = wait_target(cdp_base, "#/home")
-        cdp = CDP(target["webSocketDebuggerUrl"])
+        cdp: CDP | None = None
         previous_default_id: str | None = None
         try:
+            target = wait_target(cdp_base, "#/home")
+            cdp = CDP(target["webSocketDebuggerUrl"])
             cdp.call("Runtime.enable")
             cdp.call("DOM.enable")
             cdp.evaluate("location.hash='/home'")
@@ -118,6 +156,17 @@ def main() -> int:
                 f"fetch({json.dumps(server_base + '/system/health')}).then(r=>r.ok).catch(()=>false)",
                 timeout=45,
             )
+
+            selected_url = (
+                f"http://127.0.0.1:{history_port}{selected_path}"
+                f"?{selected_query_secret}#${selected_hash_secret}"
+            )
+            unselected_url = (
+                f"http://127.0.0.1:{history_port}{unselected_path}"
+                f"?{unselected_query_secret}#${unselected_hash_secret}"
+            )
+            seed_history_page(cdp_base, selected_url, selected_title)
+            seed_history_page(cdp_base, unselected_url, unselected_title)
 
             previous_default_id = get_default_provider_id(cdp, server_base)
             saved_status = save_temporary_provider(
@@ -134,6 +183,33 @@ def main() -> int:
                 raise RuntimeError(f"could not configure local mock provider: {configured}")
             cdp.evaluate("location.reload()")
             wait_for(cdp, "document.body.innerText.includes('Aster File Fixture Provider')")
+
+            # Use the visible Home composer history picker after the provider
+            # setup reload so its React selection remains active for the send.
+            cdp.evaluate(
+                "document.querySelector('button[aria-label=\"Attach browser history\"]')?.click()"
+            )
+            wait_for(cdp, "!!document.querySelector('input[aria-label=\"Search browser history\"]')")
+            set_input_value(cdp, 'input[aria-label="Search browser history"]', history_query)
+            cdp.evaluate("document.querySelector('button[aria-label=\"Search history\"]')?.click()")
+            wait_for(cdp, f"document.body.innerText.includes({json.dumps(selected_title)})")
+            wait_for(cdp, f"document.body.innerText.includes({json.dumps(unselected_title)})")
+            cdp.evaluate(
+                "(()=>{const row=Array.from(document.querySelectorAll('p')).find(e=>e.textContent==="
+                + json.dumps(selected_title)
+                + ");const button=row?.parentElement?.querySelector('button');if(!button)throw Error('selected history row button missing');button.click();return true})()"
+            )
+            wait_for(cdp, f"document.body.innerText.includes({json.dumps('History: ' + selected_title)})")
+            selected_history_count = cdp.evaluate(
+                "Array.from(document.querySelectorAll('button[aria-label=\"Remove browser history\"]')).length"
+            )
+            if selected_history_count != 1:
+                raise AssertionError(
+                    f"expected one selected history item, found {selected_history_count}"
+                )
+            cdp.evaluate(
+                "document.querySelector('button[aria-label=\"Attach browser history\"]')?.click()"
+            )
 
             set_file_input(cdp, str(file_path))
             wait_for(cdp, f"document.body.innerText.includes({json.dumps(filename)})")
@@ -170,6 +246,45 @@ def main() -> int:
                 raise AssertionError("local provider did not receive a model request")
             if not request_contains_marker(FixtureProvider.requests[-1], marker):
                 raise AssertionError("local provider request did not contain the selected file content")
+            provider_request_json = json.dumps(FixtureProvider.requests[0], ensure_ascii=False)
+            if provider_request_json.count(selected_title) != 1:
+                raise AssertionError(
+                    "selected history title did not reach the provider exactly once; "
+                    f"provider messages={FixtureProvider.requests[0].get('messages', [])!r}"
+                )
+            selected_origin = f"http://127.0.0.1:{history_port}"
+            if provider_request_json.count(selected_origin) != 1:
+                raise AssertionError("selected history origin did not reach the provider exactly once")
+            forbidden_history_values = (
+                unselected_title,
+                selected_path,
+                unselected_path,
+                selected_query_secret,
+                unselected_query_secret,
+                selected_hash_secret,
+                unselected_hash_secret,
+            )
+            forbidden_route_values = (
+                selected_title,
+                unselected_title,
+                selected_origin,
+                selected_path,
+                unselected_path,
+                selected_query_secret,
+                unselected_query_secret,
+                selected_hash_secret,
+                unselected_hash_secret,
+            )
+            for forbidden in forbidden_history_values:
+                if forbidden in provider_request_json:
+                    raise AssertionError(
+                        f"unselected history or full URL component reached provider: {forbidden}"
+                    )
+            if selected_title not in json.dumps(request.get("body", ""), ensure_ascii=False):
+                raise AssertionError("selected history title was absent from the /chat body")
+            for candidate in forbidden_route_values:
+                if candidate in request.get("url", "") or candidate in cdp.evaluate("location.href"):
+                    raise AssertionError("history content or full URL component leaked into a route URL")
             try:
                 body = json.loads(request.get("body", ""))
                 attachment_data = body["attachments"][0]["data"]
@@ -285,6 +400,11 @@ def main() -> int:
                         "request_body_file_marker": "observed",
                         "local_provider_file_marker": "observed",
                         "local_provider_response": "turn_one_received",
+                        "selected_history_provider_receipt": "selected_title_and_origin_once",
+                        "unselected_history_and_full_urls": "absent_from_provider_and_route_url",
+                        "selected_history_title": selected_title,
+                        "selected_history_origin": selected_origin,
+                        "unselected_history_title": unselected_title,
                         "turn_two_prior_file_marker": "absent_from_chat_and_model_request",
                         "turn_two_local_provider_response": "received",
                         "page_and_chat_url_leak": "none",
@@ -298,16 +418,26 @@ def main() -> int:
         finally:
             # Always best-effort delete this fresh UUID, including when the
             # PUT reached the sidecar but its response was lost.
-            try:
-                cleanup_temporary_provider(
-                    cdp, server_base, provider_id, previous_default_id
-                )
-            except Exception as exc:
-                print(f"provider cleanup failed: {exc}", file=sys.stderr)
-                raise
-            provider_server.shutdown()
-            provider_server.server_close()
-            cdp.ws.close()
+
+            def cleanup_provider() -> None:
+                if cdp is not None:
+                    cleanup_temporary_provider(
+                        cdp, server_base, provider_id, previous_default_id
+                    )
+
+            cleanup_with_resources(
+                cleanup_provider,
+                [
+                    ("provider server shutdown", provider_server.shutdown),
+                    ("provider server close", provider_server.server_close),
+                    ("history server shutdown", history_server.shutdown),
+                    ("history server close", history_server.server_close),
+                    (
+                        "CDP websocket close",
+                        lambda: cdp.ws.close() if cdp is not None else None,
+                    ),
+                ],
+            )
 
 
 def get_default_provider_id(cdp: CDP, server_base: str) -> str | None:
@@ -395,6 +525,34 @@ def cleanup_temporary_provider(
         raise RuntimeError("; ".join(errors))
 
 
+def cleanup_with_resources(
+    primary_cleanup: Callable[[], None],
+    resource_cleanups: list[tuple[str, Callable[[], None]]],
+) -> None:
+    primary_error: Exception | None = None
+    primary_traceback = None
+    try:
+        primary_cleanup()
+    except Exception as exc:
+        primary_error = exc
+        primary_traceback = exc.__traceback__
+
+    resource_errors: list[tuple[str, Exception]] = []
+    for name, cleanup in resource_cleanups:
+        try:
+            cleanup()
+        except Exception as exc:
+            resource_errors.append((name, exc))
+
+    if primary_error is not None:
+        for name, error in resource_errors:
+            print(f"additional cleanup failed ({name}): {error}", file=sys.stderr)
+        raise primary_error.with_traceback(primary_traceback)
+    if resource_errors:
+        details = "; ".join(f"{name}: {error}" for name, error in resource_errors)
+        raise RuntimeError(f"resource cleanup failed: {details}") from resource_errors[0][1]
+
+
 def set_file_input(cdp: CDP, file_path: str) -> None:
     root = cdp.call("DOM.getDocument")["root"]["nodeId"]
     node = cdp.call(
@@ -413,6 +571,41 @@ def set_textarea(cdp: CDP, value: str) -> None:
         + json.dumps(value)
         + ");e.dispatchEvent(new Event('input',{bubbles:true}));return true})()"
     )
+
+
+def set_input_value(cdp: CDP, selector: str, value: str) -> None:
+    cdp.evaluate(
+        "(()=>{const e=document.querySelector(" + json.dumps(selector) + ");"
+        "if(!e)throw Error('input missing: '+" + json.dumps(selector) + ");"
+        "const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;"
+        "set.call(e," + json.dumps(value) + ");"
+        "e.dispatchEvent(new Event('input',{bubbles:true}));"
+        "e.dispatchEvent(new Event('change',{bubbles:true}));return true})()"
+    )
+
+
+def seed_history_page(cdp_base: str, url: str, expected_title: str) -> None:
+    request = urllib.request.Request(
+        f"{cdp_base}/json/new?{urllib.parse.quote(url, safe='')}", method="PUT"
+    )
+    with urllib.request.urlopen(request, timeout=5) as response:
+        target = json.load(response)
+    page_cdp: CDP | None = None
+    try:
+        page_cdp = CDP(target["webSocketDebuggerUrl"])
+        page_cdp.call("Page.enable")
+        page_cdp.call("Page.navigate", {"url": url})
+        wait_for(page_cdp, f"document.title === {json.dumps(expected_title)}", timeout=15)
+    finally:
+        try:
+            if page_cdp is not None:
+                page_cdp.ws.close()
+        finally:
+            close_request = urllib.request.Request(
+                f"{cdp_base}/json/close/{target['id']}"
+            )
+            with urllib.request.urlopen(close_request, timeout=5):
+                pass
 
 
 def click_send(cdp: CDP) -> None:
