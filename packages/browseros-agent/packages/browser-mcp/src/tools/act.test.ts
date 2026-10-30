@@ -13,9 +13,12 @@ const DIFF: SnapshotDiff = {
 
 // Minimal session: act(kind=focus) only calls input().focus, and the post-action
 // diff reads observe().diff() plus pages.getInfo for the origin.
-function mockSession(diff: SnapshotDiff): BrowserSession {
+function mockSession(
+  diff: SnapshotDiff,
+  fill?: (ref: string, value: string) => Promise<void>,
+): BrowserSession {
   return {
-    input: () => ({ focus: async () => {} }),
+    input: () => ({ focus: async () => {}, fill }),
     observe: () => ({ diff: async () => diff }),
     pages: { getInfo: () => ({ url: 'https://example.com/act' }) },
   } as unknown as BrowserSession
@@ -73,5 +76,46 @@ describe('act diff control (#2700)', () => {
     expect(text).toContain('[Page 0 diff]')
     expect(text).toContain('3 added, 1 removed')
     expect(text).not.toContain('DIFF_BODY_MARKER')
+  })
+})
+
+describe('act fill cancellation', () => {
+  it('does not dispatch later field fills after abort during an in-flight fill', async () => {
+    let releaseFirstFill!: () => void
+    const firstFill = new Promise<void>((resolve) => {
+      releaseFirstFill = resolve
+    })
+    const fillCalls: string[] = []
+    const controller = new AbortController()
+    const execution = executeTool(
+      act,
+      {
+        page: 0,
+        kind: 'fill',
+        fields: [
+          { ref: 'e1', value: 'first' },
+          { ref: 'e2', value: 'second' },
+        ],
+        diff: 'none',
+      },
+      {
+        session: mockSession(DIFF, async (ref) => {
+          fillCalls.push(ref)
+          if (ref === 'e1') await firstFill
+        }),
+        signal: controller.signal,
+      },
+    )
+
+    await Promise.resolve()
+    expect(fillCalls).toEqual(['e1'])
+    controller.abort()
+    await expect(execution).rejects.toMatchObject({ name: 'AbortError' })
+
+    // The dispatched first fill cannot be recalled; once it settles, the handler
+    // must observe cancellation before it dispatches the next field.
+    releaseFirstFill()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(fillCalls).toEqual(['e1'])
   })
 })

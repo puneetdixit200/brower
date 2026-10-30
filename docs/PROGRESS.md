@@ -6,6 +6,10 @@ The latest committed source and documentation checkpoint is `3ad822153` (U06 `@`
 
 The next source slice is T23.1–T23.2: inspect existing stop/stream behavior, then fill only the proven gap for active-operation cancellation and truthful interrupted state without replaying uncertain mutations. The native checkout remains protected: 319 changed paths, no `.ninja_log`, no linked browser; do not build or regenerate GN until safe incremental-state recovery and bounded dry-run behavior are established.
 
+### T23.1 browser fill cancellation — 2026-10-30
+
+`act(kind='fill', fields=[...])` now checks the run AbortSignal before each fill dispatch, including the single-field form. This closes a concrete post-stop continuation: if one dispatched fill settles after Stop, later fields no longer run. The focused browser-MCP suite passes 4/4; package typecheck, targeted Biome and `git diff --check` pass. Independent Luna review found no blocker. The first CDP fill already dispatched at cancellation may still complete; this does not cover cancellation behavior for other browser action kinds or provider-wide guarantees. A04 remains PARTIAL. Next continue T23.2 partial-transcript durability/no-replay and expand action coverage only against concrete gaps.
+
 Prior allowance stop — 2026-10-30: the short window reached 95% used (5% remaining), and that batch was stopped. The user has since resumed the goal. At this resumed batch start the live meter showed 4% primary-window usage and 78% weekly usage (96% and 22% remaining); the 5%-remaining stop gate has not been reached.
 
 ### T19/T23 stale approval after sidecar restart — 2026-10-30

@@ -6,6 +6,7 @@ import {
   errorResult,
   type ToolResult,
   textResult,
+  throwIfAborted,
 } from './framework'
 
 type InputApi = ReturnType<BrowserSession['input']>
@@ -83,7 +84,7 @@ export const act = defineTool({
   handler: async (args, ctx, response) => {
     const input = ctx.session.input(args.page)
 
-    const err = await runKind(args, input)
+    const err = await runKind(args, input, ctx.signal)
     if (err) return err
 
     response.data({ kind: args.kind })
@@ -128,6 +129,7 @@ type ActArgs = {
 type ActHandler = (
   args: ActArgs,
   input: InputApi,
+  signal?: AbortSignal,
 ) => Promise<ToolResult | undefined>
 
 const ACT_HANDLERS: Record<string, ActHandler> = {
@@ -151,10 +153,11 @@ const ACT_HANDLERS: Record<string, ActHandler> = {
 async function runKind(
   args: ActArgs,
   input: InputApi,
+  signal?: AbortSignal,
 ): Promise<ToolResult | undefined> {
   const handler = ACT_HANDLERS[args.kind]
   return handler
-    ? handler(args, input)
+    ? handler(args, input, signal)
     : errorResult(`act: unknown kind "${args.kind}".`)
 }
 
@@ -201,13 +204,17 @@ async function typeAt(
 async function fill(
   args: ActArgs,
   input: InputApi,
+  signal?: AbortSignal,
 ): Promise<ToolResult | undefined> {
   if (args.fields) {
-    for (const field of args.fields)
+    for (const field of args.fields) {
+      throwIfAborted(signal)
       await input.fill(field.ref, field.value, { clear: args.clear })
+    }
     return undefined
   }
   if (args.ref && args.value !== undefined) {
+    throwIfAborted(signal)
     await input.fill(args.ref, args.value, { clear: args.clear })
     return undefined
   }
