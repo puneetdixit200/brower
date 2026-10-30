@@ -6,6 +6,7 @@ import type { LlmProviderConfig } from '@/lib/llm-providers/types'
 import {
   buildRequestBrowserContext,
   buildSidepanelPreparedSendMessagesRequest,
+  getLastUserMessageAttachments,
   getLastUserMessageFiles,
   getOwnerTabSelection,
   getToolApprovalResponse,
@@ -302,6 +303,69 @@ describe('chat request preparation', () => {
     expect(removedRequest.api).toBe('http://127.0.0.1:5151/chat')
     expect(removedRequest.body.attachments).toBeUndefined()
     expect(JSON.stringify(removedRequest.body)).not.toContain(selectedFile.data)
+  })
+
+  it('resends the failed turn attachment on retry without replaying older files', () => {
+    const earlierFile = {
+      type: 'file' as const,
+      mediaType: 'text/plain',
+      filename: 'earlier.txt',
+      url: 'data:text/plain;base64,QU5DSE9SLU9MRC1GSUxF',
+    }
+    const retryFile = {
+      type: 'file' as const,
+      mediaType: 'text/plain',
+      filename: 'retry.txt',
+      url: 'data:text/plain;base64,UkVUUlktdHVybi1maWxl',
+    }
+    // useChat's regenerate() retries the last user turn from its transcript;
+    // the errored assistant message remains after that user message.
+    const messages = [
+      {
+        id: 'old-user',
+        role: 'user',
+        parts: [{ type: 'text', text: 'earlier turn' }, earlierFile],
+      },
+      {
+        id: 'old-assistant',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'earlier answer' }],
+      },
+      {
+        id: 'failed-user',
+        role: 'user',
+        parts: [{ type: 'text', text: 'retry this file' }, retryFile],
+      },
+      {
+        id: 'failed-assistant',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'temporary provider error' }],
+      },
+    ] satisfies UIMessage[]
+
+    const buildRetryRequest = () =>
+      buildSidepanelPreparedSendMessagesRequest({
+        agentServerUrl: 'http://127.0.0.1:5151',
+        target: llmTarget,
+        fallbackProvider,
+        message: 'retry this file',
+        attachments: getLastUserMessageAttachments(messages),
+        ...commonRequestInput(),
+      })
+    const initialAttempt = buildRetryRequest()
+    const retryAttempt = buildRetryRequest()
+
+    expect(getLastUserMessageAttachments(messages)).toEqual([
+      {
+        mediaType: retryFile.mediaType,
+        data: retryFile.url,
+        name: retryFile.filename,
+      },
+    ])
+    expect(retryAttempt.body).toEqual(initialAttempt.body)
+    expect(JSON.stringify(retryAttempt.body)).toContain(retryFile.url)
+    expect(JSON.stringify(retryAttempt.body)).not.toContain(earlierFile.url)
+    expect(retryAttempt.body.attachments).toHaveLength(1)
   })
 
   it('sends ACP agents to the same endpoint without provider fields', () => {

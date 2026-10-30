@@ -23,6 +23,15 @@ export function getLastUserMessageFiles(messages: UIMessage[]) {
   return []
 }
 
+/** Project active-turn files into the request format used by both send and retry. */
+export function getLastUserMessageAttachments(messages: UIMessage[]) {
+  return getLastUserMessageFiles(messages).map((file) => ({
+    mediaType: file.mediaType,
+    data: file.url,
+    ...(file.filename ? { name: file.filename } : {}),
+  }))
+}
+
 export interface OwnerTabSelection {
   text: string
   url: string

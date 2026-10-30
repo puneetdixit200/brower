@@ -62,7 +62,7 @@ import type {
 } from './chat-session-request'
 import {
   buildRequestBrowserContext,
-  getLastUserMessageFiles,
+  getLastUserMessageAttachments,
   getOwnerTabSelection,
   getToolApprovalResponse,
   isSameOwnerTabSelection,
@@ -543,11 +543,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
           persist,
           declinedApps,
           approvalResponse,
-          attachments: getLastUserMessageFiles(messages).map((file) => ({
-            mediaType: file.mediaType,
-            data: file.url,
-            ...(file.filename ? { name: file.filename } : {}),
-          })),
+          attachments: getLastUserMessageAttachments(messages),
         }
 
         const message = getApprovalAwareMessage(messages, approvalResponse)

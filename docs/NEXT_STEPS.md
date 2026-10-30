@@ -370,6 +370,12 @@ Site-recipe route contracts are now covered by four isolated API tests (36 asser
 
 Next for M06: exercise the Memory settings recipe panel in a headed Aster view, verify private-context behavior with a supported off-the-record extension, and confirm packaged persistence/restart behavior. Keep the row PARTIAL until those gates pass. Automated recipe execution remains outside scope.
 
+### U06 retry request projection — 2026-10-30
+
+The retry path now projects attachments from the last user message through the same helper used by normal sends. The focused request regression models the retained transcript after an assistant stream error and confirms retry request serialization keeps the active file once and excludes prior-turn files. `bun test modules/chat/chat-session-request.test.ts` passes 13/13 (58 assertions); app typecheck, targeted Biome, and `git diff --check` pass. Luna review checked the installed AI SDK `regenerate()` behavior and found no functional issue. This is request-boundary/source evidence, not a live failed-stream retry or linked Aster test. Keep U06 PARTIAL.
+
+Native build gate remains: current pinned checkout has 319 modified/untracked porcelain paths, generated graph without `.ninja_log`, no linked browser binary, and unverified provenance for existing objects; host resources are not a safe basis for a clean Chromium build. Preserve it. Next executable work: implement a client interaction on another incomplete user journey with a runnable BrowserOS fixture, while arranging a separate clean pinned native build host (at least 32 GiB RAM and 500 GB free SSD); do not regenerate GN or start Ninja in the existing checkout. For U06, next runtime gate is a disposable headed failed-provider-stream retry that proves selected attachment reaches a second real sidecar request, followed by native chooser and Aster acceptance when a binary exists.
+
 
 ### T30.4 approval ledger follow-up — 2026-10-29
 
