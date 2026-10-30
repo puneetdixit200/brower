@@ -1,5 +1,9 @@
 # Progress
 
+### T23.3 / A05 browser-process startup visibility — 2026-10-30
+
+The extension registers `runtime.onStartup` and writes local-only per-task interrupted markers for persisted running tasks whose `startedAt` predates that startup. It re-reads history before writing, skips malformed conversation/task entries, uses a separate key namespace so server terminal markers win, and does not rewrite history or replay execution. Task History and Recent Tasks read both marker sources. Focused recovery/history suites pass 30/30 (57 assertions); app typecheck, targeted Biome, diff check and independent Luna review pass. A disposable Chromium launch did not produce an observable startup marker, so browser event delivery is unverified; no Aster-native browser is available. A05 remains PARTIAL. See [startup recovery evidence](evidence/aster-browser-startup-recovery-2026-10-30.md).
+
 ### U13 screenshot consent-race hardening and T20a single-TU compile — 2026-10-30
 
 Both screenshot-to-Downloads and screenshot-for-AI-context now re-read the selected tab after consent, check its current window and HTTP(S) URL before capture, then verify active tab/window/HTTP(S) again after capture. Any mismatch throws before download or draft staging. The focused helper suite passes 8/8 (14 assertions); app typecheck, targeted Biome, `git diff --check`, and independent Luna review pass. This is source-level coverage; no headed browser permission/capture test ran. U13 remains PARTIAL.

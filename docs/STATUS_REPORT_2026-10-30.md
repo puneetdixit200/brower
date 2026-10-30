@@ -4,7 +4,7 @@
 
 - Repository: `/home/puneet/Projects/aster-browser/upstream-browseros`
 - Branch: `feat/aster-linux-ui`
-- Latest committed checkpoint entering this batch: `392c880547d455cea38145ad09b31f6d575d62bd` (`feat(aster): harden interrupted transcript screening`); it matched `aster/feat/aster-linux-ui` at fetch. This batch adds U13 screenshot consent-race hardening and a bounded native single-translation-unit compile; see the current checkpoint below.
+- Latest committed checkpoint entering the T23.3 batch: `348de2ca207ec4c89ab56310100515d0c157dda3` (`docs(aster): record current implementation checkpoint`); it matched `aster/feat/aster-linux-ui` at fetch. The preceding report records the U13 screenshot consent-race hardening and bounded native single-translation-unit compile.
 - Push remote: `aster` → `https://github.com/puneetdixit200/brower.git`. Upstream `origin` remains `https://github.com/browseros-ai/BrowserOS.git`.
 
 ## Overall status
@@ -28,6 +28,14 @@ The current T30 source change adds a production-boundary race regression: two in
 The account allowance meter was not exposed in this batch, so no current percentage is available. Earlier readings are historical and must not be reused as current; resume checking the live meter when the environment exposes it.
 
 ## Current batch — U13 screenshot consent race and T20a bounded object compile
+
+This is the historical preceding batch. The latest A05 startup work is recorded below.
+
+## Current batch — T23.3 browser-startup task visibility
+
+The extension now uses `runtime.onStartup` to create local-only, per-task interrupted markers for persisted running tasks older than startup. It skips malformed entries, keeps startup and server markers in separate namespaces, and the UI prefers server terminal state. No history rewrite, transcript replay, or execution resumption is performed. Focused recovery/history tests pass 30/30 (57 assertions), app typecheck and targeted Biome pass, and independent Luna review found and then verified a fix for malformed storage records aborting the whole recovery pass.
+
+A disposable direct Chromium launch with a seeded local running task did not produce an observable startup marker. This smoke is inconclusive and is not acceptance evidence; Aster `chrome`, actual startup-event delivery, headed Task History, task resumption, and packaged/native behavior remain unverified. See [detailed evidence](evidence/aster-browser-startup-recovery-2026-10-30.md). Matrix remains 2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, and 1 NOT_STARTED (72 rows); this is not an engineering completion percentage. The account allowance meter is unavailable in this environment.
 
 Reviewed implementation and documentation were committed as `1272c9caef22982eb003a0f02a5fd7a4f94f3aa2` (`fix(ui): revalidate screenshot target around capture`) and pushed to `aster/feat/aster-linux-ui`; remote ref verification matched the commit and the tracked worktree is clean.
 

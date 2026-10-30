@@ -12,7 +12,9 @@ import { Button } from '@/components/ui/button'
 import { useIncognitoWindow } from '@/lib/browseros/use-incognito-window'
 import {
   applyExecutionRecoveryMarkers,
+  browserStartupRecoveryMarkerKey,
   executionRecoveryMarkerKey,
+  getExecutionRecoveryMarker,
   isExecutionRecoveryMarker,
   reconcileInterruptedExecutionTasks,
 } from '@/lib/execution-history/recovery'
@@ -181,7 +183,10 @@ async function persistMissingRunMarkers(
       const existingMarker = existing[key]
       return isExecutionRecoveryMarker(existingMarker) &&
         existingMarker.taskId === marker.taskId &&
-        existingMarker.conversationId === marker.conversationId
+        existingMarker.conversationId === marker.conversationId &&
+        existingMarker.source !== 'browser-startup' &&
+        existingMarker.status === marker.status &&
+        existingMarker.responsePreview === marker.responsePreview
         ? []
         : [[key, marker]]
     }),
@@ -216,19 +221,20 @@ async function loadExecutionHistoryTasks(): Promise<ExecutionTaskRecord[]> {
   const runningTasks = Object.values(visibleHistory).flatMap((item) =>
     item.tasks.filter((task) => task.status === 'running'),
   )
-  const markerKeys = runningTasks.map((task) =>
+  const markerKeys = runningTasks.flatMap((task) => [
     executionRecoveryMarkerKey(task.id),
-  )
+    browserStartupRecoveryMarkerKey(task.id),
+  ])
   const markerValues = markerKeys.length
     ? await chrome.storage.local.get(markerKeys)
     : {}
   const markers = runningTasks.flatMap((task) => {
-    const marker = markerValues[executionRecoveryMarkerKey(task.id)]
-    return isExecutionRecoveryMarker(marker) &&
-      marker.taskId === task.id &&
-      marker.conversationId === task.conversationId
-      ? [marker]
-      : []
+    const marker = getExecutionRecoveryMarker(
+      task.id,
+      task.conversationId,
+      markerValues,
+    )
+    return marker ? [marker] : []
   })
   return flattenExecutionHistory(
     applyExecutionRecoveryMarkers(visibleHistory, markers),

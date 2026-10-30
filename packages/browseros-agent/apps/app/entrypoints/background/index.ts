@@ -14,6 +14,7 @@ import {
   toggleSidePanel,
 } from '@/lib/browseros/toggleSidePanel'
 import { checkAndShowChangelog } from '@/lib/changelog/changelog-notifier'
+import { persistBrowserStartupRecoveryMarkers } from '@/lib/execution-history/browser-startup-recovery'
 import { fetchMcpTools } from '@/lib/mcp/client'
 import {
   onRuntimeMessage,
@@ -87,6 +88,14 @@ export default defineBackground(() => {
   })
 
   Capabilities.initialize().catch(() => null)
+
+  chrome.runtime.onStartup.addListener(() => {
+    const startupAt = new Date().toISOString()
+    void persistBrowserStartupRecoveryMarkers(
+      chrome.storage.local,
+      startupAt,
+    ).catch(() => undefined)
+  })
 
   scheduledJobRuns()
 

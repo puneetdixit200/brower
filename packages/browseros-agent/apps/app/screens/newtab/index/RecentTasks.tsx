@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { useIncognitoWindow } from '@/lib/browseros/use-incognito-window'
 import {
+  browserStartupRecoveryMarkerKey,
   executionRecoveryMarkerKey,
-  isExecutionRecoveryMarker,
+  getExecutionRecoveryMarker,
 } from '@/lib/execution-history/recovery'
 import type {
   ExecutionHistoryByConversation,
@@ -68,17 +69,20 @@ export function RecentTasks() {
         const running = Object.values(history).flatMap((record) =>
           (record.tasks ?? []).filter((task) => task.status === 'running'),
         )
-        const keys = running.map((task) => executionRecoveryMarkerKey(task.id))
+        const keys = running.flatMap((task) => [
+          executionRecoveryMarkerKey(task.id),
+          browserStartupRecoveryMarkerKey(task.id),
+        ])
         const storedMarkers = keys.length
           ? await chrome.storage.local.get(keys)
           : {}
         const markers = running.flatMap((task) => {
-          const marker = storedMarkers[executionRecoveryMarkerKey(task.id)]
-          return isExecutionRecoveryMarker(marker) &&
-            marker.taskId === task.id &&
-            marker.conversationId === task.conversationId
-            ? [marker]
-            : []
+          const marker = getExecutionRecoveryMarker(
+            task.id,
+            task.conversationId,
+            storedMarkers,
+          )
+          return marker ? [marker] : []
         })
         const recent = buildRecentTasks(history, markers)
         if (active && current === generation) {
@@ -98,7 +102,9 @@ export function RecentTasks() {
         area === 'local' &&
         Object.keys(changes).some(
           (key) =>
-            key === HISTORY_KEY || key.startsWith('executionHistoryRecovery:'),
+            key === HISTORY_KEY ||
+            key.startsWith('executionHistoryRecovery:') ||
+            key.startsWith('executionHistoryBrowserStartup:'),
         )
       ) {
         void refresh()

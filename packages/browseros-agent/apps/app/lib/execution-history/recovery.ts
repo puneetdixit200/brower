@@ -9,11 +9,14 @@ export interface ExecutionRecoveryMarker {
   conversationId: string
   status: Exclude<ExecutionTaskRecord['status'], 'running'>
   completedAt: string
+  /** Indicates that this marker came from a browser process restart signal. */
+  source?: 'browser-startup'
   /** Bounded server transcript context for an interrupted run, kept local only. */
   responsePreview?: string
 }
 
 const RECOVERY_MARKER_PREFIX = 'executionHistoryRecovery:'
+const BROWSER_STARTUP_MARKER_PREFIX = 'executionHistoryBrowserStartup:'
 const MAX_RESPONSE_PREVIEW_BYTES = 16 * 1024
 
 function isBoundedResponsePreview(value: unknown): value is string {
@@ -36,6 +39,34 @@ export function executionRecoveryMarkerKey(taskId: string): string {
   return `${RECOVERY_MARKER_PREFIX}${taskId}`
 }
 
+export function browserStartupRecoveryMarkerKey(taskId: string): string {
+  return `${BROWSER_STARTUP_MARKER_PREFIX}${taskId}`
+}
+
+/** Prefer the server's terminal snapshot when both recovery sources exist. */
+export function getExecutionRecoveryMarker(
+  taskId: string,
+  conversationId: string,
+  stored: Record<string, unknown>,
+): ExecutionRecoveryMarker | undefined {
+  const serverMarker = stored[executionRecoveryMarkerKey(taskId)]
+  if (
+    isExecutionRecoveryMarker(serverMarker) &&
+    serverMarker.taskId === taskId &&
+    serverMarker.conversationId === conversationId
+  ) {
+    return serverMarker
+  }
+
+  const startupMarker = stored[browserStartupRecoveryMarkerKey(taskId)]
+  return isExecutionRecoveryMarker(startupMarker) &&
+    startupMarker.source === 'browser-startup' &&
+    startupMarker.taskId === taskId &&
+    startupMarker.conversationId === conversationId
+    ? startupMarker
+    : undefined
+}
+
 export function isExecutionRecoveryMarker(
   value: unknown,
 ): value is ExecutionRecoveryMarker {
@@ -49,6 +80,8 @@ export function isExecutionRecoveryMarker(
       candidate.status === 'failed' ||
       candidate.status === 'interrupted') &&
     typeof candidate.completedAt === 'string' &&
+    (candidate.source === undefined ||
+      candidate.source === 'browser-startup') &&
     (candidate.responsePreview === undefined ||
       (candidate.status === 'interrupted' &&
         isBoundedResponsePreview(candidate.responsePreview) &&
