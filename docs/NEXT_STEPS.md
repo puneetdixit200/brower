@@ -2,7 +2,7 @@
 
 ### T26.2 / A12 continuation target freshness — 2026-10-30
 
-Continuation now resolves only against live current-window tabs and aborts after the asynchronous lookup if its owning conversation is no longer selected; the handoff UI remounts per conversation. Focused handoff suite passes 12/12 (49 assertions), with app typecheck, targeted compatible-Biome and diff check passing. Next add a query-rejection regression and verify the handoff in headed Aster; broader challenge false-positive and process-restart acceptance remain open. Keep A12 PARTIAL.
+Continuation now resolves only against live current-window tabs and aborts after the asynchronous lookup if its owning conversation is no longer selected; the handoff UI remounts per conversation. Focused handoff suite passes 13/13 (51 assertions), including chat-switch and query-rejection zero-send checks; app typecheck, targeted compatible-Biome and diff check pass. Next verify the handoff in headed Aster; broader challenge false-positive and process-restart acceptance remain open. Keep A12 PARTIAL.
 
 ### T24.1 / A07 conversation queue isolation — 2026-10-30
 

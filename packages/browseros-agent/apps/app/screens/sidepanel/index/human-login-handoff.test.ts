@@ -189,6 +189,24 @@ describe('human login handoff', () => {
     expect(sends).toBe(0)
   })
 
+  it('rejects a continuation when live-tab lookup fails without sending', async () => {
+    let sends = 0
+    const status = await sendContinuationForConversation(
+      'conversation-a',
+      () => 'conversation-a',
+      async () => {
+        throw new Error('tabs query failed')
+      },
+      () => {
+        sends += 1
+        return true
+      },
+    )
+
+    expect(status).toBe(false)
+    expect(sends).toBe(0)
+  })
+
   it('shows manual-switch guidance and truthful accepted/rejected UI states', () => {
     const renderNotice = (continuationStatus: 'accepted' | 'rejected' | null) =>
       renderToStaticMarkup(
