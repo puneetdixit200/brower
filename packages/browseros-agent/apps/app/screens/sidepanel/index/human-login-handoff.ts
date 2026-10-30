@@ -37,6 +37,30 @@ export function continuationTabs<T extends LoginTab>(
   return eligible(currentWindowTabs.filter((tab) => tab.active)) as T[]
 }
 
+export async function queryContinuationTabs<T extends LoginTab>(
+  attachedTabs: readonly T[],
+  queryCurrentWindow: () => Promise<readonly T[]>,
+): Promise<T[]> {
+  return continuationTabs(attachedTabs, await queryCurrentWindow())
+}
+
+export async function sendContinuationForConversation<T>(
+  ownerConversationId: string,
+  getCurrentConversationId: () => string,
+  resolveTarget: () => Promise<T | null>,
+  send: (target: T) => boolean | Promise<boolean>,
+): Promise<boolean> {
+  let target: T | null
+  try {
+    target = await resolveTarget()
+  } catch {
+    return false
+  }
+  if (!target || getCurrentConversationId() !== ownerConversationId)
+    return false
+  return send(target)
+}
+
 /** A new user turn; it cannot resume or automatically replay the stopped run. */
 export function humanLoginContinuationPrompt(): string {
   return [

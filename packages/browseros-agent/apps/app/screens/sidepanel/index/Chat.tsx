@@ -37,7 +37,10 @@ import { ChatFooter } from './ChatFooter'
 import { ChatMessages } from './ChatMessages'
 import { hasPendingHumanWait } from './getMessageSegments'
 import { HumanLoginHandoff } from './HumanLoginHandoff'
-import { continuationTabs } from './human-login-handoff'
+import {
+  queryContinuationTabs,
+  sendContinuationForConversation,
+} from './human-login-handoff'
 import { IncognitoNotice } from './IncognitoNotice'
 import {
   canDrainPromptQueue,
@@ -111,6 +114,8 @@ export const Chat = () => {
   const queueGeneration = useRef(0)
   const queueAwaitingRun = useRef(false)
   const [attachedTabs, setAttachedTabs] = useState<chrome.tabs.Tab[]>([])
+  const conversationIdRef = useRef(conversationId)
+  conversationIdRef.current = conversationId
   const [attachments, setAttachments] = useState<StagedAttachment[]>([])
   const [assessResearchSupport, setAssessResearchSupport] = useState(false)
   const selectedProviderId = selectedProvider?.id
@@ -584,25 +589,29 @@ export const Chat = () => {
       )}
       {mode === 'agent' && (
         <HumanLoginHandoff
+          key={conversationId}
           onStop={handleStop}
           onContinue={async (prompt) => {
-            let targetTabs = attachedTabs
-            if (!targetTabs.length) {
-              try {
-                targetTabs = await chrome.tabs.query({ currentWindow: true })
-              } catch {
-                return false
-              }
-            }
-            targetTabs = continuationTabs(attachedTabs, targetTabs)
-            if (!targetTabs.length) return false
-            const action = createBrowserOSAction({
-              mode: 'agent',
-              message: prompt,
-              tabs: targetTabs,
-              contextPrivacy: 'human-login-continuation',
-            })
-            return sendMessage({ text: prompt, action })
+            return sendContinuationForConversation(
+              conversationId,
+              () => conversationIdRef.current,
+              async () => {
+                const targetTabs = await queryContinuationTabs(
+                  attachedTabs,
+                  () => chrome.tabs.query({ currentWindow: true }),
+                )
+                return targetTabs.length ? targetTabs : null
+              },
+              (targetTabs) => {
+                const action = createBrowserOSAction({
+                  mode: 'agent',
+                  message: prompt,
+                  tabs: targetTabs,
+                  contextPrivacy: 'human-login-continuation',
+                })
+                return sendMessage({ text: prompt, action })
+              },
+            )
           }}
           attachedTabs={attachedTabs}
         />

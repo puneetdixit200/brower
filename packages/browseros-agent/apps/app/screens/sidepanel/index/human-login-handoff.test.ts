@@ -7,6 +7,8 @@ import {
   findAttachedLoginTab,
   humanLoginContinuationPrompt,
   isLocalMfaFixtureUrl,
+  queryContinuationTabs,
+  sendContinuationForConversation,
   sendHumanLoginContinuation,
   startHumanLoginHandoff,
 } from './human-login-handoff'
@@ -142,6 +144,49 @@ describe('human login handoff', () => {
         [{ id: 8, url: 'https://active.test', active: true }],
       ),
     ).toEqual([{ id: 8, url: 'https://active.test', active: true }])
+  })
+
+  it('queries live tabs even when cached attachments are non-empty', async () => {
+    let queries = 0
+    const liveTabs: { id: number; url: string; active?: boolean }[] = [
+      { id: 8, url: 'https://active.test', active: true },
+    ]
+    const tabs = await queryContinuationTabs<{
+      id: number
+      url: string
+      active?: boolean
+    }>([{ id: 7, url: 'https://stale.test' }], async () => {
+      queries += 1
+      return liveTabs
+    })
+
+    expect(queries).toBe(1)
+    expect(tabs).toEqual([{ id: 8, url: 'https://active.test', active: true }])
+    expect(tabs.some((tab) => tab.id === 7)).toBe(false)
+  })
+
+  it('does not send a pending continuation after switching conversations', async () => {
+    let currentConversationId = 'conversation-a'
+    let resolveTarget!: (target: string) => void
+    let sends = 0
+    const pendingTarget = new Promise<string>((resolve) => {
+      resolveTarget = resolve
+    })
+    const continuation = sendContinuationForConversation(
+      'conversation-a',
+      () => currentConversationId,
+      () => pendingTarget,
+      () => {
+        sends += 1
+        return true
+      },
+    )
+
+    currentConversationId = 'conversation-b'
+    resolveTarget('live target')
+
+    expect(await continuation).toBe(false)
+    expect(sends).toBe(0)
   })
 
   it('shows manual-switch guidance and truthful accepted/rejected UI states', () => {
