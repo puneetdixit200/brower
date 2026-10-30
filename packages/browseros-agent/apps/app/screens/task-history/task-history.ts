@@ -1,5 +1,6 @@
 import { containsCredentialShapedText } from '@/lib/execution-history/safety'
 import type {
+  ExecutionArtifactDescriptor,
   ExecutionHistoryByConversation,
   ExecutionStepRecord,
   ExecutionTaskRecord,
@@ -41,6 +42,31 @@ function safeText(value?: string): string | undefined {
     : value
 }
 
+/** Only well-formed, filename-safe descriptors may reach the task detail UI. */
+function isSafeArtifactDescriptor(
+  artifact: unknown,
+): artifact is ExecutionArtifactDescriptor {
+  if (typeof artifact !== 'object' || artifact === null) return false
+  const descriptor = artifact as Partial<ExecutionArtifactDescriptor>
+  return (
+    typeof descriptor.filename === 'string' &&
+    descriptor.filename.trim().length > 0 &&
+    descriptor.filename !== '.' &&
+    descriptor.filename !== '..' &&
+    !containsCredentialShapedText(descriptor.filename) &&
+    !/[\\/\0]/.test(descriptor.filename) &&
+    typeof descriptor.sizeBytes === 'number' &&
+    Number.isSafeInteger(descriptor.sizeBytes) &&
+    descriptor.sizeBytes >= 0 &&
+    typeof descriptor.sha256 === 'string' &&
+    /^[a-f0-9]{64}$/i.test(descriptor.sha256) &&
+    (descriptor.artifactId === undefined ||
+      descriptor.artifactId === '' ||
+      (typeof descriptor.artifactId === 'string' &&
+        /^[a-f0-9-]{36}$/i.test(descriptor.artifactId)))
+  )
+}
+
 function safeStep(step: ExecutionStepRecord): ExecutionStepRecord | undefined {
   const toolName = safeText(step.toolName)
   const previewText = safeText(step.previewText)
@@ -53,6 +79,10 @@ function safeStep(step: ExecutionStepRecord): ExecutionStepRecord | undefined {
     previewText,
     errorText,
     approval: step.approval ? { ...step.approval, reason } : undefined,
+    artifact:
+      step.artifact && isSafeArtifactDescriptor(step.artifact)
+        ? step.artifact
+        : undefined,
     // Stored raw tool I/O is never part of the detail view projection.
     input: undefined,
     output: undefined,
@@ -71,6 +101,7 @@ export function getTaskDisplayRecord(
     promptText,
     responseText,
     responsePreview,
+    artifacts: (task.artifacts ?? []).filter(isSafeArtifactDescriptor),
     steps: task.steps.flatMap((step) => {
       const safe = safeStep(step)
       return safe ? [safe] : []
@@ -80,18 +111,9 @@ export function getTaskDisplayRecord(
 
 function hasSafeArtifactDescriptors(task: ExecutionTaskRecord): boolean {
   return (
-    (task.artifacts ?? []).every(
-      (artifact) =>
-        !containsCredentialShapedText(artifact.filename) &&
-        !/[\\/\0]/.test(artifact.filename) &&
-        Number.isSafeInteger(artifact.sizeBytes) &&
-        artifact.sizeBytes >= 0 &&
-        /^[a-f0-9]{64}$/i.test(artifact.sha256) &&
-        (!artifact.artifactId || /^[a-f0-9-]{36}$/i.test(artifact.artifactId)),
-    ) &&
+    (task.artifacts ?? []).every(isSafeArtifactDescriptor) &&
     task.steps.every(
-      (step) =>
-        !step.artifact || !containsCredentialShapedText(step.artifact.filename),
+      (step) => !step.artifact || isSafeArtifactDescriptor(step.artifact),
     )
   )
 }
@@ -119,7 +141,6 @@ export function flattenExecutionHistory(
 ): ExecutionTaskRecord[] {
   return Object.values(history ?? {})
     .flatMap((conversation) => conversation.tasks ?? [])
-    .filter(hasSafeArtifactDescriptors)
     .map(getTaskDisplayRecord)
     .sort((left, right) => right.startedAt.localeCompare(left.startedAt))
 }

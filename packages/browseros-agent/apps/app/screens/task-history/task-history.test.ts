@@ -117,7 +117,7 @@ describe('task history helpers', () => {
     expect(tasks[2]?.steps).toEqual([])
   })
 
-  test('omits tasks with credential-shaped artifact filenames', () => {
+  test('omits unsafe step artifact descriptors while preserving safe timeline steps', () => {
     const tasks = flattenExecutionHistory({
       history: {
         conversationId: 'history',
@@ -145,10 +145,19 @@ describe('task history helpers', () => {
       },
     })
 
-    expect(tasks.map((item) => item.id)).toEqual(['safe'])
+    expect(tasks.map((item) => item.id)).toEqual([
+      'safe',
+      'unsafe-step-artifact',
+    ])
+    expect(tasks[1]?.steps).toHaveLength(1)
+    expect(tasks[1]?.steps[0]).toMatchObject({
+      toolName: 'download',
+      previewText: 'Downloaded file',
+      artifact: undefined,
+    })
   })
 
-  test('omits artifacts with credential-shaped or path-like filenames', () => {
+  test('projects only strict artifact descriptors from task and step records', () => {
     const descriptor = {
       artifactId: '00000000-0000-4000-8000-000000000001',
       filename: 'report.csv',
@@ -169,10 +178,82 @@ describe('task history helpers', () => {
           task('path-filename', '2026-10-25T00:00:00.000Z', {
             artifacts: [{ ...descriptor, filename: '../outside.txt' }],
           }),
+          task('dot-filename', '2026-10-24T12:00:00.000Z', {
+            artifacts: [{ ...descriptor, filename: '.' }],
+          }),
+          task('dotdot-filename', '2026-10-24T06:00:00.000Z', {
+            artifacts: [{ ...descriptor, filename: '..' }],
+          }),
+          task('invalid-size', '2026-10-24T00:00:00.000Z', {
+            artifacts: [{ ...descriptor, sizeBytes: -1 }],
+          }),
+          task('invalid-hash', '2026-10-23T00:00:00.000Z', {
+            artifacts: [{ ...descriptor, sha256: 'not-a-hash' }],
+          }),
+          task('invalid-id', '2026-10-22T00:00:00.000Z', {
+            artifacts: [{ ...descriptor, artifactId: 'not-a-uuid' }],
+          }),
+          task('invalid-step-descriptor', '2026-10-21T00:00:00.000Z', {
+            steps: [
+              {
+                id: 'download',
+                toolName: 'download',
+                order: 1,
+                state: 'output-available',
+                startedAt: '2026-10-21T00:00:00.000Z',
+                previewText: 'Downloaded safely',
+                artifact: { ...descriptor, sizeBytes: Number.NaN },
+              },
+              {
+                id: 'safe-download',
+                toolName: 'download',
+                order: 2,
+                state: 'output-available',
+                startedAt: '2026-10-21T00:00:01.000Z',
+                previewText: 'Downloaded another file safely',
+                artifact: descriptor,
+              },
+            ],
+          }),
         ],
       },
     })
-    expect(tasks.map((item) => item.id)).toEqual(['safe-artifact'])
+    expect(tasks.map((item) => item.id)).toEqual([
+      'safe-artifact',
+      'credential-filename',
+      'path-filename',
+      'dot-filename',
+      'dotdot-filename',
+      'invalid-size',
+      'invalid-hash',
+      'invalid-id',
+      'invalid-step-descriptor',
+    ])
+    expect(tasks.map((item) => item.artifacts)).toEqual([
+      [descriptor],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+    ])
+    expect(tasks[8]?.steps).toMatchObject([
+      {
+        previewText: 'Downloaded safely',
+        artifact: undefined,
+      },
+      {
+        previewText: 'Downloaded another file safely',
+        artifact: descriptor,
+      },
+    ])
+    expect(tasks[8]?.steps.map((step) => step.artifact)).toEqual([
+      undefined,
+      descriptor,
+    ])
   })
 
   test('uses only the bounded response preview', () => {

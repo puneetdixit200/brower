@@ -366,8 +366,8 @@ Follow the reviewed batches in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md
 
 ### T12.2/U16 task-detail safe source slice — 2026-10-30
 
-- Task detail now projects saved records to available display fields: empty text stays absent, partial responses fall back to the saved preview, and unsafe prompt/response/timeline strings are omitted individually while safe summaries remain visible. The projection explicitly clears saved step `input`/`output`; it screens existing credential detector patterns and supported POSIX and Windows absolute local path forms. Artifact descriptors and capability-based download behavior are unchanged.
-- Focused task-history tests, app typecheck, targeted Biome and `git diff --check` pass. This is source/helper coverage; headed Aster task-detail, native download, and persistence/restart acceptance remain open. U16 remains PARTIAL.
+- Task detail now projects saved records to available display fields: empty text stays absent, partial responses fall back to the saved preview, and unsafe prompt/response/timeline strings are omitted individually while safe summaries remain visible. The projection explicitly clears saved step `input`/`output`; it screens existing credential detector patterns and supported POSIX and Windows absolute local path forms. A shared strict descriptor predicate now omits unsafe task and step artifacts, including path-like filenames and invalid size/hash/nonempty artifact IDs, while preserving safe timeline steps.
+- Focused task-history tests pass (11/11; 34 assertions), app typecheck, targeted Biome and `git diff --check` pass. This is source/helper coverage; headed Aster task-detail, native download, and persistence/restart acceptance remain open. U16 remains PARTIAL.
 
 ### A05 follow-up — interrupted task visibility recovery (partial)
 
