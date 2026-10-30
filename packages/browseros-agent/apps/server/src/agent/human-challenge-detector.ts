@@ -65,9 +65,9 @@ export function detectHumanChallenge(input: unknown): HumanChallengeResult {
     input.visibleOtpInputCount > 0 && input.formState === 'challenge'
 
   if (
-    hasCaptchaMarkers &&
-    hasMfaMarkers &&
-    input.explicitChallengeState !== 'unknown'
+    (hasCaptchaMarkers && hasMfaMarkers) ||
+    (hasCaptchaMarkers && input.explicitChallengeState === 'mfa') ||
+    (hasMfaMarkers && input.explicitChallengeState === 'captcha')
   ) {
     return ambiguous('conflicting_signals')
   }

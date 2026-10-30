@@ -1,5 +1,9 @@
 # Progress
 
+### T26.2 / A12 challenge-signal conflict guard — 2026-10-30
+
+The server now treats opposing explicit CAPTCHA/MFA state and supported visual evidence as conflicting, and simultaneous CAPTCHA plus MFA evidence remains a conflict even when the explicit state is `unknown`. Matching explicit states keep their existing classification. Detector and browser-dispatch suites pass 15/15 (32 assertions); server typecheck, targeted Biome and `git diff --check` pass. Independent Luna review found no classification defect. The detector still relies on bounded page-authored metadata and remains vulnerable to nonstandard or spoofed signals; A12 stays PARTIAL pending headed, restart and packaged Aster acceptance.
+
 ### T12.1 / U03 Recent Tasks storage loader — 2026-10-30
 
 Extracted persisted history and recovery-marker reads into `loadRecentTasks` behind an injectable storage interface, keeping the component's incognito gate, stale-result protection, and storage-change subscription intact. The loader fails closed for malformed history and validates task, step, artifact, conversation ownership, required counters, and optional IDs before projecting cards. Focused Recent Tasks tests cover startup/server marker precedence, duplicate IDs across conversations, unmarked running tasks, malformed/missing records and storage errors; the combined Recent Tasks and Task History/export/download suites pass 27/27 (68 assertions), app typecheck passes, targeted Biome and `git diff --check` pass. U03 remains PARTIAL pending headed Aster persistence/privacy and restart acceptance.

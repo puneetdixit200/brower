@@ -77,6 +77,60 @@ describe('human challenge detector contract', () => {
     ).toEqual({ kind: 'ambiguous', reason: 'conflicting_signals' })
   })
 
+  it('returns fixed ambiguity when CAPTCHA evidence conflicts with explicit MFA', () => {
+    expect(
+      detectHumanChallenge({
+        ...baseSignal,
+        captchaIframeCount: 1,
+        captchaProviderMarkerCount: 1,
+        explicitChallengeState: 'mfa',
+      }),
+    ).toEqual({ kind: 'ambiguous', reason: 'conflicting_signals' })
+  })
+
+  it('returns fixed ambiguity when MFA evidence conflicts with explicit CAPTCHA', () => {
+    expect(
+      detectHumanChallenge({
+        ...baseSignal,
+        visibleOtpInputCount: 1,
+        formState: 'challenge',
+        explicitChallengeState: 'captcha',
+      }),
+    ).toEqual({ kind: 'ambiguous', reason: 'conflicting_signals' })
+  })
+
+  it('keeps simultaneous CAPTCHA and MFA evidence conflicting with unknown explicit state', () => {
+    expect(
+      detectHumanChallenge({
+        ...baseSignal,
+        visibleOtpInputCount: 1,
+        captchaIframeCount: 1,
+        captchaProviderMarkerCount: 1,
+        explicitChallengeState: 'unknown',
+        formState: 'challenge',
+      }),
+    ).toEqual({ kind: 'ambiguous', reason: 'conflicting_signals' })
+  })
+
+  it('allows explicit states that agree with supported metadata evidence', () => {
+    expect(
+      detectHumanChallenge({
+        ...baseSignal,
+        captchaIframeCount: 1,
+        captchaProviderMarkerCount: 1,
+        explicitChallengeState: 'captcha',
+      }),
+    ).toEqual({ kind: 'captcha', reason: 'captcha_signals_agree' })
+    expect(
+      detectHumanChallenge({
+        ...baseSignal,
+        visibleOtpInputCount: 1,
+        formState: 'challenge',
+        explicitChallengeState: 'mfa',
+      }),
+    ).toEqual({ kind: 'mfa', reason: 'mfa_signals_agree' })
+  })
+
   it('fails closed for malformed, extra, and oversized signals', () => {
     const oversized = 'x'.repeat(513)
     for (const value of [

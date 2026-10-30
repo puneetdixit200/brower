@@ -1,5 +1,9 @@
 # Aster next steps
 
+### T26.2 / A12 challenge-signal conflict guard — 2026-10-30
+
+Conflicting explicit CAPTCHA/MFA states and supported visual evidence now resolve to fixed ambiguity; simultaneous CAPTCHA and MFA metadata also remains ambiguous when explicit state is unknown. Detector and browser-dispatch suites pass 15/15 (32 assertions), with server typecheck, targeted Biome, diff check, and independent Luna review passing. Next validate supported and false-positive signals on headed Aster or an equivalent BrowserOS runtime, then exercise killed-process recovery and packaged acceptance. Keep A12 PARTIAL.
+
 ### T24.1 / A07 queue retry timer lifecycle — 2026-10-30
 
 Refused-prompt retries now use an extracted timer helper whose returned cleanup is used by the Chat effect. Tests verify the 250 ms retry scheduling, callback execution, and timer cleanup; the focused queue suite passes 12/12 (46 assertions), with app typecheck, targeted Biome, and diff check passing. Independent review found no concrete behavior issue. This remains helper coverage; next validate the effect in headed Aster with retry, stop, clear, and conversation switch. True mid-run steering and mounted UI/stream acceptance remain open. Keep A07 PARTIAL.
