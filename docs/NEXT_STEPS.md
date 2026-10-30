@@ -1,5 +1,11 @@
 # Aster next steps
 
+### A01 headed BrowserOS UI-to-page-read checkpoint — 2026-10-30
+
+The disposable headed smoke now passes a user prompt through the BrowserOS side panel, local sidecar and Browser MCP `tabs` → `read`, then verifies the final assistant text contains the local page title and sentinel. The hardened rerun passed after independent review tightened the final-message assertion and cleanup logic. This remains fixture-only evidence: semantic comprehension, external egress policy, and Aster-native acceptance are unverified. Keep A01 PARTIAL. Details: `docs/evidence/aster-a01-headed-ui-page-read-2026-10-30.md`.
+
+Next continue an independent user-facing journey that can be verified against the disposable BrowserOS runtime while preserving the native-build gate. For A01, a later acceptance pass still needs a real-provider semantic check and a linked Aster-native browser; do not promote the feature based on fixture output.
+
 ### Current A04/T19 implementation checkpoint — 2026-10-30
 
 Stop failures now remain visible and retryable in both chat surfaces, with lifecycle guards for conversation changes, stream completion, and delayed responses. Focused app tests pass 6/6 across the stop helper and NewTabChat; app typecheck and targeted Biome pass. The production ChatService/ToolLoopAgent fixture verifies SQLite approval grant consumption and unique execution claims across approve, deny, retry and replay; ChatService passes 28/28 (150 assertions), and claim/stale-approval tests pass 7/7 (24 assertions). These are source/integration fixtures; A04/A06 remain PARTIAL, and no remote MCP transport or arbitrary-provider interruption is established.
