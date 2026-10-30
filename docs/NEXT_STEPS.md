@@ -2,7 +2,7 @@
 
 ### T10.2 / B06 recent-history timestamp boundary — 2026-10-30
 
-The recent-history path now makes one bounded 256-result query and selects eight valid HTTP(S) rows locally, preventing equal-timestamp `endTime` boundaries from hiding the rest of a batch. Focused history test 4/4 (6 assertions), app typecheck and targeted compatible-Biome check pass; the repository Biome config is incompatible with installed Biome 2.6.4. Independent Luna review found no implementation defect; the helper test does not spy on the component API call or assert order. Next verify the history and nested-bookmark UI in headed Aster, then native import/export and profile/restart behavior. Keep B06 PARTIAL. Full test/evidence details are in `docs/PROGRESS.md` under this checkpoint.
+The recent-history path now makes one bounded 256-result query and selects eight valid HTTP(S) rows locally, preventing equal-timestamp `endTime` boundaries from hiding the rest of a batch. Focused history test 4/4 (6 assertions), app typecheck, commit-hook Biome and diff check pass. Independent Luna review found no implementation defect; the helper test does not spy on the component API call or assert order. Next verify the history and nested-bookmark UI in headed Aster, then native import/export and profile/restart behavior. Keep B06 PARTIAL. Full test/evidence details are in `docs/PROGRESS.md` under this checkpoint.
 
 ### A01 headed BrowserOS UI-to-page-read checkpoint — 2026-10-30
 
