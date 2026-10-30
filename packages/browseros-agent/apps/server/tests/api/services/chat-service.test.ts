@@ -81,7 +81,7 @@ const productionFixtureModel = new MockLanguageModelV3({
       productionModelCalls % 2 === 1
         ? {
             type: 'tool-call' as const,
-            toolCallId: 'provider-send-call-1',
+            toolCallId: `provider-send-call-${productionModelCalls}`,
             toolName: productionToolCallOverride?.toolName ?? 'send_message',
             input: JSON.stringify(
               productionToolCallOverride?.input ?? {
@@ -1703,6 +1703,52 @@ describe('ChatService history persistence', () => {
         )
       ).text()
       expect(productionToolDispatches).toHaveLength(1)
+
+      const deniedToolCallId = deniedRequest?.toolCallId
+      expect(deniedToolCallId).toBeTruthy()
+      expect(productionToolDispatches).toHaveLength(1)
+
+      await (
+        await service.processMessage(
+          makeRequest(deniedConversation, 'Please try again.') as never,
+          new AbortController().signal,
+        )
+      ).text()
+      const retriedMessages = (
+        sessionStore.get(deniedConversation) as unknown as {
+          agent: { messages: Array<{ parts: Array<Record<string, unknown>> }> }
+        }
+      ).agent.messages
+      const retriedRequest = retriedMessages
+        .flatMap((message) => message.parts)
+        .find((part) => part.state === 'approval-requested')
+      if (!retriedRequest) throw new Error('Expected a fresh pending approval')
+      expect(retriedRequest?.toolCallId).toBeTruthy()
+      expect(retriedRequest?.toolCallId).not.toBe(deniedToolCallId)
+      const retriedApprovalId = (retriedRequest.approval as { id: string }).id
+      expect(retriedApprovalId).not.toBe(deniedApprovalId)
+      expect(productionToolDispatches).toHaveLength(1)
+
+      await (
+        await service.processMessage(
+          makeRequest(deniedConversation, '', {
+            id: retriedApprovalId,
+            approved: true,
+          }) as never,
+          new AbortController().signal,
+        )
+      ).text()
+      expect(productionToolDispatches).toHaveLength(2)
+
+      const retriedReplay = await service.processMessage(
+        makeRequest(deniedConversation, '', {
+          id: retriedApprovalId,
+          approved: true,
+        }) as never,
+        new AbortController().signal,
+      )
+      expect(retriedReplay.status).toBe(409)
+      expect(productionToolDispatches).toHaveLength(2)
     } finally {
       useProductionAgentFixture = false
     }
