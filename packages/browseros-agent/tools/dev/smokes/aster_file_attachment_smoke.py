@@ -42,6 +42,7 @@ def main() -> int:
     response_texts = [
         "Aster local fixture provider acknowledged turn one.",
         "Aster local fixture provider acknowledged turn two.",
+        "Aster local fixture provider acknowledged NewTabChat submission.",
     ]
 
     class FixtureProvider(ThreadingHTTPServer):
@@ -205,6 +206,8 @@ def main() -> int:
                 parsed_second_chat_body = json.loads(second_chat_body)
             except (TypeError, ValueError) as exc:
                 raise AssertionError("second /chat request body was not JSON") from exc
+            if followup_prompt not in json.dumps(parsed_second_chat_body, ensure_ascii=False):
+                raise AssertionError("turn-two follow-up prompt was absent from the /chat body")
             if parsed_second_chat_body.get("attachments"):
                 raise AssertionError("turn two unexpectedly submitted an attachment")
             second_provider_request = FixtureProvider.requests[1]
@@ -218,6 +221,63 @@ def main() -> int:
             if marker in current_url or filename in current_url:
                 raise AssertionError("file content or filename leaked into the chat URL")
 
+            # Exercise the persistent NewTabChat composer, mounted by the
+            # extension hash route #/home/chat. Staging stays local until the
+            # user explicitly submits the form.
+            cdp.evaluate("window.__asterChatRequests=[];location.hash='/home/chat'")
+            wait_for(cdp, "location.hash.endsWith('/home/chat')")
+            wait_for(cdp, "!!document.querySelector('textarea')")
+            set_file_input(cdp, str(file_path))
+            wait_for(cdp, f"document.body.innerText.includes({json.dumps(filename)})")
+            assert_no_newtab_submission(cdp, FixtureProvider.requests, "initial stage")
+            cdp.evaluate(
+                "document.querySelector("
+                + json.dumps(f'button[aria-label="Remove {filename}"]')
+                + ")?.click()"
+            )
+            wait_for(cdp, f"!document.body.innerText.includes({json.dumps(filename)})")
+            assert_no_newtab_submission(cdp, FixtureProvider.requests, "remove")
+            set_file_input(cdp, str(file_path))
+            wait_for(cdp, f"document.body.innerText.includes({json.dumps(filename)})")
+            assert_no_newtab_submission(cdp, FixtureProvider.requests, "reattach")
+            set_textarea(cdp, "Read the attached fixture in the persistent new-tab composer.")
+            click_send(cdp)
+            wait_for(cdp, "window.__asterChatRequests.length === 1", timeout=60)
+            wait_for(
+                cdp,
+                f"document.body.innerText.includes({json.dumps(response_texts[2])})",
+                timeout=60,
+            )
+            newtab_chat_request = cdp.evaluate("window.__asterChatRequests[0]")
+            if not newtab_chat_request or not newtab_chat_request.get("url", "").endswith("/chat"):
+                raise AssertionError("NewTabChat did not submit through /chat")
+            newtab_page_url = cdp.evaluate("location.href")
+            if any(
+                value in newtab_page_url or value in newtab_chat_request["url"]
+                for value in (marker, filename)
+            ):
+                raise AssertionError("NewTabChat leaked file content or filename into a URL")
+            try:
+                newtab_chat_body = json.loads(newtab_chat_request.get("body", ""))
+            except (TypeError, ValueError) as exc:
+                raise AssertionError("NewTabChat /chat request body was not JSON") from exc
+            if "Read the attached fixture in the persistent new-tab composer." not in json.dumps(
+                newtab_chat_body, ensure_ascii=False
+            ):
+                raise AssertionError("NewTabChat prompt was absent from the /chat body")
+            if len(newtab_chat_body.get("attachments", [])) != 1:
+                raise AssertionError("NewTabChat did not submit exactly one selected attachment")
+            if count_marker(newtab_chat_body["attachments"], marker) != 1:
+                raise AssertionError("NewTabChat /chat attachment did not contain exactly one marker")
+            if len(FixtureProvider.requests) != 3:
+                raise AssertionError(
+                    f"expected exactly three local model requests, got {len(FixtureProvider.requests)}"
+                )
+            if count_marker(FixtureProvider.requests[2], marker) != 1:
+                raise AssertionError(
+                    "NewTabChat provider request did not contain exactly one file marker"
+                )
+
             print(
                 json.dumps(
                     {
@@ -228,6 +288,8 @@ def main() -> int:
                         "turn_two_prior_file_marker": "absent_from_chat_and_model_request",
                         "turn_two_local_provider_response": "received",
                         "page_and_chat_url_leak": "none",
+                        "newtab_chat_attach_remove_explicit_submit": "passed",
+                        "newtab_chat_marker_in_chat_and_provider": "observed",
                         "synthetic_fixture": filename,
                     }
                 )
@@ -361,6 +423,24 @@ def click_send(cdp: CDP) -> None:
         raise RuntimeError("could not submit the composer")
 
 
+def assert_no_newtab_submission(
+    cdp: CDP, provider_requests: list[dict], stage: str
+) -> None:
+    # Give queued browser/provider work a short chance to surface before
+    # asserting that local staging/removal did not submit a chat turn.
+    time.sleep(0.25)
+    chat_requests = cdp.evaluate("window.__asterChatRequests.length")
+    if chat_requests != 0:
+        raise AssertionError(
+            f"NewTabChat submitted during {stage}: {chat_requests} /chat requests"
+        )
+    if len(provider_requests) != 2:
+        raise AssertionError(
+            f"NewTabChat reached the local provider during {stage}: "
+            f"{len(provider_requests)} requests"
+        )
+
+
 def request_contains_marker(value: object, marker: str) -> bool:
     if isinstance(value, str):
         if marker in value:
@@ -376,6 +456,23 @@ def request_contains_marker(value: object, marker: str) -> bool:
     if isinstance(value, dict):
         return any(request_contains_marker(item, marker) for item in value.values())
     return False
+
+
+def count_marker(value: object, marker: str) -> int:
+    if isinstance(value, str):
+        count = value.count(marker)
+        if value.startswith("data:") and "," in value:
+            try:
+                decoded = base64.b64decode(value.split(",", 1)[1]).decode("utf-8")
+                count += decoded.count(marker)
+            except (ValueError, UnicodeDecodeError):
+                pass
+        return count
+    if isinstance(value, list):
+        return sum(count_marker(item, marker) for item in value)
+    if isinstance(value, dict):
+        return sum(count_marker(item, marker) for item in value.values())
+    return 0
 
 
 def wait_target(base: str, fragment: str) -> dict:
