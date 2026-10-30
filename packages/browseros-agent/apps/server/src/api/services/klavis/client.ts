@@ -46,10 +46,10 @@ export class KlavisClient {
       })
 
       if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(
-          `Klavis error: ${response.status} ${response.statusText} - ${errorText}`,
-        )
+        // Remote error bodies may echo submitted API keys or user data. Keep
+        // diagnostics to the numeric status so route-level logging cannot
+        // persist an untrusted response body.
+        throw new Error(`Klavis request failed with HTTP ${response.status}`)
       }
 
       return response.json()
