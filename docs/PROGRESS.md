@@ -110,7 +110,7 @@ Two browser-scenario attempts correctly fail before navigation: stock `/usr/bin/
 
 ### T14.3 / A13 refused-send draft preservation — 2026-10-30
 
-Home now explicitly refuses Send when the provider/target is unavailable or routing is waiting. The composer awaits acceptance, preserves text/attachments/context on refusal or failure, shows a safe error for failures, and blocks duplicate submission. A revision guard preserves edits made during the await. App `bun run compile` (WXT prepare + TypeScript), targeted Biome and independent Luna review pass. No DOM interaction test or headed missing-provider acceptance ran; A13 remains PARTIAL.
+Home explicitly refuses Send when the provider/target is unavailable or routing is waiting. The composer awaits acceptance, preserves text/attachments/context on refusal or failure, shows a safe error for failures, and blocks duplicate submission. A revision guard preserves edits made during the await. Review of the app test setup found static server rendering but no DOM test runtime or React interaction harness, so there is no test of `ConversationInput`'s delayed-acceptance clear path. Next add DOM-capable component coverage for text and selected-context edits before acceptance resolves; then verify headed missing-provider acceptance. A13 remains PARTIAL.
 
 ### B05 download controls — 2026-10-30
 
