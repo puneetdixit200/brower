@@ -15,22 +15,17 @@ import { RpcClientProvider } from '@/lib/rpc/RpcClientProvider'
 import { cn } from '@/lib/utils'
 import { ActiveConversationProvider } from '@/modules/conversations/active-conversation-context'
 import { ShortcutsDialog } from '@/screens/newtab/index/ShortcutsDialog'
-import { shouldCollapseSidebarAfterResize } from './sidebar-resize'
+import {
+  boundedSidebarWidth,
+  DEFAULT_SIDEBAR_WIDTH,
+  keyboardSidebarWidth,
+  MAX_SIDEBAR_WIDTH,
+  MIN_SIDEBAR_WIDTH,
+  shouldCollapseSidebarAfterResize,
+} from './sidebar-resize'
 
 const COLLAPSE_DELAY = 150
 const SIDEBAR_WIDTH_KEY = 'aster.sidebar.expandedWidth.v1'
-const MIN_SIDEBAR_WIDTH = 220
-const MAX_SIDEBAR_WIDTH = 420
-const DEFAULT_SIDEBAR_WIDTH = 256
-
-function boundedSidebarWidth(value: number): number {
-  if (!Number.isFinite(value)) return DEFAULT_SIDEBAR_WIDTH
-  return Math.max(
-    MIN_SIDEBAR_WIDTH,
-    Math.min(MAX_SIDEBAR_WIDTH, Math.round(value)),
-  )
-}
-
 function readSidebarWidth(): number {
   try {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY)
@@ -166,16 +161,9 @@ const SidebarLayoutContent: FC = () => {
   }, [handleMouseLeave, resizing])
 
   const resizeWithKeyboard = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const delta =
-      event.key === 'ArrowRight' ? 16 : event.key === 'ArrowLeft' ? -16 : 0
-    if (!delta && event.key !== 'Home' && event.key !== 'End') return
+    const next = keyboardSidebarWidth(expandedWidth, event.key)
+    if (next === null) return
     event.preventDefault()
-    const next =
-      event.key === 'Home'
-        ? MIN_SIDEBAR_WIDTH
-        : event.key === 'End'
-          ? MAX_SIDEBAR_WIDTH
-          : boundedSidebarWidth(expandedWidth + delta)
     lastResizeWidth.current = next
     setExpandedWidth(next)
     saveSidebarWidth(next)

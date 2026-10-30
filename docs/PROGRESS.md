@@ -1,5 +1,9 @@
 # Progress
 
+### U01 sidebar resize bounds and keyboard source coverage — 2026-10-30
+
+Moved sidebar width bounds/defaults and supported keyboard resize mapping into pure helpers used by the layout. Tests cover pointer-release collapse, clamping/rounding and invalid numeric values, ArrowLeft/Right, Home/End, unsupported keys, and minimum/maximum width boundaries. Focused suite passes 7/7 (17 assertions), with app typecheck, targeted Biome, and `git diff --check` passing; independent Luna review found no behavior change. Stored-width conversion was inspected but not tested against localStorage directly. U01 remains PARTIAL pending headed Aster pointer/keyboard, native alignment and actual window resize acceptance.
+
 ### T24.1 / A07 retry timer lifecycle follow-up — 2026-10-30
 
 Extracted the refused-prompt retry timer setup into a small helper used by the React effect, preserving the 250 ms delay and returning the timer cleanup for effect invalidation. New tests verify scheduling, callback execution, and clearing the timer handle. Focused queue tests pass 12/12 (46 assertions), with app typecheck, targeted Biome, and `git diff --check` passing. Independent Luna review found no behavior regression and recommended asserting timer capture; that assertion is now included. This remains helper-level coverage without a mounted React test or headed Aster UI/stream acceptance. A07 remains PARTIAL.
