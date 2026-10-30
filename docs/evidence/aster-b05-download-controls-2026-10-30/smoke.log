@@ -1,0 +1,146 @@
+{"at":"2026-10-30T10:24:36.055Z","event":"stage_start","label":"fixture_server_listen","timeoutMs":5000}
+{"at":"2026-10-30T10:24:36.062Z","event":"stage_complete","label":"fixture_server_listen"}
+{"at":"2026-10-30T10:24:36.062Z","event":"stage_start","label":"browser_launch","timeoutMs":25000}
+{"at":"2026-10-30T10:24:36.406Z","event":"stage_complete","label":"browser_launch"}
+{"at":"2026-10-30T10:24:36.407Z","event":"stage_start","label":"browser_version","timeoutMs":5000}
+{"at":"2026-10-30T10:24:36.408Z","event":"stage_complete","label":"browser_version"}
+{"at":"2026-10-30T10:24:36.408Z","event":"browser_started","executable":"/usr/bin/chromium","version":"Chrome/155.0.8059.84","argv":["/usr/bin/chromium","--allow-pre-commit-input","--disable-background-networking","--disable-background-timer-throttling","--disable-backgrounding-occluded-windows","--disable-breakpad","--disable-client-side-phishing-detection","--disable-component-extensions-with-background-pages","--disable-crash-reporter","--disable-default-apps","--disable-dev-shm-usage","--disable-hang-monitor","--disable-infobars","--disable-ipc-flooding-protection","--disable-popup-blocking","--disable-prompt-on-repost","--disable-renderer-backgrounding","--disable-search-engine-choice-screen","--disable-sync","--enable-automation","--export-tagged-pdf","--force-color-profile=srgb","--generate-pdf-document-outline","--metrics-recording-only","--no-first-run","--password-store=basic","--use-mock-keychain","--disable-features=Translate,AcceptCHFrame,MediaRouter,OptimizationHints,WebUIReloadButton,WebUIOmniboxPopup,WebUIOmniboxAimPopup,ProcessPerSiteUpToMainFrameThreshold,IsolateSandboxedIframes","--enable-features=PdfOopif","--user-data-dir=/tmp/aster-b05-profile-KXrF2b","--disable-extensions","about:blank","--remote-debugging-address=127.0.0.1","--remote-debugging-port=0","--disable-dev-shm-usage","--no-first-run","--no-default-browser-check","--disable-background-networking","--ozone-platform=x11","--load-extension=/home/puneet/Projects/aster-browser/upstream-browseros/packages/browseros-agent/apps/app/dist/chrome-mv3-dev","--disable-extensions-except=/home/puneet/Projects/aster-browser/upstream-browseros/packages/browseros-agent/apps/app/dist/chrome-mv3-dev"],"profileDir":"/tmp/aster-b05-profile-KXrF2b","downloadsDir":"/tmp/aster-b05-profile-KXrF2b/Downloads","extensionDir":"/home/puneet/Projects/aster-browser/upstream-browseros/packages/browseros-agent/apps/app/dist/chrome-mv3-dev","extensionId":"oifdmombnijnaiocijiacjhajbnpdlhb","fixtureUrl":"http://127.0.0.1:46223/slow.bin","cdp":"Puppeteer WebSocket transport; loopback ephemeral port; no remote-allow-origins flag","sourceHashes":{"screens/agent-command/BrowserQuickControls.tsx":"6e8e2d55b770629dbca505c1beb71d3ad7f02d5b108861df93ba57217b25b958","screens/agent-command/downloads-progress.ts":"0393a5da23d13c2423f66a0b396c878892497e10ecaeed8ae6af00cd80244413","screens/agent-command/downloads-progress.test.ts":"86bed8fec60b533671ac0bef6a2832a7f20841ba33667311ab747433aa296d51","packages/browseros-agent/apps/app/dist/chrome-mv3-dev/chunks/app-CnkqHjZa.js":"10f01df36797b4f4c125fb9fa52e2e3a08b98a373b87bb25c7000a566ae54b39"}}
+{"at":"2026-10-30T10:24:36.408Z","event":"stage_start","label":"sandbox_page_create","timeoutMs":5000}
+{"at":"2026-10-30T10:24:36.500Z","event":"stage_complete","label":"sandbox_page_create"}
+{"at":"2026-10-30T10:24:36.501Z","event":"stage_start","label":"sandbox_page_goto","timeoutMs":5000}
+{"at":"2026-10-30T10:24:36.548Z","event":"stage_complete","label":"sandbox_page_goto"}
+{"at":"2026-10-30T10:24:36.549Z","event":"stage_start","label":"sandbox_status_read","timeoutMs":5000}
+{"at":"2026-10-30T10:24:36.575Z","event":"stage_complete","label":"sandbox_status_read"}
+{"at":"2026-10-30T10:24:36.575Z","event":"sandbox_status","url":"chrome://sandbox/","text":"Sandbox Status\nLayer 1 Sandbox\tNamespace\nPID namespaces\tYes\nNetwork namespaces\tYes\nSeccomp-BPF sandbox\tYes\nSeccomp-BPF sandbox supports TSYNC\tYes\nPtrace Protection with Yama LSM (Broker)\tYes\nPtrace Protection with Yama LSM (Non-broker)\tNo\n\nYou are adequately sandboxed.","passed":true,"missing":[]}
+{"at":"2026-10-30T10:24:36.576Z","event":"stage_start","label":"sandbox_page_close","timeoutMs":5000}
+{"at":"2026-10-30T10:24:36.586Z","event":"stage_complete","label":"sandbox_page_close"}
+{"at":"2026-10-30T10:24:36.586Z","event":"stage_start","label":"cdp_session_create","timeoutMs":5000}
+{"at":"2026-10-30T10:24:36.589Z","event":"stage_complete","label":"cdp_session_create"}
+{"at":"2026-10-30T10:24:36.589Z","event":"stage_start","label":"download_path_set","timeoutMs":5000}
+{"at":"2026-10-30T10:24:36.592Z","event":"stage_complete","label":"download_path_set"}
+{"at":"2026-10-30T10:24:36.592Z","event":"download_path_set","downloadsDir":"/tmp/aster-b05-profile-KXrF2b/Downloads"}
+{"at":"2026-10-30T10:24:36.592Z","event":"stage_start","label":"app_page_create","timeoutMs":5000}
+{"at":"2026-10-30T10:24:36.630Z","event":"stage_complete","label":"app_page_create"}
+{"at":"2026-10-30T10:24:36.630Z","event":"stage_start","label":"app_page_goto","timeoutMs":15000}
+{"at":"2026-10-30T10:24:36.930Z","event":"stage_complete","label":"app_page_goto"}
+{"at":"2026-10-30T10:24:36.931Z","event":"stage_start","label":"loaded_app_bundle_hash","timeoutMs":5000}
+{"at":"2026-10-30T10:24:37.225Z","event":"page_error","message":"McpPortError: MCP server port not configured.\nlze (chrome-extension://oifdmombnijnaiocijiacjhajbnpdlhb/chunks/mermaid-HWGCJPDP-MSa9vj4G.js:747:8507)"}
+{"at":"2026-10-30T10:24:37.295Z","event":"stage_complete","label":"loaded_app_bundle_hash"}
+{"at":"2026-10-30T10:24:37.295Z","event":"loaded_bundle_verified","url":"chrome-extension://oifdmombnijnaiocijiacjhajbnpdlhb/chunks/app-CnkqHjZa.js","sha256":"10f01df36797b4f4c125fb9fa52e2e3a08b98a373b87bb25c7000a566ae54b39","sourceHashes":{"screens/agent-command/BrowserQuickControls.tsx":"6e8e2d55b770629dbca505c1beb71d3ad7f02d5b108861df93ba57217b25b958","screens/agent-command/downloads-progress.ts":"0393a5da23d13c2423f66a0b396c878892497e10ecaeed8ae6af00cd80244413","screens/agent-command/downloads-progress.test.ts":"86bed8fec60b533671ac0bef6a2832a7f20841ba33667311ab747433aa296d51","packages/browseros-agent/apps/app/dist/chrome-mv3-dev/chunks/app-CnkqHjZa.js":"10f01df36797b4f4c125fb9fa52e2e3a08b98a373b87bb25c7000a566ae54b39"}}
+{"at":"2026-10-30T10:24:37.295Z","event":"stage_start","label":"downloads_control_wait","timeoutMs":13000}
+{"at":"2026-10-30T10:24:37.378Z","event":"stage_complete","label":"downloads_control_wait"}
+{"at":"2026-10-30T10:24:37.378Z","event":"stage_start","label":"open_downloads_ui","timeoutMs":5000}
+{"at":"2026-10-30T10:24:37.393Z","event":"stage_complete","label":"open_downloads_ui"}
+{"at":"2026-10-30T10:24:37.393Z","event":"stage_start","label":"fixture_page_create","timeoutMs":5000}
+{"at":"2026-10-30T10:24:37.437Z","event":"stage_complete","label":"fixture_page_create"}
+{"at":"2026-10-30T10:24:37.437Z","event":"stage_start","label":"fixture_download_navigation","timeoutMs":11000}
+{"at":"2026-10-30T10:24:37.445Z","event":"download_navigation","result":"net::ERR_ABORTED at http://127.0.0.1:46223/slow.bin"}
+{"at":"2026-10-30T10:24:37.445Z","event":"stage_complete","label":"fixture_download_navigation"}
+{"at":"2026-10-30T10:24:37.445Z","event":"stage_start","label":"synthetic download progress_poll","timeoutMs":8000}
+{"at":"2026-10-30T10:24:37.445Z","event":"stage_start","label":"download_search","timeoutMs":4000}
+{"at":"2026-10-30T10:24:37.461Z","event":"stage_complete","label":"download_search"}
+{"at":"2026-10-30T10:24:37.461Z","event":"stage_complete","label":"synthetic download progress_poll"}
+{"at":"2026-10-30T10:24:37.561Z","event":"stage_start","label":"synthetic download progress_poll","timeoutMs":7884}
+{"at":"2026-10-30T10:24:37.561Z","event":"stage_start","label":"download_search","timeoutMs":4000}
+{"at":"2026-10-30T10:24:37.563Z","event":"stage_complete","label":"download_search"}
+{"at":"2026-10-30T10:24:37.563Z","event":"stage_complete","label":"synthetic download progress_poll"}
+{"at":"2026-10-30T10:24:37.663Z","event":"stage_start","label":"synthetic download progress_poll","timeoutMs":7782}
+{"at":"2026-10-30T10:24:37.663Z","event":"stage_start","label":"download_search","timeoutMs":4000}
+{"at":"2026-10-30T10:24:37.665Z","event":"stage_complete","label":"download_search"}
+{"at":"2026-10-30T10:24:37.665Z","event":"stage_complete","label":"synthetic download progress_poll"}
+{"at":"2026-10-30T10:24:37.765Z","event":"stage_start","label":"synthetic download progress_poll","timeoutMs":7680}
+{"at":"2026-10-30T10:24:37.765Z","event":"stage_start","label":"download_search","timeoutMs":4000}
+{"at":"2026-10-30T10:24:37.769Z","event":"stage_complete","label":"download_search"}
+{"at":"2026-10-30T10:24:37.770Z","event":"stage_complete","label":"synthetic download progress_poll"}
+{"at":"2026-10-30T10:24:37.870Z","event":"stage_start","label":"synthetic download progress_poll","timeoutMs":7575}
+{"at":"2026-10-30T10:24:37.871Z","event":"stage_start","label":"download_search","timeoutMs":4000}
+{"at":"2026-10-30T10:24:37.873Z","event":"stage_complete","label":"download_search"}
+{"at":"2026-10-30T10:24:37.873Z","event":"stage_complete","label":"synthetic download progress_poll"}
+{"at":"2026-10-30T10:24:37.973Z","event":"stage_start","label":"synthetic download progress_poll","timeoutMs":7472}
+{"at":"2026-10-30T10:24:37.973Z","event":"stage_start","label":"download_search","timeoutMs":4000}
+{"at":"2026-10-30T10:24:37.976Z","event":"stage_complete","label":"download_search"}
+{"at":"2026-10-30T10:24:37.976Z","event":"stage_complete","label":"synthetic download progress_poll"}
+{"at":"2026-10-30T10:24:37.976Z","event":"download_started","item":{"bytesReceived":589824,"canResume":false,"danger":"safe","estimatedEndTime":"2026-10-30T10:25:18.975Z","exists":true,"fileSize":25165824,"filename":"/tmp/aster-b05-profile-KXrF2b/Downloads/aster-b05-4114909-1793355876048.bin","finalUrl":"http://127.0.0.1:46223/slow.bin","id":1,"incognito":false,"mime":"application/octet-stream","paused":false,"referrer":"","startTime":"2026-10-30T10:24:37.446Z","state":"in_progress","totalBytes":25165824,"url":"http://127.0.0.1:46223/slow.bin"}}
+{"at":"2026-10-30T10:24:37.976Z","event":"stage_start","label":"in-progress_scroll","timeoutMs":5000}
+{"at":"2026-10-30T10:24:37.987Z","event":"stage_complete","label":"in-progress_scroll"}
+{"at":"2026-10-30T10:24:37.987Z","event":"stage_start","label":"in-progress_screenshot","timeoutMs":8000}
+{"at":"2026-10-30T10:24:38.103Z","event":"stage_complete","label":"in-progress_screenshot"}
+{"at":"2026-10-30T10:24:38.103Z","event":"stage_start","label":"in-progress_read_rows","timeoutMs":5000}
+{"at":"2026-10-30T10:24:38.109Z","event":"stage_complete","label":"in-progress_read_rows"}
+{"at":"2026-10-30T10:24:38.109Z","event":"ui_snapshot","label":"in-progress","item":{"bytesReceived":589824,"canResume":false,"danger":"safe","estimatedEndTime":"2026-10-30T10:25:18.975Z","exists":true,"fileSize":25165824,"filename":"/tmp/aster-b05-profile-KXrF2b/Downloads/aster-b05-4114909-1793355876048.bin","finalUrl":"http://127.0.0.1:46223/slow.bin","id":1,"incognito":false,"mime":"application/octet-stream","paused":false,"referrer":"","startTime":"2026-10-30T10:24:37.446Z","state":"in_progress","totalBytes":25165824,"url":"http://127.0.0.1:46223/slow.bin"},"visibleRows":"aster-b05-4114909-1793355876048.bin\nin_progress 0%","screenshotPath":"/tmp/aster-b05-evidence-4naqJQ/in-progress.png"}
+{"at":"2026-10-30T10:24:38.110Z","event":"control_activation_method","method":"synthetic in-page DOM click","physicalPointerUXVerified":false}
+{"at":"2026-10-30T10:24:38.110Z","event":"stage_start","label":"pause_button_lookup","timeoutMs":5000}
+{"at":"2026-10-30T10:24:38.112Z","event":"stage_complete","label":"pause_button_lookup"}
+{"at":"2026-10-30T10:24:38.112Z","event":"stage_start","label":"pause_button_dom_activation","timeoutMs":2500}
+{"at":"2026-10-30T10:24:38.125Z","event":"stage_complete","label":"pause_button_dom_activation"}
+{"at":"2026-10-30T10:24:38.125Z","event":"stage_start","label":"paused state_poll","timeoutMs":8000}
+{"at":"2026-10-30T10:24:38.126Z","event":"stage_start","label":"download_search","timeoutMs":4000}
+{"at":"2026-10-30T10:24:38.134Z","event":"stage_complete","label":"download_search"}
+{"at":"2026-10-30T10:24:38.134Z","event":"stage_complete","label":"paused state_poll"}
+{"at":"2026-10-30T10:24:38.134Z","event":"download_paused","item":{"bytesReceived":589824,"canResume":true,"danger":"safe","exists":true,"fileSize":25165824,"filename":"/tmp/aster-b05-profile-KXrF2b/Downloads/aster-b05-4114909-1793355876048.bin","finalUrl":"http://127.0.0.1:46223/slow.bin","id":1,"incognito":false,"mime":"application/octet-stream","paused":true,"referrer":"","startTime":"2026-10-30T10:24:37.446Z","state":"in_progress","totalBytes":25165824,"url":"http://127.0.0.1:46223/slow.bin"}}
+{"at":"2026-10-30T10:24:38.134Z","event":"stage_start","label":"paused_scroll","timeoutMs":5000}
+{"at":"2026-10-30T10:24:38.142Z","event":"stage_complete","label":"paused_scroll"}
+{"at":"2026-10-30T10:24:38.142Z","event":"stage_start","label":"paused_screenshot","timeoutMs":8000}
+{"at":"2026-10-30T10:24:38.248Z","event":"stage_complete","label":"paused_screenshot"}
+{"at":"2026-10-30T10:24:38.248Z","event":"stage_start","label":"paused_read_rows","timeoutMs":5000}
+{"at":"2026-10-30T10:24:38.255Z","event":"stage_complete","label":"paused_read_rows"}
+{"at":"2026-10-30T10:24:38.255Z","event":"ui_snapshot","label":"paused","item":{"bytesReceived":589824,"canResume":true,"danger":"safe","exists":true,"fileSize":25165824,"filename":"/tmp/aster-b05-profile-KXrF2b/Downloads/aster-b05-4114909-1793355876048.bin","finalUrl":"http://127.0.0.1:46223/slow.bin","id":1,"incognito":false,"mime":"application/octet-stream","paused":true,"referrer":"","startTime":"2026-10-30T10:24:37.446Z","state":"in_progress","totalBytes":25165824,"url":"http://127.0.0.1:46223/slow.bin"},"visibleRows":"aster-b05-4114909-1793355876048.bin\npaused 2%","screenshotPath":"/tmp/aster-b05-evidence-4naqJQ/paused.png"}
+{"at":"2026-10-30T10:24:38.255Z","event":"stage_start","label":"resume_button_lookup","timeoutMs":5000}
+{"at":"2026-10-30T10:24:38.257Z","event":"stage_complete","label":"resume_button_lookup"}
+{"at":"2026-10-30T10:24:38.257Z","event":"stage_start","label":"resume_button_dom_activation","timeoutMs":2500}
+{"at":"2026-10-30T10:24:38.270Z","event":"stage_complete","label":"resume_button_dom_activation"}
+{"at":"2026-10-30T10:24:38.270Z","event":"stage_start","label":"resumed byte progress_poll","timeoutMs":8000}
+{"at":"2026-10-30T10:24:38.270Z","event":"stage_start","label":"download_search","timeoutMs":4000}
+{"at":"2026-10-30T10:24:38.278Z","event":"stage_complete","label":"download_search"}
+{"at":"2026-10-30T10:24:38.278Z","event":"stage_complete","label":"resumed byte progress_poll"}
+{"at":"2026-10-30T10:24:38.378Z","event":"stage_start","label":"resumed byte progress_poll","timeoutMs":7892}
+{"at":"2026-10-30T10:24:38.378Z","event":"stage_start","label":"download_search","timeoutMs":4000}
+{"at":"2026-10-30T10:24:38.380Z","event":"stage_complete","label":"download_search"}
+{"at":"2026-10-30T10:24:38.381Z","event":"stage_complete","label":"resumed byte progress_poll"}
+{"at":"2026-10-30T10:24:38.481Z","event":"stage_start","label":"resumed byte progress_poll","timeoutMs":7789}
+{"at":"2026-10-30T10:24:38.482Z","event":"stage_start","label":"download_search","timeoutMs":4000}
+{"at":"2026-10-30T10:24:38.483Z","event":"stage_complete","label":"download_search"}
+{"at":"2026-10-30T10:24:38.484Z","event":"stage_complete","label":"resumed byte progress_poll"}
+{"at":"2026-10-30T10:24:38.584Z","event":"stage_start","label":"resumed byte progress_poll","timeoutMs":7686}
+{"at":"2026-10-30T10:24:38.584Z","event":"stage_start","label":"download_search","timeoutMs":4000}
+{"at":"2026-10-30T10:24:38.587Z","event":"stage_complete","label":"download_search"}
+{"at":"2026-10-30T10:24:38.587Z","event":"stage_complete","label":"resumed byte progress_poll"}
+{"at":"2026-10-30T10:24:38.687Z","event":"stage_start","label":"resumed byte progress_poll","timeoutMs":7583}
+{"at":"2026-10-30T10:24:38.687Z","event":"stage_start","label":"download_search","timeoutMs":4000}
+{"at":"2026-10-30T10:24:38.689Z","event":"stage_complete","label":"download_search"}
+{"at":"2026-10-30T10:24:38.689Z","event":"stage_complete","label":"resumed byte progress_poll"}
+{"at":"2026-10-30T10:24:38.789Z","event":"stage_start","label":"resumed byte progress_poll","timeoutMs":7481}
+{"at":"2026-10-30T10:24:38.790Z","event":"stage_start","label":"download_search","timeoutMs":4000}
+{"at":"2026-10-30T10:24:38.792Z","event":"stage_complete","label":"download_search"}
+{"at":"2026-10-30T10:24:38.792Z","event":"stage_complete","label":"resumed byte progress_poll"}
+{"at":"2026-10-30T10:24:38.792Z","event":"download_resumed","item":{"bytesReceived":1441792,"canResume":false,"danger":"safe","estimatedEndTime":"2026-10-30T10:25:10.791Z","exists":true,"fileSize":25165824,"filename":"/tmp/aster-b05-profile-KXrF2b/Downloads/aster-b05-4114909-1793355876048.bin","finalUrl":"http://127.0.0.1:46223/slow.bin","id":1,"incognito":false,"mime":"application/octet-stream","paused":false,"referrer":"","startTime":"2026-10-30T10:24:37.446Z","state":"in_progress","totalBytes":25165824,"url":"http://127.0.0.1:46223/slow.bin"},"bytesAtPause":589824}
+{"at":"2026-10-30T10:24:38.792Z","event":"stage_start","label":"resumed_scroll","timeoutMs":5000}
+{"at":"2026-10-30T10:24:38.797Z","event":"stage_complete","label":"resumed_scroll"}
+{"at":"2026-10-30T10:24:38.797Z","event":"stage_start","label":"resumed_screenshot","timeoutMs":8000}
+{"at":"2026-10-30T10:24:39.381Z","event":"stage_complete","label":"resumed_screenshot"}
+{"at":"2026-10-30T10:24:39.381Z","event":"stage_start","label":"resumed_read_rows","timeoutMs":5000}
+{"at":"2026-10-30T10:24:39.384Z","event":"stage_complete","label":"resumed_read_rows"}
+{"at":"2026-10-30T10:24:39.385Z","event":"ui_snapshot","label":"resumed","item":{"bytesReceived":1441792,"canResume":false,"danger":"safe","estimatedEndTime":"2026-10-30T10:25:10.791Z","exists":true,"fileSize":25165824,"filename":"/tmp/aster-b05-profile-KXrF2b/Downloads/aster-b05-4114909-1793355876048.bin","finalUrl":"http://127.0.0.1:46223/slow.bin","id":1,"incognito":false,"mime":"application/octet-stream","paused":false,"referrer":"","startTime":"2026-10-30T10:24:37.446Z","state":"in_progress","totalBytes":25165824,"url":"http://127.0.0.1:46223/slow.bin"},"visibleRows":"aster-b05-4114909-1793355876048.bin\nin_progress 2%","screenshotPath":"/tmp/aster-b05-evidence-4naqJQ/resumed.png"}
+{"at":"2026-10-30T10:24:39.385Z","event":"stage_start","label":"cancel_button_lookup","timeoutMs":5000}
+{"at":"2026-10-30T10:24:39.387Z","event":"stage_complete","label":"cancel_button_lookup"}
+{"at":"2026-10-30T10:24:39.387Z","event":"stage_start","label":"cancel_button_dom_activation","timeoutMs":2500}
+{"at":"2026-10-30T10:24:39.400Z","event":"stage_complete","label":"cancel_button_dom_activation"}
+{"at":"2026-10-30T10:24:39.400Z","event":"stage_start","label":"canceled state_poll","timeoutMs":8000}
+{"at":"2026-10-30T10:24:39.400Z","event":"stage_start","label":"download_search","timeoutMs":4000}
+{"at":"2026-10-30T10:24:39.428Z","event":"stage_complete","label":"download_search"}
+{"at":"2026-10-30T10:24:39.428Z","event":"stage_complete","label":"canceled state_poll"}
+{"at":"2026-10-30T10:24:39.428Z","event":"download_canceled","item":{"bytesReceived":0,"canResume":false,"danger":"safe","error":"USER_CANCELED","estimatedEndTime":"2026-10-30T10:25:03.426Z","exists":true,"fileSize":25165824,"filename":"/tmp/aster-b05-profile-KXrF2b/Downloads/aster-b05-4114909-1793355876048.bin","finalUrl":"http://127.0.0.1:46223/slow.bin","id":1,"incognito":false,"mime":"application/octet-stream","paused":false,"referrer":"","startTime":"2026-10-30T10:24:37.446Z","state":"interrupted","totalBytes":25165824,"url":"http://127.0.0.1:46223/slow.bin"}}
+{"at":"2026-10-30T10:24:39.428Z","event":"stage_start","label":"canceled_scroll","timeoutMs":5000}
+{"at":"2026-10-30T10:24:39.440Z","event":"stage_complete","label":"canceled_scroll"}
+{"at":"2026-10-30T10:24:39.440Z","event":"stage_start","label":"canceled_screenshot","timeoutMs":8000}
+{"at":"2026-10-30T10:24:39.549Z","event":"stage_complete","label":"canceled_screenshot"}
+{"at":"2026-10-30T10:24:39.549Z","event":"stage_start","label":"canceled_read_rows","timeoutMs":5000}
+{"at":"2026-10-30T10:24:39.555Z","event":"stage_complete","label":"canceled_read_rows"}
+{"at":"2026-10-30T10:24:39.555Z","event":"ui_snapshot","label":"canceled","item":{"bytesReceived":0,"canResume":false,"danger":"safe","error":"USER_CANCELED","estimatedEndTime":"2026-10-30T10:25:03.426Z","exists":true,"fileSize":25165824,"filename":"/tmp/aster-b05-profile-KXrF2b/Downloads/aster-b05-4114909-1793355876048.bin","finalUrl":"http://127.0.0.1:46223/slow.bin","id":1,"incognito":false,"mime":"application/octet-stream","paused":false,"referrer":"","startTime":"2026-10-30T10:24:37.446Z","state":"interrupted","totalBytes":25165824,"url":"http://127.0.0.1:46223/slow.bin"},"visibleRows":"aster-b05-4114909-1793355876048.bin\ninterrupted 0%\n\nThis download was canceled.","screenshotPath":"/tmp/aster-b05-evidence-4naqJQ/canceled.png"}
+{"at":"2026-10-30T10:24:39.556Z","event":"stage_start","label":"cleanup_search_task_download","timeoutMs":3000}
+{"at":"2026-10-30T10:24:39.558Z","event":"stage_complete","label":"cleanup_search_task_download"}
+{"at":"2026-10-30T10:24:39.558Z","event":"stage_start","label":"browser_close","timeoutMs":5000}
+{"at":"2026-10-30T10:24:39.679Z","event":"stage_complete","label":"browser_close"}
+{"at":"2026-10-30T10:24:39.700Z","event":"stage_start","label":"fixture_server_close","timeoutMs":4000}
+{"at":"2026-10-30T10:24:39.701Z","event":"stage_complete","label":"fixture_server_close"}
+{"at":"2026-10-30T10:24:39.704Z","event":"cleanup_complete","profileDir":"/tmp/aster-b05-profile-KXrF2b","evidenceDir":"/tmp/aster-b05-evidence-4naqJQ","completion":"passed","chromeStopped":true}
