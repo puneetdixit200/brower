@@ -1,5 +1,9 @@
 # Progress
 
+### P01 generated page-content password-field regression — 2026-10-30
+
+Added a browser-core regression test that evaluates the generated content-Markdown expression against a fixture containing an `INPUT` password-value sentinel, a `TEXTAREA` child-text sentinel, and ordinary visible page text. The textarea sentinel makes the form-control skip observable: its text node would otherwise be serialized. Full browser-core suite passes 54/54 (150 assertions), browser-core typecheck passes, and the browser-MCP password-redaction test passes 1/1 (7 assertions); both package typechecks pass. The existing Biome configuration cannot be loaded by the installed version (`useSortedClasses` is rejected). This is generated-expression fixture evidence, not Chromium autofill or native Aster acceptance; P01/B08 remain PARTIAL pending disposable headed-profile sentinel verification and packaged/runtime coverage.
+
 ### T05.4 / A09 action-policy draft refresh and reset safety — 2026-10-30
 
 Permission-rule refreshes now update pristine fields from the server while preserving unsaved edits. Dirty tracking is per field and clears when an edit returns to the loaded baseline or the server catches up. Successful save/reset operations invalidate older requests; a successful reset clears its row draft immediately so a later quiet refresh cannot restore it. Focused action-policy tests pass 12/12 (27 assertions), app typecheck, targeted Biome, and diff check pass. Independent Luna review findings on draft preservation, time-relative expiry classification, stale loads after save/reset, dirty reversion, and reset confirmation races were fixed; final re-review found no concrete remaining issue. No headed settings or full app/server restart persistence test was run. A09/T05 remains PARTIAL pending headed settings, restart persistence, packaged Aster/ACP acceptance, and the broader MUST plan.

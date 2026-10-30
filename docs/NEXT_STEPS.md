@@ -427,4 +427,7 @@ A07 now previews/removes individual in-memory queued prompts, but true live stee
 
 ### Current source checkpoint — 2026-10-30 (T23.1/A04)
 
-The side-panel hook now sends the server-owned stop request before detaching its local stream. If the request fails, the view stays attached so an active run remains visible and the user can retry; HTTP success with `stopped:false` means the server has no active run and the view can detach. The three focused helper tests, app typecheck and targeted Biome pass, with an independent Luna review finding no concrete defect. Next, cover stop-request failure/retry in a disposable headed BrowserOS flow when available, and test provider interruption behavior without claiming rollback of already-dispatched browser effects. Keep A04 PARTIAL. Continue the clean pinned native-build host path separately; preserve the existing dirty Chromium checkout and do not regenerate GN or start Ninja.
+
+### P01 generated page-content password-field regression — 2026-10-30
+
+The generated content-Markdown expression now has a fixture regression test covering a password-input value sentinel and a textarea child-text sentinel, which would otherwise be serialized, while preserving ordinary visible text. The full browser-core suite passes 54/54 (150 assertions), both core/MCP package typechecks pass, and the focused browser-MCP password-redaction test passes 1/1 (7 assertions). Installed Biome cannot parse the existing `useSortedClasses` configuration. Next run T07.1/T07.2 with a disposable headed Aster profile and dummy saved-password sentinel, verifying native autofill remains user-mediated and no credential enters model/tool payloads; keep P01/B08 PARTIAL until native and packaged acceptance.
