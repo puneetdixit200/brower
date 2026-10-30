@@ -12,6 +12,7 @@ export async function captureVisibleTabContext(input: {
   confirm: () => boolean
   activateAndVerify: (windowId: number, tabId: number) => Promise<boolean>
   capture: (windowId: number, tabId: number) => Promise<string>
+  verifyActive: (windowId: number, tabId: number) => Promise<boolean>
 }): Promise<string | null> {
   if (input.windowId === undefined || input.selectedTabId === null) {
     throw new Error('Select a website before capturing')
@@ -27,6 +28,11 @@ export async function captureVisibleTabContext(input: {
   }
   if (!input.confirm()) return null
   const isActive = await input.activateAndVerify(input.windowId, selected.id)
-  if (!isActive) throw new Error('Selected website is no longer active')
-  return input.capture(input.windowId, selected.id)
+  if (!isActive) throw new Error('Selected website is no longer available')
+  const image = await input.capture(input.windowId, selected.id)
+  const isStillActive = await input.verifyActive(input.windowId, selected.id)
+  if (!isStillActive) {
+    throw new Error('Selected website changed during screenshot capture')
+  }
+  return image
 }

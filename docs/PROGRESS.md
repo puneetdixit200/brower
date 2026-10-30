@@ -1,5 +1,11 @@
 # Progress
 
+### U13 screenshot consent-race hardening and T20a single-TU compile — 2026-10-30
+
+Both screenshot-to-Downloads and screenshot-for-AI-context now re-read the selected tab after consent, check its current window and HTTP(S) URL before capture, then verify active tab/window/HTTP(S) again after capture. Any mismatch throws before download or draft staging. The focused helper suite passes 8/8 (14 assertions); app typecheck, targeted Biome, `git diff --check`, and independent Luna review pass. This is source-level coverage; no headed browser permission/capture test ran. U13 remains PARTIAL.
+
+For T20a/B03, one bounded native translation-unit compile of `browser_os_api.cc` succeeded with the pinned Clang and generated graph flags, writing only to `/tmp/aster-b03-t20a-compile-6gohbo63/browser_os_api.o` under a 5 GiB memory cap, one CPU and 240-second timeout. The object is 393,432 bytes with SHA256 `0d3939a50b0a01d265dbcf2e275f37eb3b024448420e4ac47ee78ed6599ff470`; source hash matched the staged patch target. Native HEAD remained `16c3e55476d3564bea713314b2fff638749ce3e6`, with 319 ordinary status rows / 595 expanded paths unchanged. This is a single object compile only: no link, GN generation, browser binary, or runtime acceptance; `.ninja_log` remains absent. T20a/B03 remain PARTIAL.
+
 ### T23.2 / A05 credential-shaped recovery screening — 2026-10-30
 
 The shared Task History recovery detector now recognizes Google API, npm, Stripe secret/restricted, and SendGrid token shapes in addition to its existing key-value, private-key, Bearer/JWT, Slack, GitHub, and AWS patterns. Positive coverage includes each existing detector branch; negative cases cover short near-misses and public Stripe keys. Focused recovery and detector suites pass 26/26 (69 assertions), app typecheck and targeted Biome pass, and independent Luna review found no actionable issue. This is heuristic screening, not a guarantee against arbitrary unlabeled secrets. No canonical conversation history or model-input behavior changed. A05 remains PARTIAL pending browser-process crash, headed Task History, and packaged/native acceptance.

@@ -12,6 +12,7 @@ describe('captureVisibleTabContext', () => {
       tabs: [selectedTab],
       confirm: () => false,
       activateAndVerify: async () => true,
+      verifyActive: async () => true,
       capture: async () => {
         captured = true
         return 'data:image/png;base64,AA=='
@@ -29,6 +30,7 @@ describe('captureVisibleTabContext', () => {
         tabs: [selectedTab],
         confirm: () => true,
         activateAndVerify: async () => true,
+        verifyActive: async () => true,
         capture: async () => {
           throw new Error('permission denied')
         },
@@ -44,6 +46,7 @@ describe('captureVisibleTabContext', () => {
       tabs: [{ id: 7, windowId: 3, url: 'https://other.test' }, selectedTab],
       confirm: () => true,
       activateAndVerify: async () => true,
+      verifyActive: async () => true,
       capture: async (windowId) => {
         capturedWindow = windowId
         return 'data:image/png;base64,AA=='
@@ -62,6 +65,7 @@ describe('captureVisibleTabContext', () => {
         tabs: [{ ...selectedTab, windowId: 4 }],
         confirm: () => true,
         activateAndVerify: async () => true,
+        verifyActive: async () => true,
         capture: async () => {
           captured = true
           return 'data:image/png;base64,AA=='
@@ -84,13 +88,39 @@ describe('captureVisibleTabContext', () => {
           events.push('activation-verified-mismatch')
           return false
         },
+        verifyActive: async () => true,
         capture: async () => {
           events.push('captured')
           return 'data:image/png;base64,AA=='
         },
       }),
-    ).rejects.toThrow('Selected website is no longer active')
+    ).rejects.toThrow('Selected website is no longer available')
     expect(events).toEqual(['activation-verified-mismatch'])
+  })
+
+  test('revalidates the selected website after consent before capture', async () => {
+    const events: string[] = []
+    await expect(
+      captureVisibleTabContext({
+        windowId: 3,
+        selectedTabId: 8,
+        tabs: [selectedTab],
+        confirm: () => {
+          events.push('consented')
+          return true
+        },
+        activateAndVerify: async () => {
+          events.push('current-url-no-longer-web')
+          return false
+        },
+        verifyActive: async () => true,
+        capture: async () => {
+          events.push('captured')
+          return 'data:image/png;base64,AA=='
+        },
+      }),
+    ).rejects.toThrow('Selected website is no longer available')
+    expect(events).toEqual(['consented', 'current-url-no-longer-web'])
   })
 
   test('does not capture until activation has completed and been verified', async () => {
@@ -104,11 +134,41 @@ describe('captureVisibleTabContext', () => {
         events.push(`activated:${windowId}:${tabId}`)
         return true
       },
+      verifyActive: async (windowId, tabId) => {
+        events.push(`verified-after-capture:${windowId}:${tabId}`)
+        return true
+      },
       capture: async (windowId, tabId) => {
         events.push(`captured:${windowId}:${tabId}`)
         return 'data:image/png;base64,AA=='
       },
     })
-    expect(events).toEqual(['activated:3:8', 'captured:3:8'])
+    expect(events).toEqual([
+      'activated:3:8',
+      'captured:3:8',
+      'verified-after-capture:3:8',
+    ])
+  })
+
+  test('discards the image when the active tab changes during capture', async () => {
+    const events: string[] = []
+    await expect(
+      captureVisibleTabContext({
+        windowId: 3,
+        selectedTabId: 8,
+        tabs: [selectedTab],
+        confirm: () => true,
+        activateAndVerify: async () => true,
+        capture: async () => {
+          events.push('captured')
+          return 'data:image/png;base64,private-image'
+        },
+        verifyActive: async () => {
+          events.push('different-tab-active')
+          return false
+        },
+      }),
+    ).rejects.toThrow('Selected website changed during screenshot capture')
+    expect(events).toEqual(['captured', 'different-tab-active'])
   })
 })

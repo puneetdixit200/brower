@@ -4,7 +4,7 @@
 
 - Repository: `/home/puneet/Projects/aster-browser/upstream-browseros`
 - Branch: `feat/aster-linux-ui`
-- Latest committed checkpoint entering this batch: `411c41bcc` (`docs(aster): record native patch reconciliation`). Earlier source commits include T23.2 transcript recovery, T04.1 logger redaction, production approval/retry/stop/claim races, and S04 consent hardening.
+- Latest committed checkpoint entering this batch: `392c880547d455cea38145ad09b31f6d575d62bd` (`feat(aster): harden interrupted transcript screening`); it matched `aster/feat/aster-linux-ui` at fetch. This batch adds U13 screenshot consent-race hardening and a bounded native single-translation-unit compile; see the current checkpoint below.
 - Push remote: `aster` → `https://github.com/puneetdixit200/brower.git`. Upstream `origin` remains `https://github.com/browseros-ai/BrowserOS.git`.
 
 ## Overall status
@@ -25,7 +25,13 @@ Commit `2f47f8fff` hardens T04.1: `FeedbackCohort::new()` fails closed with invi
 
 The current T30 source change adds a production-boundary race regression: two independently created ToolLoopAgent runs share a task UUID and provider call ID, reach the side-effect claim boundary together, and contend through the actual SQLite claim store. Exactly one tool dispatch and one claim row are observed. Focused agent-boundary plus claim-store tests pass 11/11 (34 assertions), including the existing two-process claim test; server typecheck, targeted Biome and `git diff --check` pass. Independent Luna review found no actionable issue. This remains a same-process deterministic fixture and does not prove browser transport, live-provider, restart or packaged native behavior; keep R02 PARTIAL.
 
-Live quota meter at this report refresh: primary window 41% used (59% remaining), weekly window 84% used (16% remaining). Stop project work when either window reaches 5% remaining, then commit/push all verified changes and leave the next-task handoff.
+The account allowance meter was not exposed in this batch, so no current percentage is available. Earlier readings are historical and must not be reused as current; resume checking the live meter when the environment exposes it.
+
+## Current batch — U13 screenshot consent race and T20a bounded object compile
+
+Both screenshot-to-Downloads and screenshot-for-AI-context now re-read the selected tab after consent, validate its current window and HTTP(S) URL before capture, then validate active tab/window/HTTP(S) again after capture. A mismatch prevents the image from being downloaded or staged in the composer. Focused helper tests pass 8/8 (14 assertions); app typecheck, targeted Biome, `git diff --check`, and independent Luna review pass. No headed screenshot permission test ran; U13 remains PARTIAL.
+
+`browser_os_api.cc` compiled successfully as one translation unit with pinned Clang and current generated graph flags, under a 5 GiB memory cap, one CPU and 240-second timeout. The temporary object `/tmp/aster-b03-t20a-compile-6gohbo63/browser_os_api.o` is 393,432 bytes, SHA256 `0d3939a50b0a01d265dbcf2e275f37eb3b024448420e4ac47ee78ed6599ff470`; source hash matched the staged patch target. Native HEAD remained `16c3e55476d3564bea713314b2fff638749ce3e6`; 319 ordinary status rows / 595 expanded paths are unchanged. `.ninja_log` remains absent. This proves only one object compile; no link, GN regeneration, executable, or runtime acceptance occurred. Keep T20a/B03 PARTIAL.
 
 ## Read-only native build-state audit — 2026-10-30
 

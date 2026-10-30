@@ -285,29 +285,58 @@ export function BrowserQuickControls({
       if (privateWindow)
         throw new Error('Screenshot not available in private windows')
       const current = await chrome.windows.getCurrent()
-      if (current.id === undefined || selectedTabId === null) {
-        throw new Error('Select a website before capturing')
-      }
       const tabs = await chrome.tabs.query({ currentWindow: true })
-      const target = tabs.find(
-        (tab) =>
-          tab.id === selectedTabId &&
-          tab.windowId === current.id &&
-          (tab.url?.startsWith('https://') || tab.url?.startsWith('http://')),
-      )
-      if (target?.id === undefined)
-        throw new Error('Selected website not available')
-      if (
-        !window.confirm(
-          'Capture the selected website tab? It may contain private information. The image will be saved to Downloads; nothing is sent to an AI model.',
-        )
-      ) {
-        return
-      }
-      await chrome.tabs.update(target.id, { active: true })
-      const image = await chrome.tabs.captureVisibleTab(current.id, {
-        format: 'png',
+      const image = await captureVisibleTabContext({
+        windowId: current.id,
+        selectedTabId,
+        tabs,
+        confirm: () =>
+          window.confirm(
+            'Capture the selected website tab? It may contain private information. The image will be saved to Downloads; nothing is sent to an AI model.',
+          ),
+        activateAndVerify: async (windowId, tabId) => {
+          const target = await chrome.tabs.get(tabId)
+          if (
+            target.windowId !== windowId ||
+            !(
+              target.url?.startsWith('https://') ||
+              target.url?.startsWith('http://')
+            )
+          ) {
+            return false
+          }
+          await chrome.tabs.update(tabId, { active: true })
+          const [activeTab] = await chrome.tabs.query({
+            active: true,
+            windowId,
+          })
+          return (
+            activeTab?.id === tabId &&
+            activeTab.windowId === windowId &&
+            Boolean(
+              activeTab.url?.startsWith('https://') ||
+                activeTab.url?.startsWith('http://'),
+            )
+          )
+        },
+        capture: async (windowId) =>
+          chrome.tabs.captureVisibleTab(windowId, { format: 'png' }),
+        verifyActive: async (windowId, tabId) => {
+          const [activeTab] = await chrome.tabs.query({
+            active: true,
+            windowId,
+          })
+          return (
+            activeTab?.id === tabId &&
+            activeTab.windowId === windowId &&
+            Boolean(
+              activeTab.url?.startsWith('https://') ||
+                activeTab.url?.startsWith('http://'),
+            )
+          )
+        },
       })
+      if (!image) return
       await chrome.downloads.download({
         url: image,
         filename:
@@ -334,15 +363,46 @@ export function BrowserQuickControls({
             'Capture the selected website tab for an AI message? The image stays in this draft until you submit it.',
           ),
         activateAndVerify: async (windowId, tabId) => {
+          const target = await chrome.tabs.get(tabId)
+          if (
+            target.windowId !== windowId ||
+            !(
+              target.url?.startsWith('https://') ||
+              target.url?.startsWith('http://')
+            )
+          ) {
+            return false
+          }
           await chrome.tabs.update(tabId, { active: true })
           const [activeTab] = await chrome.tabs.query({
             active: true,
             windowId,
           })
-          return activeTab?.id === tabId && activeTab.windowId === windowId
+          return (
+            activeTab?.id === tabId &&
+            activeTab.windowId === windowId &&
+            Boolean(
+              activeTab.url?.startsWith('https://') ||
+                activeTab.url?.startsWith('http://'),
+            )
+          )
         },
         capture: async (windowId, _tabId) => {
           return chrome.tabs.captureVisibleTab(windowId, { format: 'png' })
+        },
+        verifyActive: async (windowId, tabId) => {
+          const [activeTab] = await chrome.tabs.query({
+            active: true,
+            windowId,
+          })
+          return (
+            activeTab?.id === tabId &&
+            activeTab.windowId === windowId &&
+            Boolean(
+              activeTab.url?.startsWith('https://') ||
+                activeTab.url?.startsWith('http://'),
+            )
+          )
         },
       })
       if (!image) return

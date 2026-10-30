@@ -1,6 +1,14 @@
 # Aster next steps
 
-### Latest resumed batch — 2026-10-30
+### Current implementation checkpoint — 2026-10-30 (T20a/B03, U13)
+
+At batch start, `feat/aster-linux-ui` was `392c880547d455cea38145ad09b31f6d575d62bd` and matched `aster/feat/aster-linux-ui`; no other source/document changes were present. U13 now revalidates the current selected tab's window and HTTP(S) URL after consent and again after asynchronous capture in both the Downloads and AI-context screenshot paths. Focused helper tests pass 8/8 (14 assertions), app typecheck and targeted Biome pass, and independent Luna review found no remaining finding. This is source-only evidence; U13 remains PARTIAL pending headed permission and runtime acceptance.
+
+T20a/B03 achieved one bounded single-TU compile of `browser_os_api.cc` using the pinned Clang and current graph flags. The temporary object is 393,432 bytes, SHA256 `0d3939a50b0a01d265dbcf2e275f37eb3b024448420e4ac47ee78ed6599ff470`, at `/tmp/aster-b03-t20a-compile-6gohbo63/browser_os_api.o`; source SHA matched the staged patch target. Compile ran with 5 GiB memory cap, one CPU and 240-second timeout. Native HEAD stayed `16c3e55476d3564bea713314b2fff638749ce3e6`, status stayed 319 porcelain rows / 595 expanded paths, and `.ninja_log` is still absent. No link, GN generation or browser/runtime test occurred; T20a/B03 remain PARTIAL.
+
+Next prioritize the native integration gate: establish safe incremental-state provenance or a clean pinned build host, then compile/link and launch a disposable-profile Aster browser. Separately extend browser-process crash recovery and headed Task History acceptance. The current native object compile is not a runnable binary. Matrix remains 2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED and 1 NOT_STARTED (72 total), an acceptance count rather than an engineering completion percentage. Current account allowance is not exposed in this environment; do not infer a percentage from earlier reports.
+
+### Previous native reconciliation batch — 2026-10-30
 
 At branch `feat/aster-linux-ui`, local `411c41bcc` matched `aster/feat/aster-linux-ui` at batch start. We applied only the intended StopTabLoading hunks to the three existing untracked native API files after verifying their old blob hashes and exact patch-source deltas; independent Luna review confirmed byte-for-byte equality with the intended patch files and intact Aster/profile/tab-ownership checks. The selected 48-patch `cdp-api` doctor reports 48 already applied and 0 failed. The full 424-patch doctor reports 2 clean, 422 already applied, 0 failed, healthy. The two `//chrome/browser/browseros:buildflags` dependencies and histogram ID 2019/XML entry also remain reconciled. Native HEAD is `16c3e55476d3564bea713314b2fff638749ce3e6`; counts remain 319 porcelain rows / 595 expanded paths. No `.ninja_log`, linked browser/test binary, compile, or GN regeneration.
 
