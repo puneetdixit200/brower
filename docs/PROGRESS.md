@@ -1,5 +1,11 @@
 # Progress
 
+### T20a native gate recheck and startup-smoke isolation limit — 2026-10-30
+
+Read-only Luna audit confirms the native output directory is 8.2 GiB with 14,252 Ninja fragments, but no paired `.ninja_log`, linked browser or active build. It remains at Chromium HEAD `16c3e55476d3564bea713314b2fff638749ce3e6`, 319 dirty status rows; the empty lock file has no holder. Graph/dependency/args hashes and host resource readings are in [native build-gate evidence](evidence/aster-native-build-gate-2026-10-30.md). With ~5 GiB RAM available, do not reconstruct incremental state or build locally; the safe next path is an exact matching log from a verified snapshot, otherwise a separate clean pinned host/output.
+
+For A05, direct Chromium remained unusable as an isolated fixture: a host-managed Hangouts extension was present even with a temporary profile, extension allowlist and hidden Chromium policy directory. Both runs were stopped immediately without interacting with it. Startup-marker runtime delivery remains unverified; use a policy-clean test host. See [smoke limits](evidence/aster-browser-startup-recovery-2026-10-30.md).
+
 ### T23.3 / A05 browser-process startup visibility — 2026-10-30
 
 The extension registers `runtime.onStartup` and writes local-only per-task interrupted markers for persisted running tasks whose `startedAt` predates that startup. It re-reads history before writing, skips malformed conversation/task entries, uses a separate key namespace so server terminal markers win, and does not rewrite history or replay execution. Task History and Recent Tasks read both marker sources. Focused recovery/history suites pass 30/30 (57 assertions); app typecheck, targeted Biome, diff check and independent Luna review pass. A disposable Chromium launch did not produce an observable startup marker, so browser event delivery is unverified; no Aster-native browser is available. A05 remains PARTIAL. See [startup recovery evidence](evidence/aster-browser-startup-recovery-2026-10-30.md).
