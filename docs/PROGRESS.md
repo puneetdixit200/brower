@@ -1,5 +1,11 @@
 # Progress
 
+### Current status report — 2026-10-30
+
+The latest committed source and documentation checkpoint is `3ad822153` (U06 `@` picker file action); it follows `c6f0c88ac` (stale approval expiry across sidecar restart). The branch was clean and matched `aster/feat/aster-linux-ui` before this documentation update. Matrix acceptance accounting remains 2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, and 1 NOT_STARTED across 72 rows. This ratio is not a project-effort completion percentage. See [the current status report and next-agent prompt](STATUS_REPORT_2026-10-30.md).
+
+The next source slice is T23.1–T23.2: inspect existing stop/stream behavior, then fill only the proven gap for active-operation cancellation and truthful interrupted state without replaying uncertain mutations. The native checkout remains protected: 319 changed paths, no `.ninja_log`, no linked browser; do not build or regenerate GN until safe incremental-state recovery and bounded dry-run behavior are established.
+
 Prior allowance stop — 2026-10-30: the short window reached 95% used (5% remaining), and that batch was stopped. The user has since resumed the goal. At this resumed batch start the live meter showed 4% primary-window usage and 78% weekly usage (96% and 22% remaining); the 5%-remaining stop gate has not been reached.
 
 ### T19/T23 stale approval after sidecar restart — 2026-10-30
