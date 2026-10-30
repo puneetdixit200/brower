@@ -2,7 +2,7 @@
 
 ### Current source checkpoint — T13.3/U06 selected-file request serialization — 2026-10-30
 
-The production request path now selects files from only the latest user turn; a regression prevents prior-turn attachments from being replayed. `chat-session-request.test.ts` passes 12/12 (53 assertions), including a selected-file body/empty-attachment serialization case. This is source request-boundary evidence only; it does not prove chooser/remove UI behavior or transport/model receipt. U06 remains PARTIAL. Next exercise chooser → remove/submit → deterministic mock-provider receipt in a disposable headed BrowserOS profile, then repeat on Aster when a linked native binary exists.
+The production request path now selects files from only the latest user turn; a regression prevents prior-turn attachments from being replayed. `chat-session-request.test.ts` passes 12/12 (53 assertions). The disposable headed BrowserOS smoke now verifies attach → remove → reattach → submit, decodes the selected synthetic file marker from the extension `/chat` request body, and receives the deterministic mock response. This does not prove that a provider/model consumed the content. U06 remains PARTIAL. Next validate one-use behavior across retry/persistence boundaries, add real deterministic provider receipt if feasible, then repeat the full flow on Aster when a linked native binary exists. Evidence: `docs/evidence/aster-u06-headed-file-attachment-2026-10-30.md`.
 
 ### Current source checkpoint — B09 website-permissions handoff — 2026-10-30
 
