@@ -167,7 +167,7 @@ function selectModelStep(
     })
     return {
       toolName: null,
-      finalText: 'Read the local fixture title and sentinel.',
+      finalText: `Read ${BROWSER_PAGE_TITLE}; sentinel ${BROWSER_SENTINEL}.`,
     }
   }
   if (lastCall === 'navigate') {
@@ -412,6 +412,35 @@ function approvalIdFromSse(raw: string): string {
     }
   }
   throw new Error(`No approval id in SSE; first bytes: ${raw.slice(0, 1200)}`)
+}
+
+function assistantTextFromSse(raw: string): string {
+  const textById = new Map<string, string>()
+  const completedTexts: string[] = []
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line.startsWith('data:')) continue
+    let value: unknown
+    try {
+      value = JSON.parse(line.slice(5).trim())
+    } catch {
+      continue
+    }
+    if (!value || typeof value !== 'object') continue
+    const event = value as { type?: unknown; id?: unknown; delta?: unknown }
+    if (typeof event.id !== 'string') continue
+    if (event.type === 'text-start') {
+      textById.set(event.id, '')
+    } else if (
+      event.type === 'text-delta' &&
+      typeof event.delta === 'string' &&
+      textById.has(event.id)
+    ) {
+      textById.set(event.id, `${textById.get(event.id)}${event.delta}`)
+    } else if (event.type === 'text-end' && textById.has(event.id)) {
+      completedTexts.push(textById.get(event.id) ?? '')
+    }
+  }
+  return completedTexts.at(-1) ?? ''
 }
 
 function persistedPendingApproval(
@@ -1242,6 +1271,12 @@ async function main() {
         `Browser tool scenario failed: ${browserResult.response.status}`,
       )
       browserSseOutput = browserResult.text
+      const assistantText = assistantTextFromSse(browserResult.text)
+      assert(
+        assistantText.includes(BROWSER_PAGE_TITLE) &&
+          assistantText.includes(BROWSER_SENTINEL),
+        'Final assistant reply omitted the title or sentinel read from the page',
+      )
       const navigateStep = browserToolSteps.find(
         (step) => step.toolName === 'navigate',
       )
