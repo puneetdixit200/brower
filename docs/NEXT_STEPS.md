@@ -2,7 +2,7 @@
 
 Prior allowance stop — 2026-10-30: the short window reached 95% used (5% remaining), and that batch was stopped. The user has since resumed the goal. At this resumed batch start the live meter showed 4% primary-window usage and 78% weekly usage (96% and 22% remaining); the 5%-remaining stop gate has not been reached.
 
-Current repository status and the ready-to-use next-agent prompt: [STATUS_REPORT_2026-10-30.md](STATUS_REPORT_2026-10-30.md). The latest branch tip is `3ad822153`; U06 is committed, not uncommitted. Matrix accounting remains 2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, and 1 NOT_STARTED (72 total), which is an acceptance count, not a completion percentage.
+Current repository status and the ready-to-use next-agent prompt: [STATUS_REPORT_2026-10-30.md](STATUS_REPORT_2026-10-30.md). Latest source commit `72d6d0c04` closes a bounded T23.1 multi-field fill cancellation gap; U06 remains committed in `3ad822153`. Matrix accounting remains 2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, and 1 NOT_STARTED (72 total), which is an acceptance count, not a completion percentage.
 
 T14.3 / A13 source checkpoint (2026-10-30): refused or failed Home sends now preserve drafts/context, including edits while async acceptance is pending. Typecheck/lint/review pass; next verify missing-provider Send, delayed handoff and duplicate submission in a reliable headed runtime. No UI interaction test is claimed.
 

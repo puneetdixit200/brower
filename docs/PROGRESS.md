@@ -2,9 +2,9 @@
 
 ### Current status report — 2026-10-30
 
-The latest committed source and documentation checkpoint is `3ad822153` (U06 `@` picker file action); it follows `c6f0c88ac` (stale approval expiry across sidecar restart). The branch was clean and matched `aster/feat/aster-linux-ui` before this documentation update. Matrix acceptance accounting remains 2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, and 1 NOT_STARTED across 72 rows. This ratio is not a project-effort completion percentage. See [the current status report and next-agent prompt](STATUS_REPORT_2026-10-30.md).
+The latest source commit is `72d6d0c04` (T23.1 later-field cancellation guard); the latest prior documentation checkpoint is `2c596d7ef`. Matrix acceptance accounting remains 2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, and 1 NOT_STARTED across 72 rows. This ratio is not a project-effort completion percentage. See [the current status report and next-agent prompt](STATUS_REPORT_2026-10-30.md).
 
-The next source slice is T23.1–T23.2: inspect existing stop/stream behavior, then fill only the proven gap for active-operation cancellation and truthful interrupted state without replaying uncertain mutations. The native checkout remains protected: 319 changed paths, no `.ninja_log`, no linked browser; do not build or regenerate GN until safe incremental-state recovery and bounded dry-run behavior are established.
+Next: implement and process-test T23.2 partial-transcript durability and no-replay recovery across sidecar/browser crash, without replaying uncertain mutations. The native checkout remains protected: 319 changed paths, no `.ninja_log`, no linked browser; do not build or regenerate GN until safe incremental-state recovery and bounded dry-run behavior are established.
 
 ### T23.1 browser fill cancellation — 2026-10-30
 
