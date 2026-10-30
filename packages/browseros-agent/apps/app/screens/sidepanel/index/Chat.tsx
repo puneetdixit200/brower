@@ -65,6 +65,7 @@ export const Chat = () => {
     respondToToolApproval,
     status,
     stop,
+    stopError,
     agentUrlError,
     chatError,
     canSend,
@@ -399,6 +400,11 @@ export const Chat = () => {
 
   return (
     <>
+      {stopError && (
+        <div role="alert" className="rounded-lg border p-3 text-sm">
+          {stopError}
+        </div>
+      )}
       <main className="mt-4 flex h-full flex-1 flex-col space-y-4 overflow-y-auto">
         <HumanInterventionResume
           wait={

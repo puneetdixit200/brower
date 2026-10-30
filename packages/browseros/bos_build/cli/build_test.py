@@ -761,6 +761,12 @@ class SourceProvenanceTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not match HEAD"):
             _resolve_source_sha(self.root, "f" * 40)
 
+    def test_untracked_source_file_cannot_be_bound_to_head(self) -> None:
+        (self.root / "untracked-source.ts").write_text("export const local = true;\n")
+
+        with self.assertRaisesRegex(ValueError, "untracked-source.ts"):
+            _resolve_source_sha(self.root, self.sha)
+
 
 if __name__ == "__main__":
     unittest.main()

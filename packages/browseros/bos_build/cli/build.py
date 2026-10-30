@@ -962,15 +962,25 @@ def _resolve_source_sha(repo_root: Path, expected_sha: Optional[str] = None) -> 
         text=True,
         check=True,
     ).stdout.splitlines()
-    if changed:
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "--"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+    if changed or untracked:
         allowed = {
             "packages/browseros/resources/BROWSEROS_VERSION",
             "packages/browseros/bos_build/config/BROWSEROS_BUILD_OFFSET",
         }
         unexpected = sorted(set(changed) - allowed)
-        if expected_sha is None or unexpected:
-            detail = ", ".join(unexpected or sorted(changed))
+        if expected_sha is None or unexpected or untracked:
+            changed_paths = sorted(set(unexpected) | set(untracked)) or sorted(changed)
+            detail = ", ".join(changed_paths)
             raise ValueError(
-                "source mode requires a clean tracked checkout; changed: " + detail
+                "source mode requires a clean tracked checkout "
+                "(no non-ignored untracked files); changed: "
+                + detail
             )
     return sha

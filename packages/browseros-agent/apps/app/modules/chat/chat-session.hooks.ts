@@ -205,6 +205,8 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   setSearchParamsRef.current = setSearchParams
   const conversationIdParam = searchParams.get('conversationId')
   const [restoreError, setRestoreError] = useState<string | null>(null)
+  const [stopError, setStopError] = useState<string | null>(null)
+  const stopAttemptRef = useRef(0)
   const [restoreAttempt, setRestoreAttempt] = useState(0)
   const [restoredConversationId, setRestoredConversationId] = useState<
     string | null
@@ -265,6 +267,15 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   conversationIdRef.current = conversationId
   const serverRunIdRef = useRef(serverRunId)
   serverRunIdRef.current = serverRunId
+  const stopErrorConversationRef = useRef(conversationId)
+  useEffect(() => {
+    if (stopErrorConversationRef.current === conversationId) return
+    stopErrorConversationRef.current = conversationId
+    // A warning belongs to one conversation. Invalidate pending stop requests
+    // as soon as navigation commits so a late failure cannot leak across views.
+    stopAttemptRef.current += 1
+    setStopError(null)
+  }, [conversationId])
   const [humanInterventionWait, setHumanInterventionWait] =
     useState<DetectedHumanInterventionWait | null>(null)
   const humanInterventionWaitRef = useRef<DetectedHumanInterventionWait | null>(
@@ -597,6 +608,10 @@ export const useChatSession = (options?: ChatSessionOptions) => {
       if (!localStreamConversationRef.current) attachmentRef.current?.retry()
     },
     onFinish: async ({ message, messages, isAbort, isError, finishReason }) => {
+      // A failed stop request must not report an active task after its stream
+      // has naturally completed while the stop request was still in flight.
+      stopAttemptRef.current += 1
+      setStopError(null)
       setServerRunId(undefined)
       const nextMessages = addContentFilterNotice(
         messages,
@@ -693,14 +708,18 @@ export const useChatSession = (options?: ChatSessionOptions) => {
   }, [detachView, options?.origin])
 
   const stop = useCallback(async () => {
+    const attempt = ++stopAttemptRef.current
+    setStopError(null)
     const stoppedConversationId = conversationIdRef.current
     try {
       const serverUrl = agentUrlRef.current ?? (await resolveAgentServerUrl())
       await stopConversationView({
         serverUrl,
         conversationId: stoppedConversationId,
+        canDetach: () => conversationIdRef.current === stoppedConversationId,
         detachView,
       })
+      return true
     } catch (error) {
       sentry.captureException(error, {
         extra: {
@@ -708,6 +727,15 @@ export const useChatSession = (options?: ChatSessionOptions) => {
           operation: 'stop-server-conversation',
         },
       })
+      if (
+        attempt === stopAttemptRef.current &&
+        conversationIdRef.current === stoppedConversationId
+      ) {
+        setStopError(
+          'Could not confirm the task stopped. It may still be running. Try Stop again.',
+        )
+      }
+      return false
     }
   }, [detachView])
 
@@ -1257,6 +1285,7 @@ export const useChatSession = (options?: ChatSessionOptions) => {
     isIncognito,
     isRestoringConversation,
     restoreError,
+    stopError,
     retryRestoreConversation: () => {
       setRestoredConversationId(null)
       setRestoreAttempt((value) => value + 1)

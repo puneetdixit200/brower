@@ -2,11 +2,13 @@ export async function stopConversationView({
   serverUrl,
   conversationId,
   fetchImpl = fetch,
+  canDetach,
   detachView,
 }: {
   serverUrl: string
   conversationId: string
   fetchImpl?: typeof fetch
+  canDetach: () => boolean
   detachView: () => Promise<void>
 }) {
   const response = await fetchImpl(
@@ -18,5 +20,5 @@ export async function stopConversationView({
   }
   // A 200 response with `stopped: false` means there was no active server run;
   // either way, detaching after this response cannot hide a running task.
-  await detachView()
+  if (canDetach()) await detachView()
 }

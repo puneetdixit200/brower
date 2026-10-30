@@ -16,6 +16,7 @@ describe('stop conversation view', () => {
       serverUrl: 'http://127.0.0.1:9000',
       conversationId: 'conversation/one',
       fetchImpl: fetchImpl as unknown as typeof fetch,
+      canDetach: () => true,
       detachView,
     })
 
@@ -36,6 +37,7 @@ describe('stop conversation view', () => {
         conversationId: 'conversation',
         fetchImpl: (async () =>
           new Response(null, { status: 503 })) as unknown as typeof fetch,
+        canDetach: () => true,
         detachView,
       }),
     ).rejects.toThrow('Conversation stop failed (503)')
@@ -50,9 +52,28 @@ describe('stop conversation view', () => {
       conversationId: 'conversation',
       fetchImpl: (async () =>
         Response.json({ stopped: false })) as unknown as typeof fetch,
+      canDetach: () => true,
       detachView,
     })
 
     expect(detachView).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not detach a different conversation after the stop request settles', async () => {
+    const detachView = mock(async () => {})
+    let currentConversationId = 'original'
+
+    await stopConversationView({
+      serverUrl: 'http://127.0.0.1:9000',
+      conversationId: 'original',
+      fetchImpl: (async () => {
+        currentConversationId = 'next'
+        return new Response(null, { status: 200 })
+      }) as unknown as typeof fetch,
+      canDetach: () => currentConversationId === 'original',
+      detachView,
+    })
+
+    expect(detachView).not.toHaveBeenCalled()
   })
 })

@@ -57,6 +57,7 @@ export const NewTabChat: FC = () => {
     onClickDislike,
     isRestoringConversation,
     restoreError,
+    stopError,
     retryRestoreConversation,
     conversationId,
     serverRunId,
@@ -280,6 +281,11 @@ export const NewTabChat: FC = () => {
                 New conversation
               </button>
             </div>
+          </div>
+        )}
+        {stopError && (
+          <div role="alert" className="rounded-lg border p-3 text-sm">
+            {stopError}
           </div>
         )}
         {agentUrlError && (

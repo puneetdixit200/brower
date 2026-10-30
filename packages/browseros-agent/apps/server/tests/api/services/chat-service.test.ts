@@ -1747,6 +1747,28 @@ describe('ChatService history persistence', () => {
       },
       ...(approvalResponse ? { approvalResponse } : {}),
     })
+    const readOperationCounts = () => {
+      const sqlite = getDbHandle().sqlite
+      return {
+        claims: (
+          sqlite
+            .prepare('SELECT COUNT(*) AS count FROM tool_operation_claims')
+            .get() as { count: number }
+        ).count,
+        grants: (
+          sqlite
+            .prepare('SELECT COUNT(*) AS count FROM approval_operation_grants')
+            .get() as { count: number }
+        ).count,
+        consumedGrants: (
+          sqlite
+            .prepare(
+              'SELECT COUNT(*) AS count FROM approval_operation_grants WHERE consumed_at IS NOT NULL',
+            )
+            .get() as { count: number }
+        ).count,
+      }
+    }
 
     try {
       const approvedConversation = crypto.randomUUID()
@@ -1781,6 +1803,11 @@ describe('ChatService history persistence', () => {
       expect(productionToolDispatches).toEqual([
         { destination: 'user@example.test', body: 'hello' },
       ])
+      expect(readOperationCounts()).toEqual({
+        claims: 1,
+        grants: 1,
+        consumedGrants: 1,
+      })
 
       const replay = await service.processMessage(
         makeRequest(approvedConversation, '', {
@@ -1791,6 +1818,11 @@ describe('ChatService history persistence', () => {
       )
       expect(replay.status).toBe(409)
       expect(productionToolDispatches).toHaveLength(1)
+      expect(readOperationCounts()).toEqual({
+        claims: 1,
+        grants: 1,
+        consumedGrants: 1,
+      })
 
       const deniedConversation = crypto.randomUUID()
       await (
@@ -1825,6 +1857,20 @@ describe('ChatService history persistence', () => {
       const deniedToolCallId = deniedRequest?.toolCallId
       expect(deniedToolCallId).toBeTruthy()
       expect(productionToolDispatches).toHaveLength(1)
+      expect(
+        (
+          getDbHandle()
+            .sqlite.prepare(
+              'SELECT COUNT(*) AS count FROM tool_operation_claims',
+            )
+            .get() as { count: number }
+        ).count,
+      ).toBe(1)
+      expect(readOperationCounts()).toEqual({
+        claims: 1,
+        grants: 1,
+        consumedGrants: 1,
+      })
 
       await (
         await service.processMessage(
@@ -1857,6 +1903,11 @@ describe('ChatService history persistence', () => {
         )
       ).text()
       expect(productionToolDispatches).toHaveLength(2)
+      expect(readOperationCounts()).toEqual({
+        claims: 2,
+        grants: 2,
+        consumedGrants: 2,
+      })
 
       const retriedReplay = await service.processMessage(
         makeRequest(deniedConversation, '', {
@@ -1867,7 +1918,13 @@ describe('ChatService history persistence', () => {
       )
       expect(retriedReplay.status).toBe(409)
       expect(productionToolDispatches).toHaveLength(2)
+      expect(readOperationCounts()).toEqual({
+        claims: 2,
+        grants: 2,
+        consumedGrants: 2,
+      })
     } finally {
+      productionToolCallOverride = undefined
       useProductionAgentFixture = false
     }
   })

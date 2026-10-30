@@ -1041,3 +1041,16 @@ The chat view now remains attached until the server stop route returns a success
 ### A07 queued-prompt controls — 2026-10-30
 
 The side panel now previews queued prompt text and lets the user remove one queued item without disturbing the remaining FIFO order. Removal updates the local ref/state together and advances the retry generation, preventing a scheduled refused-send retry from dispatching an item after a queue edit. `bun test screens/sidepanel/index/prompt-queue.test.ts` passes 7/7 (23 assertions); app typecheck and targeted Biome pass, and an independent Luna review found no concrete issue. This does not implement live steering or durable queue storage; A07 remains PARTIAL.
+
+### A04 stop failure notice and approval-ledger assertions — 2026-10-30
+
+The Stop view now reports an accessible retry warning in both New Tab and side panel when the server cannot confirm cancellation. The warning clears on conversation change or stream completion; stale failed requests are ignored, and a delayed successful response cannot detach a newly selected conversation. Stop-view tests pass 4/4, NewTabChat tests pass 2/2, app typecheck passes, and targeted Biome plus `git diff --check` pass. Independent Luna review found no concrete defect.
+
+The production ChatService/ToolLoopAgent fixture now asserts total SQLite approval grants, consumed grants, and execution claims across initial approval, replay, denial, fresh retry approval, and retry replay. ChatService passes 28/28 (150 assertions); claim and stale-approval suites pass 7/7 (24 assertions); targeted Biome and diff check pass. The fixture uses a deterministic local dispatch callback and does not test remote MCP transport. A04 remains PARTIAL: no interruption guarantee for arbitrary providers or rollback of already-dispatched browser effects is claimed. Matrix remains 2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, and 1 NOT_STARTED (72 total).
+
+
+### T20a source provenance guard — 2026-10-30
+
+`bos_build` source-mode provenance now rejects non-ignored untracked files before binding prepared resources to the tracked HEAD SHA, closing the case where a local source module could be included without changing the reported commit. The check preserves the two explicit tracked version/offset override paths when an expected SHA matches. Focused `SourceProvenanceTest` passes 4/4; Aster unpacked-extension and bundled staging tests pass 19/19; Ruff and `git diff --check` pass. Independent Luna review confirmed the new regression would fail before the change and pass now. The boundary intentionally excludes Git-ignored files, which are typically generated outputs; this check alone does not prove existing staged native resources match current HEAD.
+
+The adjacent pinned Chromium checkout remains untouched at HEAD `16c3e55476d3564bea713314b2fff638749ce3e6`, with 319 changed paths, no `.ninja_log`, no linked `chrome` or `chrome_sandbox`, and about 6 GiB available RAM. No build or GN generation ran. Staged extension bytes match five archives associated with different source SHAs, so staged resource provenance is ambiguous. T20a remains PARTIAL; next use a clean pinned output/host, prepare resources from current source, and verify its provenance before a constrained build.

@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, mock } from 'bun:test'
+import { afterEach, beforeAll, describe, expect, it, mock } from 'bun:test'
 import { createElement, type FC } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { Provider } from '@/components/chat/chatComponentTypes'
@@ -12,6 +12,7 @@ const selectedProvider: Provider = {
   modelId: 'llama3.2',
   modelLabel: 'Llama 3.2',
 }
+let stopErrorForTest: string | null = null
 
 mock.module('react-router', () => ({
   useSearchParams: () => [new URLSearchParams(), () => {}],
@@ -36,6 +37,7 @@ mock.module('@/modules/chat-actions/chat-actions.hooks', () => ({
     onClickDislike: () => {},
     isRestoringConversation: false,
     restoreError: null,
+    stopError: stopErrorForTest,
     retryRestoreConversation: () => {},
     conversationId: null,
     providers: [selectedProvider],
@@ -93,6 +95,10 @@ beforeAll(async () => {
   NewTabChat = (await import('./NewTabChat')).NewTabChat
 })
 
+afterEach(() => {
+  stopErrorForTest = null
+})
+
 describe('NewTabChat provider disclosure', () => {
   it('passes the selected provider through to the composer disclosure', () => {
     const html = renderToStaticMarkup(createElement(NewTabChat))
@@ -100,5 +106,18 @@ describe('NewTabChat provider disclosure', () => {
     expect(html).toContain('Self-hosted endpoint')
     expect(html).toContain('may be on another computer')
     expect(html).not.toContain('No model connected')
+    expect(html).not.toContain('role="alert"')
+  })
+
+  it('announces a Stop failure accessibly', () => {
+    stopErrorForTest =
+      'Could not confirm the task stopped. It may still be running. Try Stop again.'
+    const html = renderToStaticMarkup(createElement(NewTabChat))
+
+    expect(html).toContain('role="alert"')
+    expect(html).toContain(
+      'Could not confirm the task stopped. It may still be running. Try Stop again.',
+    )
+    expect(html).toContain('Self-hosted endpoint')
   })
 })

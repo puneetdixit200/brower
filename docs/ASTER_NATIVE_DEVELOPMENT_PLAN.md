@@ -56,3 +56,9 @@ The current B03 API source/header/IDL and histogram enum were subsequently stage
 ## Read-only native checkout recheck — 2026-10-30
 
 Current recheck confirms pinned HEAD `16c3e55476d3564bea713314b2fff638749ce3e6`, 319 modified/untracked paths, missing `out/Default/.ninja_log`, no active Ninja/autoninja/GN process, 5.7 GiB available memory, and 255 GiB free disk. The generated graph is still documented at 14,252 `.ninja` files / 2.94 GB; prior relevant dry runs planned 3,017 and 12,115 actions. No new dry run, build, or GN regeneration was started. Preserve the native worktree and wait for a safe build-log recovery path or a separate clean build host.
+
+## Source SHA guard follow-up — 2026-10-30
+
+In source mode, `_resolve_source_sha` now also rejects Git non-ignored untracked files, so an untracked source module cannot enter a build while the generated manifest reports only tracked HEAD. The two explicit tracked browser-version/build-offset override paths remain allowed only with a matching expected SHA. `SourceProvenanceTest` passes 4/4; Aster unpacked-extension and bundled staging tests pass 19/19; Ruff and diff-check pass. Git-ignored paths remain outside this guard, so generated or ignored-resource provenance must still be validated separately.
+
+This does not establish the identity of resources already staged in the adjacent Chromium checkout. That tree still has 319 dirty paths, no `.ninja_log`, no linked browser and five byte-identical staged extension trees whose source archives declare different source SHAs. Preserve the output; continue from a separate clean pinned host/output prepared from the current source.
