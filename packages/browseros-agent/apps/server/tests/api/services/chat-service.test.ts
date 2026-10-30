@@ -1929,6 +1929,93 @@ describe('ChatService history persistence', () => {
     }
   })
 
+  it('blocks a concurrent duplicate approval at the active-run guard and dispatches once', async () => {
+    const dir = mkdtempSync(
+      join(tmpdir(), 'browseros-chat-concurrent-approval-'),
+    )
+    tempDirs.push(dir)
+    initializeDb({ dbPath: join(dir, 'browseros.sqlite') })
+    const sessionStore = createSessionStore()
+    const service = new ChatService({
+      sessionStore: sessionStore as never,
+      klavis: createKlavisStub() as never,
+      browser: persistenceBrowser() as never,
+    })
+    useProductionAgentFixture = true
+    productionModelCalls = 0
+    productionToolDispatches = []
+
+    const conversationId = crypto.randomUUID()
+    const makeRequest = (approvalResponse?: {
+      id: string
+      approved: boolean
+    }) => ({
+      ...browserOsRequest(conversationId, false),
+      message: approvalResponse ? '' : 'Send the message.',
+      browserContext: {
+        activeTab: { id: 3, url: 'https://example.com', title: 'Example' },
+        customMcpServers: [{ name: 'fixture', url: 'http://fixture.test/mcp' }],
+      },
+      ...(approvalResponse ? { approvalResponse } : {}),
+    })
+
+    try {
+      const initial = await service.processMessage(
+        makeRequest() as never,
+        new AbortController().signal,
+      )
+      await initial.text()
+      const messages = (
+        sessionStore.get(conversationId) as unknown as {
+          agent: { messages: Array<{ parts: Array<Record<string, unknown>> }> }
+        }
+      ).agent.messages
+      const pending = messages
+        .flatMap((message) => message.parts)
+        .find((part) => part.state === 'approval-requested')
+      if (!pending) throw new Error('Expected a pending approval')
+      const approvalId = (pending.approval as { id: string }).id
+      expect(productionToolDispatches).toEqual([])
+
+      const duplicateRequest = makeRequest({ id: approvalId, approved: true })
+      const [first, duplicate] = await Promise.all([
+        service.processMessage(
+          duplicateRequest as never,
+          new AbortController().signal,
+        ),
+        service.processMessage(
+          duplicateRequest as never,
+          new AbortController().signal,
+        ),
+      ])
+
+      expect([first.status, duplicate.status].sort()).toEqual([200, 409])
+      const accepted = first.status === 200 ? first : duplicate
+      const rejected = first.status === 409 ? first : duplicate
+      await accepted.text()
+      expect(await rejected.json()).toEqual({
+        error: 'An agent turn is already running',
+      })
+
+      expect(productionToolDispatches).toEqual([
+        { destination: 'user@example.test', body: 'hello' },
+      ])
+      expect(await service.getRunSnapshot(conversationId)).toMatchObject({
+        status: 'completed',
+      })
+      const counts = getDbHandle()
+        .sqlite.prepare(`SELECT
+          (SELECT COUNT(*) FROM tool_operation_claims) AS claims,
+          (SELECT COUNT(*) FROM approval_operation_grants) AS grants,
+          (SELECT COUNT(*) FROM approval_operation_grants WHERE consumed_at IS NOT NULL) AS consumed`)
+        .get() as { claims: number; grants: number; consumed: number }
+      expect(counts).toEqual({ claims: 1, grants: 1, consumed: 1 })
+    } finally {
+      productionToolCallOverride = undefined
+      useProductionAgentFixture = false
+    }
+  })
+
   it('rechecks a changed deny policy before the production approval response can dispatch', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'browseros-chat-policy-recheck-'))
     tempDirs.push(dir)
