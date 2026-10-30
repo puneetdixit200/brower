@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { ExecutionTaskRecord } from '@/lib/execution-history/types'
 import {
   flattenExecutionHistory,
+  getTaskDisplayRecord,
   getTaskResult,
   getTaskTranscriptResponse,
 } from './task-history'
@@ -46,7 +47,7 @@ describe('task history helpers', () => {
     expect(tasks.map((item) => item.id)).toEqual(['later', 'earlier'])
   })
 
-  test('omits tasks with credential-shaped prompts or results', () => {
+  test('keeps a record but omits credential-shaped prompt and result fields', () => {
     const tasks = flattenExecutionHistory({
       history: {
         conversationId: 'history',
@@ -63,10 +64,16 @@ describe('task history helpers', () => {
       },
     })
 
-    expect(tasks.map((item) => item.id)).toEqual(['safe'])
+    expect(tasks.map((item) => item.id)).toEqual([
+      'safe',
+      'unsafe-title',
+      'unsafe-result',
+    ])
+    expect(tasks[1]?.promptText).toBe('')
+    expect(tasks[2]?.responseText).toBeUndefined()
   })
 
-  test('omits tasks with credential-shaped rendered step text', () => {
+  test('omits credential-bearing timeline fields while retaining safe summaries', () => {
     const tasks = flattenExecutionHistory({
       history: {
         conversationId: 'history',
@@ -101,7 +108,13 @@ describe('task history helpers', () => {
       },
     })
 
-    expect(tasks.map((item) => item.id)).toEqual(['safe'])
+    expect(tasks.map((item) => item.id)).toEqual([
+      'safe',
+      'unsafe-preview',
+      'unsafe-tool',
+    ])
+    expect(tasks[1]?.steps).toEqual([])
+    expect(tasks[2]?.steps).toEqual([])
   })
 
   test('omits tasks with credential-shaped artifact filenames', () => {
@@ -187,7 +200,111 @@ describe('task history helpers', () => {
     expect(getTaskTranscriptResponse(partial)).toBe('Saved partial answer')
   })
 
-  test('excludes a run when a displayed approval reason contains credential-shaped text', () => {
+  test('projects empty and partial saved records to only available display fields', () => {
+    const empty = getTaskDisplayRecord(
+      task('empty', '2026-10-27T00:00:00.000Z', {
+        promptText: '',
+        responseText: undefined,
+        responsePreview: undefined,
+        steps: [],
+      }),
+    )
+    const partial = getTaskDisplayRecord(
+      task('partial', '2026-10-27T00:00:00.000Z', {
+        responseText: undefined,
+        responsePreview: 'Saved response',
+        steps: [
+          {
+            id: 'summary',
+            toolName: 'browser.click',
+            order: 1,
+            state: 'output-available',
+            startedAt: '2026-10-27T00:00:00.000Z',
+            previewText: 'Clicked the visible button',
+            input: { secretSentinel: 'RAW_TOOL_INPUT_SENTINEL' },
+            output: { secretSentinel: 'RAW_TOOL_OUTPUT_SENTINEL' },
+          },
+        ],
+      }),
+    )
+
+    expect(empty.promptText).toBe('')
+    expect(empty.steps).toEqual([])
+    expect(getTaskTranscriptResponse(empty)).toBe('')
+    expect(partial.responsePreview).toBe('Saved response')
+    expect(partial.steps[0]).toMatchObject({
+      toolName: 'browser.click',
+      previewText: 'Clicked the visible button',
+      input: undefined,
+      output: undefined,
+    })
+    expect(JSON.stringify(partial)).not.toContain('RAW_TOOL_')
+  })
+
+  test('omits known credential sentinels and source paths while preserving safe fields', () => {
+    const projected = getTaskDisplayRecord(
+      task('credential-bearing', '2026-10-27T00:00:00.000Z', {
+        promptText: 'Use API key: fixture-not-real',
+        responseText: 'Visit https://example.com/docs/path for details',
+        steps: [
+          {
+            id: 'credential-summary',
+            toolName: 'browser.click',
+            order: 1,
+            state: 'output-available',
+            startedAt: '2026-10-27T00:00:00.000Z',
+            previewText: 'Bearer abcdefghijklmnopqrstuvwxyz',
+          },
+          {
+            id: 'path-summary',
+            toolName: 'filesystem.read',
+            order: 2,
+            state: 'output-available',
+            startedAt: '2026-10-27T00:00:00.000Z',
+            previewText: 'Read (/home/alice/private.txt)',
+          },
+          {
+            id: 'workspace-path',
+            toolName: 'filesystem.read',
+            order: 3,
+            state: 'output-available',
+            startedAt: '2026-10-27T00:00:00.000Z',
+            previewText: 'Read /workspace/project/config.json',
+          },
+          {
+            id: 'windows-path',
+            toolName: 'filesystem.read',
+            order: 4,
+            state: 'output-available',
+            startedAt: '2026-10-27T00:00:00.000Z',
+            previewText: 'Read [C:\\Users\\alice\\secret.txt]',
+          },
+          {
+            id: 'safe-summary',
+            toolName: 'browser.click',
+            order: 5,
+            state: 'output-available',
+            startedAt: '2026-10-27T00:00:00.000Z',
+            previewText: 'Clicked submit',
+          },
+        ],
+      }),
+    )
+
+    expect(projected.promptText).toBe('')
+    expect(projected.responseText).toBe(
+      'Visit https://example.com/docs/path for details',
+    )
+    expect(projected.steps.map((step) => step.id)).toEqual(['safe-summary'])
+    const renderedText = JSON.stringify(projected)
+    expect(renderedText).not.toContain('fixture-not-real')
+    expect(renderedText).not.toContain('abcdefghijklmnopqrstuvwxyz')
+    expect(renderedText).not.toContain('/home/alice')
+    expect(renderedText).not.toContain('/workspace/project')
+    expect(renderedText).not.toContain('C:\\Users\\alice')
+  })
+
+  test('omits an approval reason containing credential-shaped text', () => {
     const tasks = flattenExecutionHistory({
       history: {
         conversationId: 'history',
@@ -210,10 +327,11 @@ describe('task history helpers', () => {
       },
     })
 
-    expect(tasks).toEqual([])
+    expect(tasks).toHaveLength(1)
+    expect(tasks[0]?.steps[0]?.approval?.reason).toBeUndefined()
   })
 
-  test('excludes a run when displayed error text matches a known credential pattern', () => {
+  test('omits error text matching a known credential pattern', () => {
     const tasks = flattenExecutionHistory({
       history: {
         conversationId: 'history',
@@ -236,6 +354,7 @@ describe('task history helpers', () => {
       },
     })
 
-    expect(tasks).toEqual([])
+    expect(tasks).toHaveLength(1)
+    expect(tasks[0]?.steps[0]?.errorText).toBeUndefined()
   })
 })
