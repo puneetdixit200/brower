@@ -55,6 +55,7 @@ export interface UseScheduledJobsReturn {
   jobs: ScheduledJob[]
   /** The server could not be reached, as opposed to reporting no jobs. */
   isUnavailable: boolean
+  refresh: () => Promise<void>
   addJob: (
     job: Omit<ScheduledJob, 'id' | 'createdAt' | 'updatedAt'>,
   ) => Promise<void>
@@ -108,6 +109,9 @@ export function useScheduledJobs(): UseScheduledJobsReturn {
   return {
     jobs,
     isUnavailable: jobsQuery.isError,
+    refresh: async () => {
+      await jobsQuery.refetch()
+    },
     addJob: async (job) => {
       const now = new Date().toISOString()
       await save({
@@ -142,6 +146,7 @@ export function useScheduledJobs(): UseScheduledJobsReturn {
 export interface UseScheduledJobRunsReturn {
   jobRuns: ScheduledJobRun[]
   isUnavailable: boolean
+  refresh: () => Promise<void>
   cancelJobRun: (runId: string) => Promise<unknown>
 }
 
@@ -152,6 +157,9 @@ export function useScheduledJobRuns(): UseScheduledJobRunsReturn {
   return {
     jobRuns: runsQuery.data ?? [],
     isUnavailable: runsQuery.isError,
+    refresh: async () => {
+      await runsQuery.refetch()
+    },
     cancelJobRun: (runId) =>
       sendScheduleMessage('cancelScheduledJobRun', { runId }),
   }

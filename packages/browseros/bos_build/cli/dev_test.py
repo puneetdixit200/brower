@@ -112,8 +112,12 @@ class DoctorCliTest(unittest.TestCase):
     def test_against_failures_grouped_and_exit_1(self):
         report = ApplyReport(
             against="/fake/src",
+            head="abc123",
+            dirty=False,
+            dirty_count=0,
             total=2,
             clean=1,
+            already_applied=0,
             failures=[ApplyFailure("chrome/a.cc", "one", "boom")],
         )
         with tempfile.TemporaryDirectory() as tmp:
@@ -130,8 +134,41 @@ class DoctorCliTest(unittest.TestCase):
                 result = invoke("doctor", "--against", tmp)
 
         self.assertEqual(result.exit_code, 1, combined(result))
-        self.assertIn("1/2 patches fail", combined(result))
+        self.assertIn(
+            "1 clean, 0 already applied, 1 failed out of 2 patches",
+            combined(result),
+        )
         self.assertIn("chrome/a.cc", combined(result))
+
+    def test_against_reports_already_applied_patches_as_applied(self):
+        report = ApplyReport(
+            against="/fake/src",
+            head="a" * 40,
+            dirty=True,
+            dirty_count=12,
+            total=2,
+            clean=0,
+            already_applied=2,
+            failures=[],
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            with (
+                mock.patch(
+                    "bos_build.patchkit.extract.utils.validate_git_repository",
+                    return_value=True,
+                ),
+                mock.patch(
+                    "bos_build.patchkit.doctor.check_apply", return_value=report
+                ),
+                mock.patch("bos_build.patchkit.doctor.check_repo", return_value=[]),
+            ):
+                result = invoke("doctor", "--against", tmp)
+
+        self.assertEqual(result.exit_code, 0, combined(result))
+        self.assertIn(
+            "0 clean, 2 already applied, 0 failed out of 2 patches",
+            combined(result),
+        )
 
 
 if __name__ == "__main__":

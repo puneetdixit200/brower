@@ -1,5 +1,13 @@
 # Aster next steps
 
+### Latest resumed batch — 2026-10-30
+
+At branch `feat/aster-linux-ui`, local `40cf4f539` matched `aster/feat/aster-linux-ui`. T20a.3 doctor now distinguishes 0 clean, 47 already-applied and 1 failed patch in the selected 48-patch `cdp-api` check; reports exact Chromium HEAD and path-free dirty-file count (595 expanded file paths, versus 319 collapsed porcelain entries); Python doctor/CLI tests pass 54/54 and independent Luna review found no issue. The single failure is `chrome/browser/devtools/BUILD.gn`. Actual native gate remains closed: HEAD `16c3e55476d3564bea713314b2fff638749ce3e6`, no `.ninja_log`, no linked browser/test binary, 319 ordinary status entries / 595 expanded changed paths. Preserve that checkout; no build or GN regeneration ran.
+
+T30.4 now has a production ChatService/ToolLoopAgent regression for policy changing from Ask to Deny while approval is pending: it resolves denied with zero dispatches and zero approval grants. ChatService focused suite passes 27/27 (139 assertions). R04's scheduled-task page now distinguishes unavailable schedule/history APIs from empty data and offers Retry for both; its component suite passes 2/2 plus app typecheck and targeted Biome. These are focused source checks only; no headed Aster acceptance was run, and no matrix status was promoted.
+
+Next, fix or explicitly disposition the selected `cdp-api` `BUILD.gn` patch divergence in the repository patch source; then prioritize a source change that closes a real UI/API journey and run its focused checks. Retry native compilation only after safe `.ninja_log` recovery or a clean pinned build host with resource checks; do not reuse the stalled broad graph dry-run. Keep the 72-feature acceptance count at 2 PASS / 68 PARTIAL / 1 PARTIAL-BLOCKED / 1 NOT STARTED, not an implementation percentage.
+
 Historical allowance stop — 2026-10-30: a prior batch stopped at 5% remaining in one window. The user later resumed the same goal; check the live account meter at each new batch boundary rather than relying on historical readings.
 
 Current repository status and the ready-to-use next-agent prompt: [STATUS_REPORT_2026-10-30.md](STATUS_REPORT_2026-10-30.md). This batch starts at `2f47f8fff`; the branch was aligned with `aster/feat/aster-linux-ui` and the worktree was clean. Matrix remains 2 PASS, 68 PARTIAL, 1 PARTIAL/BLOCKED, and 1 NOT_STARTED (72 total), an acceptance count rather than a completion percentage.

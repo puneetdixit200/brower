@@ -126,10 +126,19 @@ def _render_doctor_report(report: dict) -> None:
 
     apply_section = report["apply"]
     if apply_section is not None:
+        target = (
+            f"Apply check against {apply_section['against']} "
+            f"(HEAD {apply_section['head']}; "
+            f"{apply_section['dirty_count']} dirty paths): "
+        )
+        summary = (
+            f"{apply_section['clean']} clean, "
+            f"{apply_section['already_applied']} already applied, "
+            f"{apply_section['failed']} failed"
+        )
         if apply_section["failures"]:
             log_error(
-                f"Apply check against {apply_section['against']}: "
-                f"{apply_section['failed']}/{apply_section['total']} patches fail "
+                f"{target}{summary} out of {apply_section['total']} patches "
                 f"({apply_section['features_affected']} feature(s) affected)"
             )
             by_feature: dict = {}
@@ -139,10 +148,13 @@ def _render_doctor_report(report: dict) -> None:
                 log_error(f"  {feature_name}:")
                 for patch in by_feature[feature_name]:
                     log_error(f"    - {patch}")
+        elif apply_section["already_applied"]:
+            log_success(
+                f"{target}{summary} out of {apply_section['total']} patches"
+            )
         else:
             log_success(
-                f"Apply check against {apply_section['against']}: "
-                f"all {apply_section['total']} patches apply cleanly"
+                f"{target}all {apply_section['total']} patches apply cleanly"
             )
 
     if report["healthy"]:
@@ -156,7 +168,7 @@ def doctor(
     against: Optional[Path] = Option(
         None,
         "--against",
-        help="Chromium source tree to dry-run every patch against (git apply --check)",
+        help="Chromium source tree to check patches against without modifying it",
         exists=True,
         file_okay=False,
     ),
@@ -171,9 +183,10 @@ def doctor(
 
     Verifies .features.yaml against the patches on disk (every entry resolves,
     every patch is claimed by a feature, claims don't overlap); with --against,
-    dry-runs every patch and groups failures by feature. Read-only: nothing is
-    written to the chromium tree. Exit 0 healthy / 1 findings / 2 usage or
-    environment errors.
+    classifies each patch as cleanly applicable, already applied, or failed;
+    captures the exact Chromium HEAD and a path-free dirty summary. Read-only:
+    nothing is written to the chromium tree. Exit 0 healthy / 1 findings / 2
+    usage or environment errors.
     """
     import yaml
 

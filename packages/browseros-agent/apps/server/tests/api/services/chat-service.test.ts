@@ -1754,6 +1754,103 @@ describe('ChatService history persistence', () => {
     }
   })
 
+  it('rechecks a changed deny policy before the production approval response can dispatch', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'browseros-chat-policy-recheck-'))
+    tempDirs.push(dir)
+    initializeDb({ dbPath: join(dir, 'browseros.sqlite') })
+    const policyStore = new DbActionPolicyStore()
+    const sessionStore = createSessionStore()
+    const service = new ChatService({
+      sessionStore: sessionStore as never,
+      klavis: createKlavisStub() as never,
+      browser: persistenceBrowser() as never,
+    })
+    useProductionAgentFixture = true
+    productionModelCalls = 0
+    productionToolDispatches = []
+    productionToolCallOverride = {
+      toolName: 'tabs',
+      input: {
+        action: 'new',
+        url: 'https://policy-race.example.test/',
+        background: true,
+      },
+    }
+
+    const conversationId = crypto.randomUUID()
+    const makeRequest = (
+      message: string,
+      approvalResponse?: { id: string; approved: boolean },
+    ) => ({
+      ...browserOsRequest(conversationId, false),
+      message,
+      browserContext: {
+        activeTab: { id: 3, url: 'https://example.com', title: 'Example' },
+        customMcpServers: [{ name: 'fixture', url: 'http://fixture.test/mcp' }],
+      },
+      ...(approvalResponse ? { approvalResponse } : {}),
+    })
+
+    try {
+      const pendingResponse = await service.processMessage(
+        makeRequest('Open a background tab.') as never,
+        new AbortController().signal,
+      )
+      await pendingResponse.text()
+      const messages = (
+        sessionStore.get(conversationId) as unknown as {
+          agent: { messages: Array<{ parts: Array<Record<string, unknown>> }> }
+        }
+      ).agent.messages
+      const pending = messages
+        .flatMap((message) => message.parts)
+        .find((part) => part.state === 'approval-requested')
+      if (!pending) throw new Error('Expected a pending tab approval')
+      const approvalId = (pending.approval as { id: string }).id
+      expect(productionToolDispatches).toEqual([])
+
+      await policyStore.put('browser.tabs.new', {
+        decision: 'deny',
+        expiresAt: null,
+      })
+      const approvalResponse = await service.processMessage(
+        makeRequest('', { id: approvalId, approved: true }) as never,
+        new AbortController().signal,
+      )
+      await approvalResponse.text()
+
+      expect(productionToolDispatches).toEqual([])
+      const grantCount = getDbHandle()
+        .sqlite.prepare(
+          'SELECT COUNT(*) AS count FROM approval_operation_grants',
+        )
+        .get() as { count: number }
+      expect(grantCount.count).toBe(0)
+      const resolved = (
+        sessionStore.get(conversationId) as unknown as {
+          agent: { messages: Array<{ parts: Array<Record<string, unknown>> }> }
+        }
+      ).agent.messages
+        .flatMap((message) => message.parts)
+        .find(
+          (part) =>
+            part.state === 'output-denied' &&
+            (part.approval as { id?: string } | undefined)?.id === approvalId,
+        )
+      expect(resolved).toMatchObject({
+        state: 'output-denied',
+        approval: {
+          id: approvalId,
+          approved: false,
+          reason: 'Blocked by the current saved action policy.',
+        },
+      })
+    } finally {
+      productionToolCallOverride = undefined
+      useProductionAgentFixture = false
+    }
+  })
+
   it('stops a live production ToolLoopAgent before its saved-allow mutation dispatches', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'browseros-chat-tool-loop-stop-'))
     tempDirs.push(dir)

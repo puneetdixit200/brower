@@ -44,8 +44,12 @@ class ApplyFailure:
 @dataclass(frozen=True)
 class ApplyReport:
     against: str
+    head: str
+    dirty: bool
+    dirty_count: int
     total: int
     clean: int
+    already_applied: int
     failures: List[ApplyFailure]
 
     @property
@@ -281,12 +285,14 @@ def check_apply(
     feature: Optional[str] = None,
 ) -> ApplyReport:
     """Dry-run every patch against a chromium tree, grouping failures by feature."""
-    from .batch_apply import check_patch_applies, find_patch_files
+    from .batch_apply import check_patch_applies, find_patch_files, run_git_command
 
     features = patch_backed_features(features)
     _require_known_feature(features, feature)
     claims = compute_claims(features, patch_base_paths(patches_dir))
     total = 0
+    clean = 0
+    already_applied = 0
     failures = []
     for patch_path in find_patch_files(patches_dir):
         rel = patch_path.relative_to(patches_dir).as_posix()
@@ -295,20 +301,76 @@ def check_apply(
             continue
         total += 1
         ok, error = check_patch_applies(patch_path, chromium_src)
-        if not ok:
-            failures.append(
-                ApplyFailure(
-                    patch=rel,
-                    feature=feature or (owners[0] if owners else UNCLASSIFIED),
-                    error=(error or "").strip(),
-                )
+        if ok:
+            clean += 1
+            continue
+        reverse_check = run_git_command(
+            ["git", "apply", "--reverse", "--check", "-p1", str(patch_path)],
+            cwd=chromium_src,
+        )
+        if reverse_check.returncode == 0:
+            already_applied += 1
+            continue
+        failures.append(
+            ApplyFailure(
+                patch=rel,
+                feature=feature or (owners[0] if owners else UNCLASSIFIED),
+                error=(error or "").strip(),
             )
+        )
+    head, dirty_count = chromium_identity(chromium_src)
     return ApplyReport(
         against=str(chromium_src),
+        head=head,
+        dirty=dirty_count > 0,
+        dirty_count=dirty_count,
         total=total,
-        clean=total - len(failures),
+        clean=clean,
+        already_applied=already_applied,
         failures=failures,
     )
+
+
+def chromium_identity(chromium_src: Path) -> tuple[str, int]:
+    """Return verified HEAD and changed-path count without exposing paths."""
+    try:
+        head_result = subprocess.run(
+            ["git", "rev-parse", "--verify", "HEAD"],
+            cwd=chromium_src,
+            capture_output=True,
+            check=False,
+        )
+        if head_result.returncode != 0:
+            raise ValueError("could not verify Chromium HEAD")
+        head = head_result.stdout.decode("utf-8", errors="replace").strip()
+        if len(head) not in (40, 64) or any(
+            character not in "0123456789abcdef" for character in head.lower()
+        ):
+            raise ValueError("could not verify Chromium HEAD")
+
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            cwd=chromium_src,
+            capture_output=True,
+            check=False,
+        )
+        if status_result.returncode != 0:
+            raise ValueError("could not inspect Chromium worktree status")
+        records = status_result.stdout.split(b"\0")
+        dirty_count = 0
+        index = 0
+        while index < len(records):
+            record = records[index]
+            if not record:
+                index += 1
+                continue
+            dirty_count += 1
+            if len(record) >= 2 and (b"R" in record[:2] or b"C" in record[:2]):
+                index += 1  # Porcelain -z emits the source path as a second token.
+            index += 1
+        return head, dirty_count
+    except OSError as exc:
+        raise ValueError(f"could not inspect Chromium git metadata: {exc}") from exc
 
 
 def build_report(
@@ -340,8 +402,12 @@ def build_report(
     if apply_report is not None:
         report["apply"] = {
             "against": apply_report.against,
+            "head": apply_report.head,
+            "dirty": apply_report.dirty,
+            "dirty_count": apply_report.dirty_count,
             "total": apply_report.total,
             "clean": apply_report.clean,
+            "already_applied": apply_report.already_applied,
             "failed": len(apply_report.failures),
             "features_affected": apply_report.features_affected,
             "failures": [asdict(f) for f in apply_report.failures],

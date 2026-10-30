@@ -35,6 +35,7 @@ import { NewScheduledTaskDialog } from './NewScheduledTaskDialog'
 import { ScheduledTaskResults } from './ScheduledTaskResults'
 import { ScheduledTasksHeader } from './ScheduledTasksHeader'
 import { ScheduledTasksList } from './ScheduledTasksList'
+import { ScheduledTasksUnavailableNotice } from './ScheduledTasksUnavailableNotice'
 import type { ScheduledJob } from './types'
 
 /**
@@ -42,9 +43,22 @@ import type { ScheduledJob } from './types'
  * @public
  */
 export const ScheduledTasksPage: FC = () => {
-  const { jobs, addJob, editJob, toggleJob, removeJob, runJob } =
-    useScheduledJobs()
-  const { jobRuns, cancelJobRun } = useScheduledJobRuns()
+  const {
+    jobs,
+    addJob,
+    editJob,
+    toggleJob,
+    removeJob,
+    runJob,
+    isUnavailable: jobsUnavailable,
+    refresh: refreshJobs,
+  } = useScheduledJobs()
+  const {
+    jobRuns,
+    cancelJobRun,
+    isUnavailable: runsUnavailable,
+    refresh: refreshRuns,
+  } = useScheduledJobRuns()
   // Read directly rather than through useChatTargetSelection: this page only
   // needs to know whether anything is connected, not which one is selected.
   const { providers, isLoading: isLoadingProviders } = useLlmProviders()
@@ -63,6 +77,7 @@ export const ScheduledTasksPage: FC = () => {
   const [editingJob, setEditingJob] = useState<ScheduledJob | null>(null)
   const [deleteJobId, setDeleteJobId] = useState<string | null>(null)
   const [viewingRunId, setViewingRunId] = useState<string | null>(null)
+  const [isRetryingLoad, setIsRetryingLoad] = useState(false)
   const viewingRun = viewingRunId
     ? (jobRuns.find((r) => r.id === viewingRunId) ?? null)
     : null
@@ -159,6 +174,15 @@ export const ScheduledTasksPage: FC = () => {
     track(SCHEDULED_TASK_RETRIED_EVENT)
   }
 
+  const retryLoad = async () => {
+    setIsRetryingLoad(true)
+    try {
+      await Promise.all([refreshJobs(), refreshRuns()])
+    } finally {
+      setIsRetryingLoad(false)
+    }
+  }
+
   const handleViewRun = (run: ScheduledJobRun) => {
     setViewingRunId(run.id)
     track(SCHEDULED_TASK_VIEW_RESULTS_EVENT)
@@ -175,6 +199,13 @@ export const ScheduledTasksPage: FC = () => {
       {/* Every run resolves a provider server side, so with nothing connected
           each one fails rather than falling back to anything. */}
       {noTarget && <NoProviderNotice variant="inline" />}
+
+      {(jobsUnavailable || runsUnavailable) && (
+        <ScheduledTasksUnavailableNotice
+          onRetry={() => void retryLoad()}
+          retrying={isRetryingLoad}
+        />
+      )}
 
       <Tabs value={activeTab} onValueChange={setSelectedTab}>
         <TabsList>

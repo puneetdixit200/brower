@@ -15,6 +15,7 @@ from bos_build.patchkit.doctor import (
     ApplyReport,
     build_report,
     check_apply,
+    chromium_identity,
     check_repo,
     compute_claims,
     diagnose_repo,
@@ -318,6 +319,8 @@ class CheckApplyTest(unittest.TestCase):
         with mock.patch(
             "bos_build.patchkit.batch_apply.run_git_command",
             _fake_git({"b.cc", "orphan.cc"}),
+        ), mock.patch(
+            "bos_build.patchkit.doctor.chromium_identity", return_value=("abc123", 0)
         ):
             report = check_apply(features, patches, Path("/fake/src"))
         self.assertEqual((report.total, report.clean), (3, 1))
@@ -335,6 +338,8 @@ class CheckApplyTest(unittest.TestCase):
         calls = []
         with mock.patch(
             "bos_build.patchkit.batch_apply.run_git_command", _fake_git(set(), calls)
+        ), mock.patch(
+            "bos_build.patchkit.doctor.chromium_identity", return_value=("abc123", 0)
         ):
             report = check_apply(features, patches, Path("/fake/src"))
         self.assertEqual((report.total, report.clean, report.failures), (1, 1, []))
@@ -352,6 +357,8 @@ class CheckApplyTest(unittest.TestCase):
         calls = []
         with mock.patch(
             "bos_build.patchkit.batch_apply.run_git_command", _fake_git(set(), calls)
+        ), mock.patch(
+            "bos_build.patchkit.doctor.chromium_identity", return_value=("abc123", 0)
         ):
             report = check_apply(features, patches, Path("/fake/src"), feature="one")
         self.assertEqual(report.total, 2)
@@ -371,9 +378,76 @@ class CheckApplyTest(unittest.TestCase):
         }
         with mock.patch(
             "bos_build.patchkit.batch_apply.run_git_command", _fake_git({"a.cc"})
+        ), mock.patch(
+            "bos_build.patchkit.doctor.chromium_identity", return_value=("abc123", 0)
         ):
             report = check_apply(features, patches, Path("/fake/src"), feature="zzz")
         self.assertEqual([f.feature for f in report.failures], ["zzz"])
+
+    def test_already_applied_patch_is_separate_from_clean_and_failure_counts(self):
+        patches = _patches_dir(self, ["chrome/already.cc", "chrome/fails.cc"])
+        features = {"one": _feature(["chrome/already.cc", "chrome/fails.cc"])}
+
+        def fake_git(cmd, cwd, **kwargs):
+            reverse_check = "--reverse" in cmd
+            is_already = "already.cc" in cmd[-1]
+            successful = (not reverse_check and False) or (reverse_check and is_already)
+            return SimpleNamespace(
+                returncode=0 if successful else 1,
+                stderr="error: patch failed\n",
+            )
+
+        with mock.patch(
+            "bos_build.patchkit.batch_apply.run_git_command", fake_git
+        ), mock.patch(
+            "bos_build.patchkit.doctor.chromium_identity", return_value=("a" * 40, 2)
+        ):
+            report = check_apply(features, patches, Path("/fake/src"))
+
+        self.assertEqual(
+            (report.total, report.clean, report.already_applied), (2, 0, 1)
+        )
+        self.assertEqual(
+            [failure.patch for failure in report.failures], ["chrome/fails.cc"]
+        )
+
+
+class ChromiumIdentityTest(unittest.TestCase):
+    def test_clean_checkout_reports_head_and_zero_changes(self):
+        with mock.patch(
+            "bos_build.patchkit.doctor.subprocess.run",
+            side_effect=[
+                SimpleNamespace(returncode=0, stdout=b"a" * 40 + b"\n"),
+                SimpleNamespace(returncode=0, stdout=b""),
+            ],
+        ):
+            self.assertEqual(chromium_identity(Path("/src")), ("a" * 40, 0))
+
+    def test_dirty_checkout_counts_paths_without_returning_them(self):
+        commands = []
+
+        def fake_run(command, **kwargs):
+            commands.append(command)
+            output = b"a" * 40 + b"\n" if "rev-parse" in command else (
+                b" M secret/file.cc\0?? private/a.txt\0?? private/b.txt\0"
+            )
+            return SimpleNamespace(returncode=0, stdout=output)
+
+        with mock.patch(
+            "bos_build.patchkit.doctor.subprocess.run",
+            side_effect=fake_run,
+        ):
+            head, count = chromium_identity(Path("/src"))
+        self.assertEqual((head, count), ("a" * 40, 3))
+        self.assertIn("--untracked-files=all", commands[1])
+
+    def test_git_failure_does_not_fabricate_identity(self):
+        with mock.patch(
+            "bos_build.patchkit.doctor.subprocess.run",
+                return_value=SimpleNamespace(returncode=128, stdout=b"", stderr=b"bad"),
+        ):
+            with self.assertRaisesRegex(ValueError, "could not verify Chromium HEAD"):
+                chromium_identity(Path("/src"))
 
 
 class BuildReportTest(unittest.TestCase):
@@ -426,8 +500,12 @@ class BuildReportTest(unittest.TestCase):
         features = {"one": _feature(["chrome/a.cc"])}
         apply_report = ApplyReport(
             against="/src",
+            head="abc123",
+            dirty=False,
+            dirty_count=0,
             total=3,
             clean=2,
+            already_applied=0,
             failures=[ApplyFailure("chrome/a.cc", "one", "boom")],
         )
 
@@ -436,7 +514,18 @@ class BuildReportTest(unittest.TestCase):
         self.assertFalse(report["healthy"])
         self.assertEqual(
             set(report["apply"]),
-            {"against", "total", "clean", "failed", "features_affected", "failures"},
+            {
+                "against",
+                "head",
+                "dirty",
+                "dirty_count",
+                "total",
+                "clean",
+                "already_applied",
+                "failed",
+                "features_affected",
+                "failures",
+            },
         )
         self.assertEqual(report["apply"]["failed"], 1)
         self.assertEqual(report["apply"]["features_affected"], 1)
@@ -447,12 +536,22 @@ class BuildReportTest(unittest.TestCase):
     def test_clean_apply_report_stays_healthy(self):
         patches = _patches_dir(self, ["chrome/a.cc"])
         features = {"one": _feature(["chrome/a.cc"])}
-        apply_report = ApplyReport(against="/src", total=1, clean=1, failures=[])
+        apply_report = ApplyReport(
+            against="/src",
+            head="a" * 40,
+            dirty=False,
+            dirty_count=0,
+            total=2,
+            clean=1,
+            already_applied=1,
+            failures=[],
+        )
 
         report = build_report(patches.parent, features, [], apply_report)
 
         self.assertTrue(report["healthy"])
         self.assertEqual(report["apply"]["failed"], 0)
+        self.assertEqual(report["apply"]["already_applied"], 1)
 
     def test_feature_filter_recorded_in_report(self):
         patches = _patches_dir(self, ["chrome/a.cc"])
