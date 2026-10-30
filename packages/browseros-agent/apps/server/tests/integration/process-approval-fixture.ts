@@ -10,7 +10,7 @@
 import { Database } from 'bun:sqlite'
 import { type ChildProcess, spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { closeSync, openSync } from 'node:fs'
+import { closeSync, openSync, readlinkSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -32,7 +32,14 @@ const DEFAULT_SERVER = join(
 )
 const RESOURCES = join(REPO_ROOT, 'dist/prod/aster-server/linux-x64/resources')
 const APP_ID = 'oifdmombnijnaiocijiacjhajbnpdlhb'
-const CHILD_ENV_KEYS = ['PATH', 'HOME', 'LANG', 'LC_ALL', 'TMPDIR'] as const
+const CHILD_ENV_KEYS = [
+  'PATH',
+  'HOME',
+  'LANG',
+  'LC_ALL',
+  'TMPDIR',
+  'APPIMAGE_EXTRACT_AND_RUN',
+] as const
 const BROWSER_FIXTURE_MARKER = 'ASTER_BROWSER_FIXTURE_NAVIGATE'
 const BROWSER_SENTINEL = 'ASTER_LOCAL_PAGE_SENTINEL_71C4'
 const BROWSER_PAGE_TITLE = 'Aster Local Fixture'
@@ -490,6 +497,24 @@ async function main() {
     !(browserMode && restartMode),
     '--browser and --restart are separate fixture modes',
   )
+  if (browserMode) {
+    const currentNetNamespace = readlinkSync('/proc/self/ns/net')
+    const hostNamespaceFd = process.env.ASTER_FIXTURE_HOST_NETNS_FD
+    let hostNetNamespace: string | undefined
+    if (hostNamespaceFd && /^\d+$/.test(hostNamespaceFd)) {
+      try {
+        hostNetNamespace = readlinkSync(`/proc/self/fd/${hostNamespaceFd}`)
+      } catch {
+        // Missing or closed descriptors fail the guard below.
+      }
+    }
+    assert(
+      typeof hostNetNamespace === 'string' &&
+        /^net:\[\d+\]$/.test(hostNetNamespace) &&
+        currentNetNamespace !== hostNetNamespace,
+      '--browser requires a distinct network namespace; use tests/integration/run_browser_process_fixture_isolated.py',
+    )
+  }
   if (
     process.argv.some(
       (arg) =>
@@ -550,7 +575,7 @@ async function main() {
     chromium,
     '--headless=new',
     `--user-data-dir=${paths.profile}`,
-    // Blocks hostname resolution; external IP literal connections remain possible.
+    // Defense-in-depth only; the isolated network namespace is the egress boundary.
     '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1',
     '--remote-debugging-address=127.0.0.1',
     `--remote-debugging-port=${ports.cdp}`,
@@ -815,9 +840,28 @@ async function main() {
       ASTER_DIR: paths.state,
       BROWSEROS_USE_MOCK_LLM: '',
     })
+    if (browserMode && chromium.endsWith('.AppImage')) {
+      env.APPIMAGE_EXTRACT_AND_RUN = '1'
+    }
     browserLogFd = openSync(paths.browserLog, 'w')
     serverLogFd = openSync(paths.serverLog, 'w')
-    browserProcess = spawn(chromium, browserArgv.slice(1), {
+    // The outer network namespace maps the invoking user to UID 0 so it can
+    // bring up loopback. Run Chromium as that same host user through a nested
+    // UID map so Chromium can keep its sandbox enabled without appearing root.
+    const browserCommand = browserMode ? 'unshare' : chromium
+    const browserArgs = browserMode
+      ? [
+          '--user',
+          '--map-user',
+          '1000',
+          '--setuid',
+          '1000',
+          '--',
+          chromium,
+          ...browserArgv.slice(1),
+        ]
+      : browserArgv.slice(1)
+    browserProcess = spawn(browserCommand, browserArgs, {
       env,
       stdio: ['ignore', browserLogFd, browserLogFd],
     })

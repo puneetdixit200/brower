@@ -1,5 +1,9 @@
 # Progress
 
+### T19.4 / A01-A06 isolated browser fixture egress gate — 2026-10-30
+
+Added a Linux launcher that runs the complete compiled-sidecar browser fixture inside a fresh unprivileged network namespace, keeps only loopback, rejects default routes, and probes successful loopback plus unreachable public IPv4/IPv6 literal connections. A live namespace preflight passed; the fixture guard compares its network namespace against an inherited open host-namespace descriptor, and Python regressions reject a spoofed descriptor and direct invocation of the wrapper's internal entrypoint. The isolated BrowserOS attempt reached Chromium as a non-root mapped user but exited before CDP with `No usable sandbox`; no sandbox-disable flag or host network rule was added. The old browser PASS predates this isolated launch. Python tests pass 4/4, Python compilation and server typecheck pass. Keep A01/A06 PARTIAL until a host that permits Chromium's sandbox passes the browser journey inside this namespace.
+
 ### T26.2 / A12 challenge-signal conflict guard — 2026-10-30
 
 The server now treats opposing explicit CAPTCHA/MFA state and supported visual evidence as conflicting, and simultaneous CAPTCHA plus MFA evidence remains a conflict even when the explicit state is `unknown`. Matching explicit states keep their existing classification. Detector and browser-dispatch suites pass 15/15 (32 assertions); server typecheck, targeted Biome and `git diff --check` pass. Independent Luna review found no classification defect. The detector still relies on bounded page-authored metadata and remains vulnerable to nonstandard or spoofed signals; A12 stays PARTIAL pending headed, restart and packaged Aster acceptance.
