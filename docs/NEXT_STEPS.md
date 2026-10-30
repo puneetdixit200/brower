@@ -1,5 +1,9 @@
 # Aster next steps
 
+### T24.1 / A07 conversation queue isolation — 2026-10-30
+
+The prompt queue is now scoped to conversation ID, preventing queued text from appearing or dispatching in another active chat. Refused sends keep retrying because the active queue identity changes on timer retry. Focused tests pass 10/10 (39 assertions), with app typecheck and targeted compatible-Biome checks passing. Independent review found no concrete defect but noted the tests do not mount the React component or exercise actual timer cleanup. Next add headed UI/stream acceptance and evaluate live-steer semantics without replaying uncertain side effects; keep A07 PARTIAL.
+
 ### T10.2 / B06 recent-history timestamp boundary — 2026-10-30
 
 The recent-history path now makes one bounded 256-result query and selects eight valid HTTP(S) rows locally, preventing equal-timestamp `endTime` boundaries from hiding the rest of a batch. Focused history test 4/4 (6 assertions), app typecheck, commit-hook Biome and diff check pass. Independent Luna review found no implementation defect; the helper test does not spy on the component API call or assert order. Next verify the history and nested-bookmark UI in headed Aster, then native import/export and profile/restart behavior. Keep B06 PARTIAL. Full test/evidence details are in `docs/PROGRESS.md` under this checkpoint.

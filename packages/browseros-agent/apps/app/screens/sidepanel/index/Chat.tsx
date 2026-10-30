@@ -46,7 +46,10 @@ import {
   enqueuePrompt,
   isPromptQueueRetryCurrent,
   MAX_QUEUED_PROMPTS,
+  promptQueueForConversation,
   removeQueuedPrompt,
+  replaceConversationPromptQueue,
+  retryConversationPromptQueue,
 } from './prompt-queue'
 import { ResearchSupportConsent } from './ResearchSupportConsent'
 import { prepareSourceResearch } from './research-request'
@@ -98,8 +101,13 @@ export const Chat = () => {
   } = useJtbdPopup()
 
   const [input, setInput] = useState('')
-  const [queuedPrompts, setQueuedPrompts] = useState<string[]>([])
-  const queuedPromptsRef = useRef(queuedPrompts)
+  const [queuedPromptsByConversation, setQueuedPromptsByConversation] =
+    useState<Record<string, string[]>>({})
+  const queuedPromptsRef = useRef(queuedPromptsByConversation)
+  const queuedPrompts = promptQueueForConversation(
+    queuedPromptsByConversation,
+    conversationId,
+  )
   const queueGeneration = useRef(0)
   const queueAwaitingRun = useRef(false)
   const [attachedTabs, setAttachedTabs] = useState<chrome.tabs.Tab[]>([])
@@ -111,7 +119,7 @@ export const Chat = () => {
   const [draftIncognito, setDraftIncognito] = useState(true)
   const [draftLoaded, setDraftLoaded] = useState(false)
   const [mounted, setMounted] = useState(false)
-  queuedPromptsRef.current = queuedPrompts
+  queuedPromptsRef.current = queuedPromptsByConversation
 
   useEffect(() => {
     setMounted(true)
@@ -193,8 +201,16 @@ export const Chat = () => {
     void persistDraft().catch(() => undefined)
   }, [input, attachedTabs, draftLoaded, draftIncognito, draftOwnerTabId])
 
-  // An explicit user queue is ephemeral and bounded. No hidden browser
-  // context, credentials, or automatic tool replay is stored with a prompt.
+  const previousQueueConversationId = useRef(conversationId)
+  useEffect(() => {
+    if (previousQueueConversationId.current !== conversationId) {
+      previousQueueConversationId.current = conversationId
+      queueAwaitingRun.current = false
+    }
+  }, [conversationId])
+
+  // An explicit user queue is ephemeral and bounded to its conversation. No
+  // hidden browser context, credentials, or automatic tool replay is stored.
   useEffect(() => {
     if (status === 'streaming' || status === 'submitted') {
       queueAwaitingRun.current = false
@@ -215,7 +231,13 @@ export const Chat = () => {
       sendMessage({ text }),
     )
     if (attempt.accepted) {
-      setQueuedPrompts(attempt.remaining)
+      const nextQueues = replaceConversationPromptQueue(
+        queuedPromptsRef.current,
+        conversationId,
+        attempt.remaining,
+      )
+      queuedPromptsRef.current = nextQueues
+      setQueuedPromptsByConversation(nextQueues)
     } else {
       queueAwaitingRun.current = false
       // Refusal can be transient without changing chat status. Retry while
@@ -227,43 +249,72 @@ export const Chat = () => {
         if (
           scheduledPrompt &&
           isPromptQueueRetryCurrent(
-            queuedPromptsRef.current,
+            promptQueueForConversation(
+              queuedPromptsRef.current,
+              conversationId,
+            ),
             scheduledPrompt,
             scheduledGeneration,
             queueGeneration.current,
           )
         ) {
-          setQueuedPrompts((previous) => [...previous])
+          const nextQueues = retryConversationPromptQueue(
+            queuedPromptsRef.current,
+            conversationId,
+          )
+          if (nextQueues !== queuedPromptsRef.current) {
+            queuedPromptsRef.current = nextQueues
+            setQueuedPromptsByConversation(nextQueues)
+          }
         }
       }, 250)
       return () => window.clearTimeout(retryTimer)
     }
-  }, [status, canSend, queuedPrompts, sendMessage])
+  }, [status, canSend, queuedPrompts, sendMessage, conversationId])
 
   const queueCurrentPrompt = () => {
     if (queuedPrompts.length >= MAX_QUEUED_PROMPTS) return
     const next = enqueuePrompt(queuedPrompts, input)
     if (next === queuedPrompts) return
-    queuedPromptsRef.current = next
-    setQueuedPrompts(next)
+    const nextQueues = replaceConversationPromptQueue(
+      queuedPromptsRef.current,
+      conversationId,
+      next,
+    )
+    queuedPromptsRef.current = nextQueues
+    setQueuedPromptsByConversation(nextQueues)
     setInput('')
   }
 
   const clearQueuedPrompts = () => {
     const cleared = clearPromptQueue(queueGeneration.current)
     queueGeneration.current = cleared.generation
-    queuedPromptsRef.current = cleared.queue
+    const nextQueues = replaceConversationPromptQueue(
+      queuedPromptsRef.current,
+      conversationId,
+      cleared.queue,
+    )
+    queuedPromptsRef.current = nextQueues
     queueAwaitingRun.current = false
-    setQueuedPrompts(cleared.queue)
+    setQueuedPromptsByConversation(nextQueues)
   }
 
   const removeQueuedPromptAt = (index: number) => {
-    const next = removeQueuedPrompt(queuedPromptsRef.current, index)
-    if (next === queuedPromptsRef.current) return
+    const currentQueue = promptQueueForConversation(
+      queuedPromptsRef.current,
+      conversationId,
+    )
+    const next = removeQueuedPrompt(currentQueue, index)
+    if (next === currentQueue) return
     queueGeneration.current += 1
     queueAwaitingRun.current = false
-    queuedPromptsRef.current = next
-    setQueuedPrompts(next)
+    const nextQueues = replaceConversationPromptQueue(
+      queuedPromptsRef.current,
+      conversationId,
+      next,
+    )
+    queuedPromptsRef.current = nextQueues
+    setQueuedPromptsByConversation(nextQueues)
   }
 
   // Trigger JTBD popup when AI finishes responding

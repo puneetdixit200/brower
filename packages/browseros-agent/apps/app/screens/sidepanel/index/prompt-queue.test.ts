@@ -7,7 +7,10 @@ import {
   isPromptQueueRetryCurrent,
   MAX_QUEUED_PROMPTS,
   normalizeQueuedPrompt,
+  promptQueueForConversation,
   removeQueuedPrompt,
+  replaceConversationPromptQueue,
+  retryConversationPromptQueue,
 } from './prompt-queue'
 
 describe('per-chat prompt queue', () => {
@@ -93,6 +96,39 @@ describe('per-chat prompt queue', () => {
     expect(currentQueue).toEqual([])
   })
 
+  it('retries a refused prompt after replacing its queue identity', () => {
+    const queue = enqueuePrompt([], 'retry me')
+    const queues = replaceConversationPromptQueue({}, 'conversation-a', queue)
+    let attempts = 0
+
+    const firstAttempt = dispatchNextPrompt(
+      promptQueueForConversation(queues, 'conversation-a'),
+      () => {
+        attempts += 1
+        return false
+      },
+    )
+    expect(firstAttempt.accepted).toBe(false)
+    expect(firstAttempt.remaining).toBe(queue)
+
+    const retriedQueues = retryConversationPromptQueue(queues, 'conversation-a')
+    expect(retriedQueues).not.toBe(queues)
+    expect(
+      promptQueueForConversation(retriedQueues, 'conversation-a'),
+    ).not.toBe(queue)
+
+    const retryAttempt = dispatchNextPrompt(
+      promptQueueForConversation(retriedQueues, 'conversation-a'),
+      () => {
+        attempts += 1
+        return true
+      },
+    )
+    expect(retryAttempt.accepted).toBe(true)
+    expect(retryAttempt.remaining).toEqual([])
+    expect(attempts).toBe(2)
+  })
+
   it('Stop invalidates a scheduled refusal retry before it can dispatch', () => {
     verifyInvalidatedRetry()
   })
@@ -127,5 +163,53 @@ describe('per-chat prompt queue', () => {
     expect(removeQueuedPrompt(queue, -1)).toBe(queue)
     expect(removeQueuedPrompt(queue, 2)).toBe(queue)
     expect(removeQueuedPrompt(queue, 0.5)).toBe(queue)
+  })
+})
+
+describe('conversation-scoped prompt queues', () => {
+  it('keeps queued prompts attached to their owning conversation', () => {
+    const first = replaceConversationPromptQueue(
+      {},
+      'conversation-a',
+      enqueuePrompt([], 'private queued work'),
+    )
+
+    expect(promptQueueForConversation(first, 'conversation-a')).toEqual([
+      'private queued work',
+    ])
+    const otherChatQueue = promptQueueForConversation(first, 'conversation-b')
+    expect(otherChatQueue).toEqual([])
+    let crossConversationDispatches = 0
+    const otherChatAttempt = dispatchNextPrompt(otherChatQueue, () => {
+      crossConversationDispatches += 1
+      return true
+    })
+    expect(otherChatAttempt.accepted).toBe(false)
+    expect(crossConversationDispatches).toBe(0)
+
+    const second = replaceConversationPromptQueue(
+      first,
+      'conversation-b',
+      enqueuePrompt([], 'other chat work'),
+    )
+    expect(promptQueueForConversation(second, 'conversation-a')).toEqual([
+      'private queued work',
+    ])
+    expect(promptQueueForConversation(second, 'conversation-b')).toEqual([
+      'other chat work',
+    ])
+    expect(promptQueueForConversation(first, 'conversation-b')).toEqual([])
+  })
+
+  it('removes a conversation queue without changing another queue', () => {
+    const queues = replaceConversationPromptQueue(
+      replaceConversationPromptQueue({}, 'conversation-a', ['a']),
+      'conversation-b',
+      ['b'],
+    )
+    const cleared = replaceConversationPromptQueue(queues, 'conversation-a', [])
+
+    expect(promptQueueForConversation(cleared, 'conversation-a')).toEqual([])
+    expect(promptQueueForConversation(cleared, 'conversation-b')).toEqual(['b'])
   })
 })

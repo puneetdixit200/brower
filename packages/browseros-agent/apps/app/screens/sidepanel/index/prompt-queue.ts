@@ -1,5 +1,37 @@
 export const MAX_QUEUED_PROMPTS = 5
 
+export type ConversationPromptQueues = Record<string, string[]>
+
+const EMPTY_PROMPT_QUEUE: string[] = []
+
+export function promptQueueForConversation(
+  queues: ConversationPromptQueues,
+  conversationId: string,
+): string[] {
+  return queues[conversationId] ?? EMPTY_PROMPT_QUEUE
+}
+
+export function replaceConversationPromptQueue(
+  queues: ConversationPromptQueues,
+  conversationId: string,
+  queue: string[],
+): ConversationPromptQueues {
+  if (queues[conversationId] === queue) return queues
+  const next = { ...queues }
+  if (queue.length === 0) delete next[conversationId]
+  else next[conversationId] = queue
+  return next
+}
+
+export function retryConversationPromptQueue(
+  queues: ConversationPromptQueues,
+  conversationId: string,
+): ConversationPromptQueues {
+  const queue = queues[conversationId]
+  if (!queue?.length) return queues
+  return { ...queues, [conversationId]: [...queue] }
+}
+
 export function normalizeQueuedPrompt(prompt: string): string | null {
   const normalized = prompt.trim()
   return normalized || null
