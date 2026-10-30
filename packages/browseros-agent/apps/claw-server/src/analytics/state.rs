@@ -37,7 +37,7 @@ pub(crate) struct AnalyticsState {
 }
 
 fn default_enabled() -> bool {
-    true
+    false
 }
 
 pub(crate) fn state_path(browserclaw_dir: &Path) -> PathBuf {
@@ -64,7 +64,7 @@ fn load_or_create_blocking(path: &Path) -> io::Result<AnalyticsState> {
     let original = read_state(path)?;
     let mut state = original.clone().unwrap_or(AnalyticsState {
         distinct_id: None,
-        enabled: true,
+        enabled: false,
         installation_aliases: vec![],
     });
     let installation = match read_installation_id(parent(path)) {
@@ -195,8 +195,13 @@ mod tests {
     const B: &str = "31eca9ca-566d-4373-8a1c-2f29b32dbed1";
 
     #[tokio::test]
-    async fn installation_seeds_missing_or_consent_only_analytics() -> anyhow::Result<()> {
-        for existing in [None, Some(r#"{"enabled":false}"#)] {
+    async fn missing_consent_defaults_off_and_explicit_choices_are_preserved() -> anyhow::Result<()>
+    {
+        for (existing, expected_enabled) in [
+            (None, false),
+            (Some(r#"{"enabled":false}"#), false),
+            (Some(r#"{"enabled":true}"#), true),
+        ] {
             let directory = tempdir()?;
             let path = state_path(directory.path());
             if let Some(raw) = existing {
@@ -208,7 +213,7 @@ mod tests {
             )?;
             let state = load_or_create_state(&path).await;
             assert_eq!(state.distinct_id.as_deref(), Some(B));
-            assert_eq!(state.enabled, existing.is_none());
+            assert_eq!(state.enabled, expected_enabled);
             assert!(state.installation_aliases.is_empty());
             assert_eq!(read_state(&path)?, Some(state));
         }
@@ -279,7 +284,7 @@ mod tests {
         }
         let first = &states[0];
         assert!(first.distinct_id.as_deref().is_some_and(valid_identity));
-        assert!(first.enabled);
+        assert!(!first.enabled);
         assert!(states.iter().all(|state| state == first));
         assert_eq!(read_state(&path)?.as_ref(), Some(first));
         assert!(!directory.path().join("installation.json").exists());

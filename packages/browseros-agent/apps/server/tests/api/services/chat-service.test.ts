@@ -46,6 +46,7 @@ interface StreamResponseOptions {
   uiMessages?: MockMessage[]
   abortSignal?: AbortSignal
   options?: { taskId: string; approvalId?: string }
+  onError?: (error: unknown) => string
   onFinish(args: { messages: MockMessage[] }): Promise<void>
 }
 
@@ -176,6 +177,9 @@ const resolveLLMConfigSpy = mock(async () => ({
   model: 'gpt-5',
   apiKey: 'test-key',
 }))
+const loggerErrorSpy = mock(
+  (_message: string, _fields: Record<string, unknown>) => {},
+)
 
 // Spread the real `ai` module so other test files in the same
 // bun-test process that import { tool } / { UIMessage } / etc. from
@@ -261,7 +265,7 @@ mock.module('../../../src/lib/clients/llm/config', () => ({
 
 mock.module('../../../src/lib/logger', () => ({
   logger: {
-    error: mock(() => {}),
+    error: loggerErrorSpy,
     info: mock(() => {}),
     warn: mock(() => {}),
     debug: mock(() => {}),
@@ -1441,6 +1445,48 @@ describe('ChatService history persistence', () => {
       },
     } as never
   }
+
+  it('omits provider error text from logs while preserving the stream error response', async () => {
+    const sentinel = 'provider-private-body-sentinel-7f3d'
+    const providerError = Object.assign(new Error(sentinel), {
+      statusCode: 429,
+    })
+    const agent = createFakeAgent()
+    agentToReturn = agent
+    loggerErrorSpy.mockClear()
+    streamResponseHandler = async ({ onError }) => {
+      const errorText = onError?.(providerError) ?? ''
+      return new Response(errorText)
+    }
+    const service = new ChatService({
+      sessionStore: createSessionStore() as never,
+      klavis: createKlavisStub() as never,
+      browser: persistenceBrowser() as never,
+    })
+
+    const response = await service.processMessage(
+      browserOsRequest(crypto.randomUUID(), false),
+      new AbortController().signal,
+    )
+    const streamText = await response.text()
+
+    expect(loggerErrorSpy).toHaveBeenCalledTimes(1)
+    const logged = loggerErrorSpy.mock.calls[0]
+    expect(logged?.[1]).toMatchObject({ errorType: 'Error', statusCode: 429 })
+    expect(JSON.stringify(logged)).not.toContain(sentinel)
+    const firstDataLine = streamText
+      .split('\n')
+      .find((line) => line.startsWith('data: {'))
+    if (!firstDataLine) throw new Error('Expected a streamed error chunk')
+    const textChunk = JSON.parse(firstDataLine.slice('data: '.length)) as {
+      delta: string
+    }
+    const errorEnvelope = JSON.parse(textChunk.delta) as {
+      error: { code: string; message: string; details?: string }
+    }
+    expect(errorEnvelope.error.code).toBe('unknown')
+    expect(errorEnvelope.error.message).toBe(sentinel)
+  })
 
   it('forwards a server-held approval id and grants only its exact one-shot binding', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'browseros-chat-approval-'))

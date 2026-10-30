@@ -232,7 +232,7 @@ mod tests {
     fn consent_is_read_live_from_the_state_file() -> anyhow::Result<()> {
         let dir = tempdir()?;
         let path = state_path(dir.path());
-        assert!(read_consent(&path), "a missing file is the system default");
+        assert!(!read_consent(&path), "a missing file defaults to opt-out");
         std::fs::write(&path, br#"{"enabled":false}"#)?;
         assert!(!read_consent(&path), "a persisted opt-out must be honored");
         std::fs::write(&path, br#"{"enabled":true}"#)?;

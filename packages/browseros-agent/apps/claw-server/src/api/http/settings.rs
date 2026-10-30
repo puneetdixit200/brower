@@ -33,11 +33,26 @@ pub(super) async fn update_telemetry(
             "consent must be a boolean",
         )
     })?;
-    let telemetry = state
-        .analytics
-        .set_consent(payload.consent)
-        .await
-        .map_err(|source| internal(&request_id, source))?;
+    let _consent_update = state.consent_update_lock.lock().await;
+    // Revocation is reflected in the in-memory invitation gate even if persisting the
+    // telemetry choice fails. Close it before waiting for persistence or client shutdown.
+    if !payload.consent {
+        state.feedback_cohort.set_enabled(false).await;
+    } else {
+        // Open the in-memory gate before AnalyticsService publishes the new consent
+        // value to its watcher, so the immediate opt-in refresh can adopt its response.
+        state.feedback_cohort.set_enabled(true).await;
+    }
+    let result = state.analytics.set_consent(payload.consent).await;
+    let telemetry = match result {
+        Ok(telemetry) => telemetry,
+        Err(source) => {
+            if payload.consent && !state.analytics.get_state().await.consent {
+                state.feedback_cohort.set_enabled(false).await;
+            }
+            return Err(internal(&request_id, source));
+        }
+    };
     Ok(Json(to_contract_state(telemetry)))
 }
 

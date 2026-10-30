@@ -244,8 +244,8 @@ async fn an_installation_that_opted_out_is_not_invited() -> anyhow::Result<()> {
     let (_, invitation) = request(&app.router, "GET", INVITATION, None).await?;
     assert_eq!(invitation, json!({ "eligible": false }));
 
-    // Nothing is written either, so consenting again later still leaves the invitation
-    // available rather than silently spent while the reader was opted out.
+    // The opt-out clears cached cohort membership. Re-consenting must not resurrect
+    // cached remote cohort data; a fresh consented refresh may publish a new cohort.
     request(
         &app.router,
         "POST",
@@ -261,7 +261,7 @@ async fn an_installation_that_opted_out_is_not_invited() -> anyhow::Result<()> {
     )
     .await?;
     let (_, restored) = request(&app.router, "GET", INVITATION, None).await?;
-    assert_eq!(restored["eligible"], true);
+    assert_eq!(restored, json!({ "eligible": false }));
     Ok(())
 }
 
@@ -411,10 +411,21 @@ async fn test_app(root: &Path) -> anyhow::Result<TestApp> {
         behavior: Default::default(),
     });
     let state = AppState::new_with_home(config, root.join("home")).await?;
-    Ok(TestApp {
+    let app = TestApp {
         router: build_router(state.clone()),
         state,
-    })
+    };
+    // Invitation fixtures model an installation that has explicitly opted in. The
+    // opt-out case below revokes that consent through the real settings route.
+    let (status, _) = request(
+        &app.router,
+        "PUT",
+        "/api/v1/settings/telemetry",
+        Some(json!({ "consent": true })),
+    )
+    .await?;
+    anyhow::ensure!(status == StatusCode::OK, "fixture consent was refused");
+    Ok(app)
 }
 
 async fn install_id_of(app: &TestApp) -> String {

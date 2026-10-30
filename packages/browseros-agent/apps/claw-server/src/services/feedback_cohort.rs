@@ -13,7 +13,10 @@ use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tokio::{sync::RwLock, task::JoinHandle};
+use tokio::{
+    sync::{RwLock, watch},
+    task::JoinHandle,
+};
 use tokio_util::sync::CancellationToken;
 
 /// The PostHog remote configuration flag carrying the cohort.
@@ -85,16 +88,35 @@ struct CohortState {
     book_url: Option<String>,
 }
 
+#[derive(Debug, Default)]
+struct CohortCache {
+    enabled: bool,
+    state: Option<CohortState>,
+}
+
 /// Holds the current cohort. Cheap to clone, cheap to ask.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct FeedbackCohort {
-    state: Arc<RwLock<Option<CohortState>>>,
+    state: Arc<RwLock<CohortCache>>,
+}
+
+impl Default for FeedbackCohort {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FeedbackCohort {
     #[must_use]
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            state: Arc::new(RwLock::new(CohortCache {
+                // The production AppState replaces this test-friendly initial value with
+                // persisted analytics consent before exposing the routes.
+                enabled: true,
+                state: None,
+            })),
+        }
     }
 
     /// Where to point this installation's invitation, or `None` if it is not in the
@@ -107,7 +129,10 @@ impl FeedbackCohort {
     /// A set lookup behind a read lock, with no I/O of its own.
     pub async fn invitation_url(&self, install_id: &str, now_ms: i64) -> Option<String> {
         let guard = self.state.read().await;
-        let state = guard.as_ref()?;
+        if !guard.enabled {
+            return None;
+        }
+        let state = guard.state.as_ref()?;
         if is_stale(state.generated_at_ms, now_ms) {
             return None;
         }
@@ -138,13 +163,28 @@ impl FeedbackCohort {
             book_url: document.copy.book_url,
         };
         tracing::info!(installs = state.installs.len(), "feedback cohort adopted");
-        *self.state.write().await = Some(state);
+        let mut cache = self.state.write().await;
+        if !cache.enabled {
+            return false;
+        }
+        cache.state = Some(state);
         true
+    }
+
+    /// Changes the consent gate and clears any cached membership on revocation.
+    /// Fetch adoption and invitation lookup use the same lock, so this is the
+    /// linearization point for preventing post-revocation invitations.
+    pub async fn set_enabled(&self, enabled: bool) {
+        let mut cache = self.state.write().await;
+        cache.enabled = enabled;
+        if !enabled {
+            cache.state = None;
+        }
     }
 
     /// True once a usable cohort has been adopted. Used only by diagnostics.
     pub async fn is_loaded(&self) -> bool {
-        self.state.read().await.is_some()
+        self.state.read().await.state.is_some()
     }
 }
 
@@ -249,7 +289,34 @@ fn document_from_flags(body: &[u8]) -> Option<CohortDocument> {
 /// Returns whether the cohort changed. Every failure path is a warning and a `false`: a
 /// refused or unreachable document leaves the previous one in place rather than emptying
 /// the cohort, so a brief outage does not stop invitations that were already permitted.
-pub async fn fetch_once(cohort: &FeedbackCohort, source: &CohortSource, now_ms: i64) -> bool {
+pub async fn fetch_once(
+    cohort: &FeedbackCohort,
+    source: &CohortSource,
+    now_ms: i64,
+    consent: &mut watch::Receiver<bool>,
+) -> bool {
+    if !*consent.borrow() {
+        return false;
+    }
+    tokio::select! {
+        changed = consent.changed() => {
+            if changed.is_ok() && !*consent.borrow() {
+                cohort.set_enabled(false).await;
+            }
+            false
+        }
+        changed = fetch_and_adopt(cohort, source, now_ms) => {
+            if !*consent.borrow() {
+                cohort.set_enabled(false).await;
+                false
+            } else {
+                changed
+            }
+        }
+    }
+}
+
+async fn fetch_and_adopt(cohort: &FeedbackCohort, source: &CohortSource, now_ms: i64) -> bool {
     let client = match reqwest::Client::builder().timeout(FETCH_TIMEOUT).build() {
         Ok(client) => client,
         Err(error) => {
@@ -331,6 +398,7 @@ async fn read_capped(mut response: reqwest::Response) -> Option<Vec<u8>> {
 pub fn spawn_refresh_loop(
     cohort: FeedbackCohort,
     source: CohortSource,
+    mut consent: watch::Receiver<bool>,
     cancel: CancellationToken,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
@@ -339,8 +407,18 @@ pub fn spawn_refresh_loop(
         loop {
             tokio::select! {
                 () = cancel.cancelled() => return,
+                changed = consent.changed() => {
+                    if changed.is_err() {
+                        return;
+                    }
+                    if *consent.borrow() {
+                        fetch_once(&cohort, &source, now_ms(), &mut consent).await;
+                    } else {
+                        cohort.set_enabled(false).await;
+                    }
+                }
                 _ = ticker.tick() => {
-                    fetch_once(&cohort, &source, now_ms()).await;
+                    fetch_once(&cohort, &source, now_ms(), &mut consent).await;
                 }
             }
         }
@@ -362,6 +440,15 @@ mod tests {
             "unknown_future_field": { "anything": true }
         }))
         .unwrap_or_else(|error| panic!("fixture: {error}"))
+    }
+
+    async fn fetch_once_consented(
+        cohort: &FeedbackCohort,
+        source: &CohortSource,
+        now_ms: i64,
+    ) -> bool {
+        let (_sender, mut consent) = watch::channel(true);
+        fetch_once(cohort, source, now_ms, &mut consent).await
     }
 
     #[tokio::test]
@@ -449,8 +536,134 @@ mod tests {
         .await?;
 
         let cohort = FeedbackCohort::new();
-        assert!(fetch_once(&cohort, &CohortSource::Document(url), now).await);
+        assert!(fetch_once_consented(&cohort, &CohortSource::Document(url), now).await);
         assert!(cohort.invitation_url("install-a", now).await.is_some());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn an_in_flight_fetch_cannot_adopt_after_consent_is_revoked() -> anyhow::Result<()> {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let now = now_ms();
+        let body = serde_json::to_string(&serde_json::json!({
+            "generated_at_ms": now,
+            "installs": ["install-a"]
+        }))?;
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+            body.len()
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let url = format!("http://{}/cohort.json", listener.local_addr()?);
+        let (request_sender, mut requests) = tokio::sync::mpsc::unbounded_channel();
+        let (release_sender, release_receiver) = tokio::sync::oneshot::channel();
+        let endpoint = tokio::spawn(async move {
+            let Ok((mut socket, _)) = listener.accept().await else {
+                return;
+            };
+            let _ = request_sender.send(());
+            let mut scratch = [0_u8; 1024];
+            let _ = socket.read(&mut scratch).await;
+            let _ = release_receiver.await;
+            let _ = socket.write_all(response.as_bytes()).await;
+            let _ = socket.shutdown().await;
+        });
+
+        let cohort = FeedbackCohort::new();
+        let (consent_sender, mut consent) = watch::channel(true);
+        let refresh = tokio::spawn({
+            let cohort = cohort.clone();
+            async move { fetch_once(&cohort, &CohortSource::Document(url), now, &mut consent).await }
+        });
+
+        tokio::time::timeout(Duration::from_secs(3), requests.recv())
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("missing in-flight cohort request"))?;
+        cohort.set_enabled(false).await;
+        consent_sender.send(false)?;
+        release_sender
+            .send(())
+            .map_err(|()| anyhow::anyhow!("cohort endpoint exited before release"))?;
+
+        assert!(!tokio::time::timeout(Duration::from_secs(3), refresh).await??);
+        endpoint.await?;
+        assert!(!cohort.is_loaded().await);
+        assert!(cohort.invitation_url("install-a", now_ms()).await.is_none());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn refresh_loop_waits_for_consent_and_clears_cohort_when_consent_is_revoked()
+    -> anyhow::Result<()> {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let now = now_ms();
+        let body = serde_json::to_string(&serde_json::json!({
+            "generated_at_ms": now,
+            "installs": ["install-a"]
+        }))?;
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+            body.len()
+        );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+        let url = format!("http://{}/cohort.json", listener.local_addr()?);
+        let (request_sender, mut requests) = tokio::sync::mpsc::unbounded_channel();
+        let endpoint = tokio::spawn(async move {
+            let Ok((mut socket, _)) = listener.accept().await else {
+                return;
+            };
+            let _ = request_sender.send(());
+            let mut scratch = [0_u8; 1024];
+            let _ = socket.read(&mut scratch).await;
+            let _ = socket.write_all(response.as_bytes()).await;
+            let _ = socket.shutdown().await;
+        });
+
+        let cohort = FeedbackCohort::new();
+        let (consent_sender, consent_receiver) = watch::channel(false);
+        let cancel = CancellationToken::new();
+        let refresh = spawn_refresh_loop(
+            cohort.clone(),
+            CohortSource::Document(url),
+            consent_receiver,
+            cancel.clone(),
+        );
+
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), requests.recv())
+                .await
+                .is_err(),
+            "disabled consent must not make an HTTP request"
+        );
+        assert!(!cohort.is_loaded().await);
+
+        cohort.set_enabled(true).await;
+        consent_sender.send(true)?;
+        tokio::time::timeout(Duration::from_secs(3), requests.recv())
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("missing opted-in cohort request"))?;
+        tokio::time::timeout(Duration::from_secs(3), async {
+            while !cohort.is_loaded().await {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await?;
+        assert!(cohort.invitation_url("install-a", now_ms()).await.is_some());
+
+        consent_sender.send(false)?;
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while cohort.is_loaded().await {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await?;
+        assert!(cohort.invitation_url("install-a", now_ms()).await.is_none());
+
+        cancel.cancel();
+        refresh.await?;
+        endpoint.await?;
         Ok(())
     }
 
@@ -468,7 +681,7 @@ mod tests {
             body.len()
         ))
         .await?;
-        assert!(!fetch_once(&cohort, &CohortSource::Document(url), now).await);
+        assert!(!fetch_once_consented(&cohort, &CohortSource::Document(url), now).await);
         assert!(
             cohort.invitation_url("install-a", now).await.is_some(),
             "a bad fetch must not empty the cohort"
@@ -483,7 +696,7 @@ mod tests {
         )
         .await?;
         let cohort = FeedbackCohort::new();
-        assert!(!fetch_once(&cohort, &CohortSource::Document(url), now_ms()).await);
+        assert!(!fetch_once_consented(&cohort, &CohortSource::Document(url), now_ms()).await);
         assert!(!cohort.is_loaded().await);
         Ok(())
     }
@@ -503,7 +716,7 @@ mod tests {
         ))
         .await?;
         let cohort = FeedbackCohort::new();
-        assert!(!fetch_once(&cohort, &CohortSource::Document(url), now_ms()).await);
+        assert!(!fetch_once_consented(&cohort, &CohortSource::Document(url), now_ms()).await);
         assert!(!cohort.is_loaded().await);
         Ok(())
     }
@@ -522,7 +735,7 @@ mod tests {
         .await?;
 
         let cohort = FeedbackCohort::new();
-        assert!(fetch_once(&cohort, &CohortSource::Document(url), now).await);
+        assert!(fetch_once_consented(&cohort, &CohortSource::Document(url), now).await);
         assert!(cohort.invitation_url("install-a", now).await.is_some());
         Ok(())
     }
@@ -691,7 +904,7 @@ mod tests {
         );
         let server = tokio::spawn(async move { axum::serve(listener, app).await });
         let cohort = FeedbackCohort::new();
-        let adopted = fetch_once(&cohort, &source, now).await;
+        let adopted = fetch_once_consented(&cohort, &source, now).await;
         server.abort();
 
         assert!(
@@ -755,7 +968,7 @@ mod tests {
         .await?;
 
         let cohort = FeedbackCohort::new();
-        assert!(!fetch_once(&cohort, &CohortSource::Document(url), now_ms()).await);
+        assert!(!fetch_once_consented(&cohort, &CohortSource::Document(url), now_ms()).await);
         assert!(!cohort.is_loaded().await);
         Ok(())
     }
@@ -775,7 +988,7 @@ mod tests {
         .await?;
 
         let cohort = FeedbackCohort::new();
-        assert!(fetch_once(&cohort, &CohortSource::Document(url), now).await);
+        assert!(fetch_once_consented(&cohort, &CohortSource::Document(url), now).await);
         assert!(cohort.invitation_url("install-a", now).await.is_some());
         Ok(())
     }

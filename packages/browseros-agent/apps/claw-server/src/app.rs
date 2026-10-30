@@ -49,6 +49,8 @@ pub struct AppState {
     pub skills: Arc<SkillService>,
     pub skill_runs: Arc<SkillRunService>,
     pub analytics: Arc<AnalyticsService>,
+    /// Serializes analytics consent writes with the matching in-memory invitation gate.
+    pub consent_update_lock: Arc<tokio::sync::Mutex<()>>,
     pub error_reporter: Arc<crate::services::error_reporting::ErrorReporter>,
     pub feedback_cohort: Arc<crate::services::feedback_cohort::FeedbackCohort>,
     pub feedback_invites: Arc<crate::db::feedback_invite::FeedbackInviteRepository>,
@@ -119,6 +121,9 @@ impl AppState {
             &config.browserclaw_dir.join("logs"),
         ));
         let feedback_cohort = Arc::new(crate::services::feedback_cohort::FeedbackCohort::new());
+        feedback_cohort
+            .set_enabled(analytics.get_state().await.consent)
+            .await;
         let feedback_invites = Arc::new(crate::db::feedback_invite::FeedbackInviteRepository::new(
             database.clone(),
         ));
@@ -246,6 +251,7 @@ impl AppState {
             skills,
             skill_runs,
             analytics,
+            consent_update_lock: Arc::new(tokio::sync::Mutex::new(())),
             error_reporter,
             feedback_cohort,
             feedback_invites,

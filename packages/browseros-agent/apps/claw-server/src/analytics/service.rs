@@ -13,6 +13,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 use tokio::sync::Mutex;
+use tokio::sync::watch;
 
 #[cfg(test)]
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -92,6 +93,7 @@ pub struct AnalyticsService {
     distinct_id: Option<String>,
     config: AnalyticsConfig,
     state: Mutex<AnalyticsState>,
+    consent: watch::Sender<bool>,
     active: RwLock<Option<ActiveClient>>,
     #[cfg(test)]
     shutdown_calls: AtomicUsize,
@@ -106,6 +108,7 @@ impl AnalyticsService {
         let path = state_path(browserclaw_dir);
         let state = load_or_create_state(&path).await;
         let distinct_id = state.distinct_id.clone();
+        let (consent, _) = watch::channel(state.enabled);
         let active = if state.enabled && config.is_configured() {
             match distinct_id.as_deref() {
                 Some(id) => Some(build_client(&config, id, &state.installation_aliases).await?),
@@ -119,6 +122,7 @@ impl AnalyticsService {
             distinct_id,
             config,
             state: Mutex::new(state),
+            consent,
             active: RwLock::new(active),
             #[cfg(test)]
             shutdown_calls: AtomicUsize::new(0),
@@ -159,6 +163,12 @@ impl AnalyticsService {
         Some((self.config.host.clone(), project_key))
     }
 
+    /// Subscribes to the live persisted consent choice. Long-running background work uses
+    /// this to stop promptly when the user revokes consent after startup.
+    pub fn subscribe_consent(&self) -> watch::Receiver<bool> {
+        self.consent.subscribe()
+    }
+
     pub async fn get_state(&self) -> TelemetryState {
         let state = self.state.lock().await;
         self.telemetry_state(&state)
@@ -176,6 +186,7 @@ impl AnalyticsService {
         if let Err(source) = persist_state(&self.path, &next).await {
             if !consent {
                 *state = next;
+                self.consent.send_replace(false);
             }
             drop(state);
             if let Some(previous) = previous {
@@ -187,6 +198,7 @@ impl AnalyticsService {
             });
         }
         *state = next;
+        self.consent.send_replace(consent);
 
         if !consent || !self.config.is_configured() {
             if let Some(previous) = previous {
@@ -596,9 +608,32 @@ mod tests {
         let service =
             AnalyticsService::new_with_config(directory.path(), test_config(host, true)).await?;
         let original = service.get_state().await;
-        assert!(original.enabled);
+        let consent_updates = service.subscribe_consent();
+        assert!(!*consent_updates.borrow());
+        assert!(!original.enabled);
+        assert!(!original.consent);
+        service.capture(SERVER_STARTED, json!({}));
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), requests.recv())
+                .await
+                .is_err(),
+            "a fresh install must not send telemetry before opt-in"
+        );
+
+        let enabled = service.set_consent(true).await?;
+        assert!(*consent_updates.borrow());
+        assert!(enabled.enabled);
+        assert!(enabled.consent);
+        assert_eq!(enabled.distinct_id, original.distinct_id);
+        service.capture(SERVER_STARTED, json!({}));
+        assert!(
+            tokio::time::timeout(Duration::from_secs(2), requests.recv())
+                .await?
+                .is_some()
+        );
 
         let disabled = service.set_consent(false).await?;
+        assert!(!*consent_updates.borrow());
         assert!(!disabled.enabled);
         assert!(!disabled.consent);
         service.capture(SERVER_STARTED, json!({}));
@@ -608,10 +643,7 @@ mod tests {
                 .is_err()
         );
 
-        let enabled = service.set_consent(true).await?;
-        assert!(enabled.enabled);
-        assert!(enabled.consent);
-        assert_eq!(enabled.distinct_id, original.distinct_id);
+        assert!(service.set_consent(true).await?.enabled);
         service.capture(SERVER_STARTED, json!({}));
         service.shutdown().await;
         assert!(

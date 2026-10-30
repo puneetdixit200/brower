@@ -646,11 +646,27 @@ export class ChatService {
         // failure - including every rate limit and credit exhaustion.
         onError: (error: unknown) => {
           finishAssessmentTurn?.()
+          const errorType =
+            error instanceof Error &&
+            /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(error.constructor.name)
+              ? error.constructor.name
+              : typeof error
+          const statusCode =
+            typeof error === 'object' &&
+            error !== null &&
+            'statusCode' in error &&
+            typeof error.statusCode === 'number' &&
+            Number.isInteger(error.statusCode) &&
+            error.statusCode >= 100 &&
+            error.statusCode <= 599
+              ? error.statusCode
+              : undefined
           logger.error('Agent stream failed', {
             conversationId: request.conversationId,
             provider: agentConfig.provider,
             model: agentConfig.model,
-            message: error instanceof Error ? error.message : String(error),
+            errorType,
+            ...(statusCode !== undefined ? { statusCode } : {}),
           })
           return toChatErrorText(error, { provider: agentConfig.provider })
         },

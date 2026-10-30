@@ -194,6 +194,7 @@ impl AppRuntime {
                 handle: crate::services::feedback_cohort::spawn_refresh_loop(
                     (*state.feedback_cohort).clone(),
                     source,
+                    state.analytics.subscribe_consent(),
                     shutdown.child_token(),
                 ),
             });
