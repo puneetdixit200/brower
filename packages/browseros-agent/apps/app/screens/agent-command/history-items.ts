@@ -11,6 +11,12 @@ export type RecentHistoryRow = {
   url: string
 }
 
+export type RecentHistoryQuery = {
+  text: string
+  startTime: number
+  maxResults: number
+}
+
 const MAX_RECENT_HISTORY = 8
 export const RECENT_HISTORY_QUERY_LIMIT = 256
 
@@ -41,7 +47,13 @@ export function selectRecentHistory(
  * between endTime-based pages. The caller requests at most 256 rows.
  */
 export async function loadRecentHistory(
-  search: () => Promise<RecentHistoryEntry[]>,
+  search: (query: RecentHistoryQuery) => Promise<RecentHistoryEntry[]>,
 ): Promise<RecentHistoryRow[]> {
-  return selectRecentHistory(await search())
+  return selectRecentHistory(
+    await search({
+      text: '',
+      startTime: 0,
+      maxResults: RECENT_HISTORY_QUERY_LIMIT,
+    }),
+  )
 }

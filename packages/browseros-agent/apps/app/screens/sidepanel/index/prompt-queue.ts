@@ -79,6 +79,18 @@ export function isPromptQueueRetryCurrent(
   )
 }
 
+export function schedulePromptQueueRetry(
+  callback: () => void,
+  delayMs: number,
+  timers: {
+    setTimeout: (callback: () => void, delayMs: number) => number
+    clearTimeout: (handle: number) => void
+  } = window,
+): () => void {
+  const handle = timers.setTimeout(callback, delayMs)
+  return () => timers.clearTimeout(handle)
+}
+
 export function clearPromptQueue(generation: number): {
   queue: string[]
   generation: number

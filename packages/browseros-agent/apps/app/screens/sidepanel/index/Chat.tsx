@@ -53,6 +53,7 @@ import {
   removeQueuedPrompt,
   replaceConversationPromptQueue,
   retryConversationPromptQueue,
+  schedulePromptQueueRetry,
 } from './prompt-queue'
 import { ResearchSupportConsent } from './ResearchSupportConsent'
 import { prepareSourceResearch } from './research-request'
@@ -250,7 +251,7 @@ export const Chat = () => {
       // retry when status, sendability, or the queue changes.
       const scheduledPrompt = queuedPrompts[0]
       const scheduledGeneration = queueGeneration.current
-      const retryTimer = window.setTimeout(() => {
+      return schedulePromptQueueRetry(() => {
         if (
           scheduledPrompt &&
           isPromptQueueRetryCurrent(
@@ -273,7 +274,6 @@ export const Chat = () => {
           }
         }
       }, 250)
-      return () => window.clearTimeout(retryTimer)
     }
   }, [status, canSend, queuedPrompts, sendMessage, conversationId])
 

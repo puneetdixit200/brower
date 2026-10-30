@@ -64,15 +64,17 @@ describe('selectRecentHistory', () => {
         url: `https://example.com/${index}`,
       })),
     ]
-    let calls = 0
+    const requests: unknown[] = []
 
-    const rows = await loadRecentHistory(async () => {
-      calls += 1
+    const rows = await loadRecentHistory(async (query) => {
+      requests.push(query)
       return entries
     })
 
     expect(RECENT_HISTORY_QUERY_LIMIT).toBe(256)
-    expect(calls).toBe(1)
+    expect(requests).toEqual([
+      { text: '', startTime: 0, maxResults: RECENT_HISTORY_QUERY_LIMIT },
+    ])
     expect(rows.map(({ id }) => id)).toEqual(
       Array.from({ length: 8 }, (_, index) => `web-${index}`),
     )

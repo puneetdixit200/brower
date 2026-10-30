@@ -1,5 +1,13 @@
 # Aster next steps
 
+### T24.1 / A07 queue retry timer lifecycle — 2026-10-30
+
+Refused-prompt retries now use an extracted timer helper whose returned cleanup is used by the Chat effect. Tests verify the 250 ms retry scheduling, callback execution, and timer cleanup; the focused queue suite passes 12/12 (46 assertions), with app typecheck, targeted Biome, and diff check passing. Independent review found no concrete behavior issue. This remains helper coverage; next validate the effect in headed Aster with retry, stop, clear, and conversation switch. True mid-run steering and mounted UI/stream acceptance remain open. Keep A07 PARTIAL.
+
+### T10.2 / B06 recent-history query boundary — 2026-10-30
+
+The history loader now constructs the exact bounded Chromium query and its focused test verifies one call with `text: ''`, `startTime: 0`, and `maxResults: 256`, along with valid-row ordering. Focused tests pass 4/4 (6 assertions); app typecheck, targeted Biome, and diff check pass. Next validate the history UI and native import/export in headed Aster; keep B06 PARTIAL.
+
 ### T05.4 / A09 permission-rule draft safety — 2026-10-30
 
 The settings page now preserves unsaved per-field edits across quiet refreshes, refreshes untouched fields from server state, and prevents older refreshes from undoing save/reset results. Tests pass 12/12 (27 assertions); app typecheck, targeted Biome, and diff check pass. Independent Luna review findings were addressed and the final re-review found no concrete remaining issue. Keep A09 PARTIAL. Next verify headed settings behavior and persistence across a complete app/server restart, then test real built-in ACP mediated requests in a packaged Aster runtime when T20a is available. Continue the remaining MUST items in dependency order; do not infer overall implementation percentage from the feature acceptance count.

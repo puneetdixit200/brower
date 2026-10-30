@@ -1,5 +1,13 @@
 # Progress
 
+### T24.1 / A07 retry timer lifecycle follow-up — 2026-10-30
+
+Extracted the refused-prompt retry timer setup into a small helper used by the React effect, preserving the 250 ms delay and returning the timer cleanup for effect invalidation. New tests verify scheduling, callback execution, and clearing the timer handle. Focused queue tests pass 12/12 (46 assertions), with app typecheck, targeted Biome, and `git diff --check` passing. Independent Luna review found no behavior regression and recommended asserting timer capture; that assertion is now included. This remains helper-level coverage without a mounted React test or headed Aster UI/stream acceptance. A07 remains PARTIAL.
+
+### T10.2 / B06 recent-history query boundary — 2026-10-30
+
+Moved construction of the bounded Chromium history query into `loadRecentHistory` and added a spy assertion for its exact single request (`text: ''`, `startTime: 0`, `maxResults: 256`), while retaining the fixture that filters 248 non-web entries and returns the first eight HTTP(S) rows in order. The focused suite passes 4/4 (6 assertions); app typecheck, targeted Biome, and `git diff --check` pass. This verifies the data-request boundary without mounting the React view; headed UI and native import/export acceptance remain open. B06 remains PARTIAL.
+
 ### P01 generated page-content password-field regression — 2026-10-30
 
 Added a browser-core regression test that evaluates the generated content-Markdown expression against a fixture containing an `INPUT` password-value sentinel, a `TEXTAREA` child-text sentinel, and ordinary visible page text. The textarea sentinel makes the form-control skip observable: its text node would otherwise be serialized. Full browser-core suite passes 54/54 (150 assertions), browser-core typecheck passes, and the browser-MCP password-redaction test passes 1/1 (7 assertions); both package typechecks pass. The existing Biome configuration cannot be loaded by the installed version (`useSortedClasses` is rejected). This is generated-expression fixture evidence, not Chromium autofill or native Aster acceptance; P01/B08 remain PARTIAL pending disposable headed-profile sentinel verification and packaged/runtime coverage.

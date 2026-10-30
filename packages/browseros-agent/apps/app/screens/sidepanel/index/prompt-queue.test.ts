@@ -11,6 +11,7 @@ import {
   removeQueuedPrompt,
   replaceConversationPromptQueue,
   retryConversationPromptQueue,
+  schedulePromptQueueRetry,
 } from './prompt-queue'
 
 describe('per-chat prompt queue', () => {
@@ -135,6 +136,56 @@ describe('per-chat prompt queue', () => {
 
   it('Clear invalidates a scheduled refusal retry before it can dispatch', () => {
     verifyInvalidatedRetry()
+  })
+
+  it('runs a refused-prompt retry after the scheduled delay', () => {
+    const queue = enqueuePrompt([], 'retry me')
+    let queues = replaceConversationPromptQueue({}, 'conversation-a', queue)
+    const initialQueues = queues
+    let retries = 0
+    let scheduledDelay: number | undefined
+    let timerCallback: (() => void) | undefined
+    const timers = {
+      setTimeout: (callback: () => void, delayMs: number) => {
+        timerCallback = callback
+        scheduledDelay = delayMs
+        return 1
+      },
+      clearTimeout: () => {},
+    }
+
+    schedulePromptQueueRetry(
+      () => {
+        queues = retryConversationPromptQueue(queues, 'conversation-a')
+        retries += 1
+      },
+      250,
+      timers,
+    )
+
+    expect(retries).toBe(0)
+    expect(scheduledDelay).toBe(250)
+    expect(timerCallback).toBeDefined()
+    timerCallback?.()
+    expect(retries).toBe(1)
+    expect(promptQueueForConversation(queues, 'conversation-a')).toEqual([
+      'retry me',
+    ])
+    expect(queues).not.toBe(initialQueues)
+  })
+
+  it('cleans up the refusal retry timer when the effect is invalidated', () => {
+    let cancelledHandle: number | undefined
+    const retry = () => {}
+    const cleanup = schedulePromptQueueRetry(retry, 250, {
+      setTimeout: () => 42,
+      clearTimeout: (handle) => {
+        cancelledHandle = handle
+      },
+    })
+
+    cleanup()
+    expect(cancelledHandle).toBe(42)
   })
 
   it('caps the queue at five prompts and ignores blank prompts', () => {
