@@ -21,7 +21,9 @@ export function normalizeAsterDisplaySettings(
   const candidate = value as Record<string, unknown>
   return {
     scale:
-      candidate.scale === 90 || candidate.scale === 100 || candidate.scale === 110
+      candidate.scale === 90 ||
+      candidate.scale === 100 ||
+      candidate.scale === 110
         ? candidate.scale
         : 100,
     reducedMotion: candidate.reducedMotion === true,
@@ -59,19 +61,26 @@ export async function saveAsterDisplaySettings(
  */
 export function installAsterDisplaySettings(): () => void {
   let current = true
+  let changeVersion = 0
   const apply = (settings: AsterDisplaySettings) => {
     if (current) applyAsterDisplaySettings(settings)
   }
-  void readAsterDisplaySettings().then(apply)
   const onChange = (
     changes: Record<string, chrome.storage.StorageChange>,
     areaName: string,
   ) => {
     if (areaName !== 'local') return
     const entry = changes[ASTER_DISPLAY_SETTINGS_KEY]
-    if (entry) apply(normalizeAsterDisplaySettings(entry.newValue))
+    if (entry) {
+      changeVersion += 1
+      apply(normalizeAsterDisplaySettings(entry.newValue))
+    }
   }
   chrome.storage.onChanged.addListener(onChange)
+  const initialChangeVersion = changeVersion
+  void readAsterDisplaySettings().then((settings) => {
+    if (changeVersion === initialChangeVersion) apply(settings)
+  })
   return () => {
     current = false
     chrome.storage.onChanged.removeListener(onChange)
