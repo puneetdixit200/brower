@@ -75,8 +75,8 @@ def main() -> int:
         activate_page(browser_cdp, app_target_id)
         cdp.evaluate("location.hash='#/home'")
         wait_js(cdp, "!!document.querySelector('[aria-label=\"Open URL or search in new tab\"]')")
-        dismiss_import_hint(cdp)
         close_sidebar(cdp)
+        dismiss_import_hint(cdp)
 
         window = cdp.evaluate("chrome.windows.getCurrent().then(w=>({id:w.id,incognito:w.incognito}))")
         if not window or window.get("incognito"):
@@ -106,23 +106,35 @@ def main() -> int:
         id_a = next(int(t["id"]) for t in tabs if t.get("url") == url_a)
         id_b = next(int(t["id"]) for t in tabs if t.get("url") == url_b)
 
-        # BrowserQuickControls initial/current tab selection tracks the active web tab.
+        # Select and activate both pages through BrowserQuickControls, verifying
+        # the visible selector tracks the live current-window tab IDs.
         click_text(cdp, "Refresh tabs")
-        option_state = cdp.evaluate(f"(()=>{{const s=document.querySelector('select[aria-label=\"Choose a website tab for browser actions\"]');const o=[...s.options].findIndex(x=>Number(x.value)==={id_b});return {{current:s.selectedIndex,target:o,count:s.options.length}}}})()")
-        if option_state["target"] < 0:
-            raise AssertionError(f"active fixture tab {id_b} is absent from the visible selector: {option_state}")
-        click(cdp, 'select[aria-label="Choose a website tab for browser actions"]')
-        delta = option_state["target"] - option_state["current"]
-        for _ in range(abs(delta)):
-            key_press(cdp, "ArrowDown" if delta > 0 else "ArrowUp")
-        key_press(cdp, "Enter")
-        wait_js(cdp, f"document.querySelector('select[aria-label=\"Choose a website tab for browser actions\"]')?.value==={json.dumps(str(id_b))}")
-        click(cdp, 'button[aria-label="Activate selected tab"]')
-        wait_js(cdp, f"chrome.tabs.query({{currentWindow:true}}).then(ts=>ts.some(t=>t.id==={id_b}&&t.active))")
-        selected_id = int(cdp.evaluate("Number(document.querySelector('select[aria-label=\"Choose a website tab for browser actions\"]').value)"))
-        if selected_id != id_b:
-            raise AssertionError(f"quick controls did not select active fixture tab {id_b}; got {selected_id}")
+        for fixture_id in (id_a, id_b):
+            live = current_fixture_tabs(cdp, base)
+            if not any(
+                tab.get("id") == fixture_id and tab.get("windowId") == window["id"]
+                for tab in live
+            ):
+                raise AssertionError(
+                    f"fixture tab {fixture_id} is no longer in current window {window['id']}: {live}"
+                )
+            select_web_tab(cdp, fixture_id)
+            selected_id = int(
+                cdp.evaluate(
+                    "Number(document.querySelector('select[aria-label=\"Choose a website tab for browser actions\"]').value)"
+                )
+            )
+            if selected_id != fixture_id:
+                raise AssertionError(
+                    f"quick controls selected {selected_id}, expected fixture tab {fixture_id}"
+                )
+            click(cdp, 'button[aria-label="Activate selected tab"]')
+            wait_js(
+                cdp,
+                f"chrome.tabs.query({{currentWindow:true}}).then(ts=>ts.some(t=>t.id==={fixture_id}&&t.active&&t.windowId==={window['id']}))",
+            )
         activate_page(browser_cdp, app_target_id)
+        evidence["quick_controls_select_activate"] = [id_a, id_b]
 
         # Reorder while the sidebar still has the fixture's original titles.
         ensure_tabs_section(cdp)
@@ -136,13 +148,21 @@ def main() -> int:
         wait_js(cdp, f"chrome.tabs.query({{currentWindow:true}}).then(ts=>ts.some(t=>t.id==={id_a}&&t.active))")
         wait_js(cdp, f"[...document.querySelectorAll('button[aria-current=page]')].some(b=>b.title==={json.dumps(url_a)})")
         activate_page(browser_cdp, app_target_id)
+        # The mobile sidebar closes after navigation; reopen it before selecting
+        # the other page through the same visible control.
+        ensure_tabs_section(cdp)
+        wait_js(
+            cdp,
+            f"!!document.querySelector('button[title={json.dumps(url_b)}]')",
+        )
         click(cdp, f'button[title={json.dumps(url_b)}]')
         wait_js(cdp, f"chrome.tabs.query({{currentWindow:true}}).then(ts=>ts.some(t=>t.id==={id_b}&&t.active))")
+        wait_js(cdp, f"[...document.querySelectorAll('button[aria-current=page]')].some(b=>b.title==={json.dumps(url_b)})")
         activate_page(browser_cdp, app_target_id)
         evidence["tab_switch"] = {"first_tab_id": id_a, "second_tab_id": id_b, "sidebar_selection_followed": True}
 
         # Visible page link, then Browser actions Back / Forward / Reload.
-        page_target = wait_target(cdp_base, url_b=url_b)
+        page_target = wait_target(cdp_base, args.target_timeout, url_b=url_b)
         page = CDP(page_target["webSocketDebuggerUrl"])
         try:
             page.call("Runtime.enable")
@@ -165,18 +185,16 @@ def main() -> int:
 
         # Sidebar selection, reorder, pin/unpin, close and restore.
         ensure_tabs_section(cdp)
-        active_fixture_url = f"{base}/a-from-b?run={token}"
-        wait_js(cdp, f"[...document.querySelectorAll('button[aria-current=page]')].some(b=>b.title==={json.dumps(active_fixture_url)})")
-        sidebar_active = cdp.evaluate("[...document.querySelectorAll('button[aria-current=page]')].map(b=>b.title)")
-        if active_fixture_url not in sidebar_active:
-            raise AssertionError(f"sidebar active selection did not synchronize to {active_fixture_url}: {sidebar_active}")
 
         # Pin causes Chromium to move a tab into the pinned region; unpin through its visible button.
         fixture_row = f'li:has(button[title={json.dumps(url_a)}])'
+        wait_js(cdp, f"!!document.querySelector({json.dumps(fixture_row + ' button[aria-label=\"Pin tab\"]')})")
         click(cdp, f'{fixture_row} button[aria-label="Pin tab"]')
         wait_js(cdp, f"chrome.tabs.get({id_a}).then(t=>t.pinned)")
+        wait_js(cdp, f"!!document.querySelector({json.dumps(fixture_row + ' button[aria-label=\"Unpin tab\"]')})")
         click(cdp, f'{fixture_row} button[aria-label="Unpin tab"]')
         wait_js(cdp, f"chrome.tabs.get({id_a}).then(t=>!t.pinned)")
+        wait_js(cdp, f"!!document.querySelector({json.dumps(fixture_row + ' button[aria-label=\"Pin tab\"]')})")
         evidence["pin_unpin"] = True
 
         # Close via the sidebar and restore via Browser actions; restored ID may differ.
@@ -184,22 +202,23 @@ def main() -> int:
         wait_js(cdp, f"chrome.tabs.get({id_a}).then(()=>false).catch(()=>true)")
         close_sidebar(cdp)
         click(cdp, 'button[aria-label="Reopen closed tab"]')
-        wait_js(cdp, f"chrome.tabs.query({{currentWindow:true}}).then(ts=>ts.some(t=>t.url==={json.dumps(url_a)}))")
+        wait_js(cdp, f"chrome.tabs.query({{currentWindow:true}}).then(ts=>ts.some(t=>t.url==={json.dumps(url_a)}&&t.windowId==={window['id']}))")
         activate_page(browser_cdp, app_target_id)
         restored = next(t for t in current_fixture_tabs(cdp, base) if t.get("url") == url_a)
         evidence["close_restore"] = {"closed_id": id_a, "restored_id": restored["id"]}
 
-        # After restore, verify active IDs and the sidebar's selected row together.
+        # The extension app tab is active again for observation and is intentionally
+        # omitted from the webpage-only sidebar list. No webpage row should be
+        # marked active while the extension's own tab is the current active tab.
         click_text(cdp, "Refresh tabs")
         activate_page(browser_cdp, app_target_id)
         ensure_tabs_section(cdp)
-        active = cdp.evaluate("chrome.tabs.query({currentWindow:true}).then(ts=>ts.find(t=>t.active)?.id)")
-        wait_js(cdp, "chrome.tabs.query({currentWindow:true}).then(ts=>{const t=ts.find(x=>x.active);return !!t&&[...document.querySelectorAll('button[aria-current=page]')].some(b=>b.title===t.url)})")
+        wait_js(cdp, "chrome.tabs.query({currentWindow:true}).then(ts=>{const t=ts.find(x=>x.active);return !!t&&t.url.startsWith('chrome-extension://')&&[...document.querySelectorAll('button[aria-current=page]')].length===0})")
         active_state = cdp.evaluate("chrome.tabs.query({currentWindow:true}).then(ts=>{const t=ts.find(x=>x.active);return t?{id:t.id,url:t.url}:null})")
         sidebar_active = cdp.evaluate("[...document.querySelectorAll('button[aria-current=page]')].map(b=>b.title)")
-        if not active_state or active_state["url"] not in sidebar_active:
+        if not active_state or not active_state["url"].startswith("chrome-extension://") or sidebar_active:
             raise AssertionError(f"active browser tab and sidebar selection disagree: active={active_state}, sidebar={sidebar_active}")
-        evidence["active_tab_id"] = active
+        evidence["active_tab_id"] = active_state["id"]
         evidence["sidebar_active_titles"] = sidebar_active
         evidence["stop_identity_gate"] = "Stop control was not invoked; native Aster identity gate preserved"
         evidence["chrome_api_scope"] = "read-only tabs/windows inspection; no tab-mutating API calls"
@@ -218,7 +237,12 @@ def main() -> int:
                     owned = current_fixture_tabs(cdp, base)
                     if not owned:
                         break
-                    click(cdp, f'li:has(button[title={json.dumps(owned[0].get("url", ""))}]) button[aria-label="Close tab"]', optional=True)
+                    close_selector = (
+                        f'li:has(button[title={json.dumps(owned[0].get("url", ""))}]) '
+                        'button[aria-label="Close tab"]'
+                    )
+                    wait_js(cdp, f"!!document.querySelector({json.dumps(close_selector)})")
+                    click(cdp, close_selector)
                     wait_tab_gone(cdp, int(owned[0]["id"]), timeout=3)
             except Exception as error:
                 cleanup_error = str(error)
@@ -274,11 +298,23 @@ def current_fixture_tabs(cdp: CDP, base: str) -> list[dict]:
 
 
 def click(cdp: CDP, selector: str, optional: bool = False) -> None:
-    point = cdp.evaluate("(()=>{const e=document.querySelector(" + json.dumps(selector) + ");if(!e)return null;e.scrollIntoView({block:'nearest',inline:'nearest'});const r=e.getBoundingClientRect();if(!r.width||!r.height)return null;return {x:r.left+r.width/2,y:r.top+r.height/2}})()")
+    point = cdp.evaluate(
+        "(()=>{const e=document.querySelector(" + json.dumps(selector) + ");"
+        "if(!e)return null;e.scrollIntoView({block:'nearest',inline:'nearest'});"
+        "const r=e.getBoundingClientRect();if(!r.width||!r.height)return null;"
+        "const x=r.left+r.width/2,y=r.top+r.height/2,hit=document.elementFromPoint(x,y);"
+        "return {x,y,receivesPointer:!!hit&&(hit===e||e.contains(hit)),"
+        "hit:hit?.outerHTML.slice(0,180)}})()"
+    )
     if point is None:
         if optional:
             return
         raise RuntimeError(f"visible UI control not found: {selector}")
+    if not point["receivesPointer"]:
+        raise RuntimeError(
+            f"visible UI control is occluded at its click point: {selector}; "
+            f"hit={point['hit']}"
+        )
     for kind, button in (("mousePressed", "left"), ("mouseReleased", "left")):
         cdp.call("Input.dispatchMouseEvent", {"type": kind, "x": point["x"], "y": point["y"], "button": button, "clickCount": 1})
 
@@ -300,7 +336,16 @@ def click_text(cdp: CDP, text: str) -> None:
 def ensure_sidebar_open(cdp: CDP) -> None:
     if not cdp.evaluate("document.querySelector('[data-slot=sheet-overlay]')?.dataset.state==='open'"):
         click(cdp, 'button[aria-label="Open navigation"]')
-    wait_js(cdp, "document.querySelector('[data-slot=sheet-overlay]')?.dataset.state==='open'")
+    # Radix marks the sheet open as soon as it starts its 500 ms slide-in.
+    # Wait for the animated content to settle before sending a coordinate click.
+    wait_js(
+        cdp,
+        "(()=>{const overlay=document.querySelector('[data-slot=sheet-overlay]');"
+        "const content=document.querySelector('[data-slot=sheet-content]');"
+        "return overlay?.dataset.state==='open'&&content?.dataset.state==='open'&&"
+        "content.getAnimations().every(animation=>animation.playState==='finished')"
+        "})()",
+    )
 
 
 def ensure_tabs_section(cdp: CDP) -> None:

@@ -35,18 +35,22 @@ def main() -> int:
     base = f"http://127.0.0.1:{args.cdp_port}"
     with urllib.request.urlopen(f"{base}/json/list", timeout=5) as response:
         targets = json.load(response)
+    extension_pages = [
+        item
+        for item in targets
+        if item.get("type") == "page"
+        and item.get("url", "").startswith(f"chrome-extension://{ASTER_ID}/")
+        and item.get("webSocketDebuggerUrl")
+    ]
     target = next(
-        (
-            item
-            for item in targets
-            if item.get("type") == "page"
-            and item.get("url", "").startswith(f"chrome-extension://{ASTER_ID}/")
-            and "#/settings/customization" in item.get("url", "")
+        (item for item in extension_pages if "#/settings/customization" in item.get("url", "")),
+        next(
+            (item for item in extension_pages if "/app.html" in item.get("url", "")),
+            extension_pages[0] if extension_pages else None,
         ),
-        None,
     )
     if not target:
-        raise RuntimeError("Open Aster Settings > Customization in the disposable profile")
+        raise RuntimeError("No open Aster app page found in the caller-owned disposable profile")
 
     class OrdinaryPageHandler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
@@ -77,6 +81,7 @@ def main() -> int:
             "typeof chrome!=='undefined' && chrome.runtime?.id==="
             + json.dumps(ASTER_ID),
         )
+        ensure_customization_route(cdp)
         wait_for(cdp, "document.querySelector('button[aria-label=\"Aster theme\"]')")
         wait_for(cdp, "document.querySelector('button[aria-label=\"Aster interface scale\"]')")
         wait_for(cdp, "document.querySelector('#aster-reduced-motion')")
@@ -174,8 +179,61 @@ def emulate_scheme(cdp: CDP, scheme: str) -> None:
     )
 
 
+def ensure_customization_route(cdp: CDP) -> None:
+    """Reach display controls through the app's visible settings navigation."""
+    theme_trigger = "document.querySelector('button[aria-label=\"Aster theme\"]')"
+    if cdp.evaluate(f"!!({theme_trigger})"):
+        return
+
+    settings_link = (
+        "[...document.querySelectorAll('a')].find(link=>"
+        "link.innerText.trim()==='Settings' && link.getClientRects().length)"
+    )
+    if cdp.evaluate(f"!!({settings_link})"):
+        click_element(cdp, settings_link)
+        wait_for(cdp, "location.hash.includes('/settings/')")
+
+    customization_link = (
+        "[...document.querySelectorAll('a')].find(link=>"
+        "link.innerText.trim()==='Customize Aster' && link.getClientRects().length)"
+    )
+    if not cdp.evaluate(f"!!({customization_link})"):
+        # The settings layout moves its navigation into a mobile sheet at the
+        # headed runner's narrow viewport. Open it through the visible menu.
+        settings_menu = "document.querySelector('header button:has(svg.lucide-menu)')"
+        if cdp.evaluate(f"!!({settings_menu})"):
+            wait_for(
+                cdp,
+                "(()=>{const e="
+                + settings_menu
+                + ";if(!e)return false;e.scrollIntoView({block:'center',inline:'center'});"
+                "const r=e.getBoundingClientRect(),hit=document.elementFromPoint("
+                "r.x+r.width/2,r.y+r.height/2);return !!hit&&(hit===e||e.contains(hit))})()",
+            )
+            click_element(cdp, settings_menu)
+            wait_for(
+                cdp,
+                "(()=>{const overlay=document.querySelector('[data-slot=sheet-overlay]');"
+                "const content=document.querySelector('[data-slot=sheet-content]');"
+                "return overlay?.dataset.state==='open'&&content?.dataset.state==='open'&&"
+                "content.getAnimations().every(animation=>animation.playState==='finished')})()",
+            )
+    wait_for(cdp, f"!!({customization_link})")
+    click_element(cdp, customization_link)
+    wait_for(cdp, "location.hash.endsWith('/settings/customization')")
+    wait_for(cdp, f"!!({theme_trigger})")
+    wait_for(
+        cdp,
+        "(()=>{const overlay=document.querySelector('[data-slot=sheet-overlay]');"
+        "return !overlay||(overlay.dataset.state==='closed'&&"
+        "getComputedStyle(overlay).pointerEvents==='none')})()",
+    )
+
+
 def select_theme(cdp: CDP, label: str) -> None:
-    click_element(cdp, "document.querySelector('button[aria-label=\"Aster theme\"]')")
+    trigger = "document.querySelector('button[aria-label=\"Aster theme\"]')"
+    if not cdp.evaluate(f"{trigger}?.getAttribute('aria-expanded')==='true'"):
+        click_element(cdp, trigger)
     wait_for_option(cdp, label)
     click_element(
         cdp,
@@ -194,7 +252,8 @@ def select_theme(cdp: CDP, label: str) -> None:
 def select_scale(cdp: CDP, label: str) -> None:
     trigger = "document.querySelector('button[aria-label=\"Aster interface scale\"]')"
     wait_for(cdp, f"{trigger} && !{trigger}.disabled")
-    click_element(cdp, trigger)
+    if cdp.evaluate(f"{trigger}.getAttribute('aria-expanded')!=='true'"):
+        click_element(cdp, trigger)
     wait_for_option(cdp, label)
     click_element(
         cdp,
@@ -207,6 +266,7 @@ def select_scale(cdp: CDP, label: str) -> None:
         "document.querySelector('button[aria-label=\"Aster interface scale\"]')?.innerText.trim()==="
         + json.dumps(label),
     )
+    wait_for(cdp, "!document.querySelector('[data-slot=select-content]')")
 
 
 def toggle_reduced_motion(cdp: CDP, enabled: bool) -> None:
@@ -226,23 +286,45 @@ def toggle_reduced_motion(cdp: CDP, enabled: bool) -> None:
 
 
 def keyboard_select_theme(cdp: CDP, label: str) -> None:
-    click_element(cdp, "document.querySelector('button[aria-label=\"Aster theme\"]')")
+    trigger = "document.querySelector('button[aria-label=\"Aster theme\"]')"
+    if cdp.evaluate(f"{trigger}?.getAttribute('aria-expanded')!=='true'"):
+        click_element(cdp, trigger)
     wait_for_option(cdp, label)
-    for key, virtual_key in (("ArrowDown", 40), ("Enter", 13)):
-        for event_type in ("keyDown", "keyUp"):
-            cdp.call(
-                "Input.dispatchKeyEvent",
-                {
-                    "type": event_type,
-                    "key": key,
-                    "code": key,
-                    "windowsVirtualKeyCode": virtual_key,
-                },
-            )
+    for event_type in ("keyDown", "keyUp"):
+        cdp.call(
+            "Input.dispatchKeyEvent",
+            {
+                "type": event_type,
+                "key": "ArrowDown",
+                "code": "ArrowDown",
+                "windowsVirtualKeyCode": 40,
+            },
+        )
+    wait_for(
+        cdp,
+        "[...document.querySelectorAll('[role=option]')].some(item=>"
+        "item.innerText.trim()==="
+        + json.dumps(label)
+        + " && item.hasAttribute('data-highlighted'))",
+    )
+    for event_type in ("keyDown", "keyUp"):
+        cdp.call(
+            "Input.dispatchKeyEvent",
+            {
+                "type": event_type,
+                "key": "Enter",
+                "code": "Enter",
+                "windowsVirtualKeyCode": 13,
+            },
+        )
     wait_for(
         cdp,
         "document.querySelector('button[aria-label=\"Aster theme\"]')?.innerText.trim()==="
         + json.dumps(label),
+    )
+    wait_for(
+        cdp,
+        "document.activeElement===document.querySelector('button[aria-label=\"Aster theme\"]')",
     )
     focused = cdp.evaluate("document.activeElement?.getAttribute('aria-label')")
     if focused != "Aster theme":
@@ -305,11 +387,22 @@ def click_element(cdp: CDP, element_expression: str) -> None:
     bounds = cdp.evaluate(
         "(() => { const element="
         + element_expression
-        + "; if(!element) return null; const rect=element.getBoundingClientRect();"
-        "return {x:rect.x+rect.width/2,y:rect.y+rect.height/2}; })()"
+        + "; if(!element) return null; element.scrollIntoView({block:'center',inline:'center'});"
+        "const rect=element.getBoundingClientRect();"
+        "const style=getComputedStyle(element);"
+        "if(!rect.width||!rect.height||style.display==='none'||style.visibility==='hidden'||"
+        "style.pointerEvents==='none'||element.disabled)return null;"
+        "const x=rect.x+rect.width/2,y=rect.y+rect.height/2,hit=document.elementFromPoint(x,y);"
+        "return {x,y,receivesPointer:!!hit&&(hit===element||element.contains(hit)),"
+        "hit:hit?.outerHTML.slice(0,180)??null}; })()"
     )
     if not bounds:
-        raise RuntimeError(f"Could not find visible theme control: {element_expression}")
+        raise RuntimeError(f"Could not find visible UI control: {element_expression}")
+    if not bounds["receivesPointer"]:
+        raise RuntimeError(
+            "Visible UI control is occluded at its click point: "
+            f"{element_expression}; hit={bounds['hit']}"
+        )
     for event_type, buttons in (("mousePressed", 1), ("mouseReleased", 0)):
         cdp.call(
             "Input.dispatchMouseEvent",
