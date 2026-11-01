@@ -300,12 +300,13 @@ export function addToolEnvelopeBoundary(
       contextSchema: AgentToolRunContextSchema,
       execute: async (input, options) => {
         const context = AgentToolRunContextSchema.parse(options.context)
-        const callId = crypto.randomUUID()
         const call = AgentToolCallEnvelopeSchema.parse({
           version: 1,
           taskId: context.taskId,
-          // Provider call IDs are deliberately not copied into this envelope.
-          toolCallId: callId,
+          // Keep the provider/SDK call identity through authorization, execution,
+          // and the corresponding result. Refuse malformed IDs before running
+          // a tool so a result can never be detached from the call that caused it.
+          toolCallId: options.toolCallId,
           toolName,
           input,
         })

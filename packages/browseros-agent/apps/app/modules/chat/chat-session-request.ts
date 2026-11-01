@@ -81,8 +81,11 @@ export function buildRequestBrowserContext({
   const omitTabMetadata =
     action?.type === 'browseros' &&
     action.contextPrivacy === 'human-login-continuation'
+  const hasExplicitAttachments = Boolean(action?.tabs?.length)
 
-  if (activeTab) {
+  // Explicitly attached pages are the user's chosen context. The sidepanel
+  // owner is not an implicit extra page when the user attached another tab.
+  if (activeTab && !hasExplicitAttachments) {
     browserContext.windowId = activeTab.windowId
     browserContext.activeTab = {
       id: activeTab.id,
@@ -95,6 +98,7 @@ export function buildRequestBrowserContext({
   if (action?.tabs?.length) {
     browserContext.selectedTabs = action.tabs.map((tab) => ({
       id: tab.id,
+      windowId: tab.windowId,
       ...(omitTabMetadata ? {} : { url: tab.url, title: tab.title }),
     }))
   }
@@ -107,6 +111,69 @@ export function buildRequestBrowserContext({
     browserContext.customMcpServers = customMcpServers
   }
   return Object.keys(browserContext).length ? browserContext : undefined
+}
+
+/**
+ * Verify that every page explicitly attached to a turn is still the same tab
+ * in the same window at the same URL. The action remains the submitted
+ * snapshot; this is a last-moment guard against silently using changed
+ * context, not a refresh from the active tab.
+ */
+export async function assertActionTabsUnchanged(
+  action: ChatAction | undefined,
+  getTab: (tabId: number) => Promise<chrome.tabs.Tab> = (tabId) =>
+    chrome.tabs.get(tabId),
+): Promise<void> {
+  for (const attached of action?.tabs ?? []) {
+    await assertTabSnapshotUnchanged(attached, getTab, 'attached')
+  }
+}
+
+export async function assertOwnerTabUnchanged(
+  ownerTab: chrome.tabs.Tab | undefined,
+  getTab: (tabId: number) => Promise<chrome.tabs.Tab> = (tabId) =>
+    chrome.tabs.get(tabId),
+): Promise<void> {
+  if (ownerTab) await assertTabSnapshotUnchanged(ownerTab, getTab, 'owner')
+}
+
+async function assertTabSnapshotUnchanged(
+  snapshot: chrome.tabs.Tab,
+  getTab: (tabId: number) => Promise<chrome.tabs.Tab>,
+  pageKind: 'attached' | 'owner',
+): Promise<void> {
+  const guidance =
+    pageKind === 'attached'
+      ? 'Remove it and attach it again.'
+      : 'Reopen the sidepanel from the current page and retry.'
+  const label =
+    pageKind === 'attached' ? 'An attached page' : 'The sidepanel page'
+  const tabId = snapshot.id
+  if (tabId === undefined) {
+    throw new Error(`${label} has no tab identity. ${guidance}`)
+  }
+
+  let current: chrome.tabs.Tab
+  try {
+    current = await getTab(tabId)
+  } catch {
+    throw new Error(
+      `${label} was closed or is no longer accessible. ${guidance}`,
+    )
+  }
+
+  if (
+    snapshot.windowId === undefined ||
+    current.windowId !== snapshot.windowId
+  ) {
+    throw new Error(`${label} moved to another window. ${guidance}`)
+  }
+
+  if (!snapshot.url || !current.url || current.url !== snapshot.url) {
+    throw new Error(
+      `${label} changed its address after context selection. ${guidance}`,
+    )
+  }
 }
 
 /** Resolve selected text only from the tab that owns the contextual panel. */
@@ -186,13 +253,18 @@ export interface PrepareSidepanelSendMessagesRequestInput
     'agentServerUrl'
   > {
   resolveAgentServerUrl: () => Promise<string>
+  validateBrowserContext?: () => Promise<void>
 }
 
 export async function prepareSidepanelSendMessagesRequest({
   resolveAgentServerUrl,
+  validateBrowserContext,
   ...input
 }: PrepareSidepanelSendMessagesRequestInput) {
   const agentServerUrl = await resolveAgentServerUrl()
+  // Server URL discovery can await storage. Revalidate after it so a tab
+  // navigation during setup is rejected before the request is prepared.
+  await validateBrowserContext?.()
   return buildSidepanelPreparedSendMessagesRequest({
     agentServerUrl,
     ...input,

@@ -14,11 +14,13 @@ import { z } from 'zod'
  */
 export const TabSchema: z.ZodObject<{
   id: z.ZodNumber
+  windowId: z.ZodOptional<z.ZodNumber>
   url: z.ZodOptional<z.ZodString>
   title: z.ZodOptional<z.ZodString>
   pageId: z.ZodOptional<z.ZodNumber>
 }> = z.object({
   id: z.number(),
+  windowId: z.number().optional(),
   url: z.string().optional(),
   title: z.string().optional(),
   pageId: z.number().optional(),

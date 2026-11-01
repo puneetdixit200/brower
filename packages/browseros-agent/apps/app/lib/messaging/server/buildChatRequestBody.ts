@@ -28,6 +28,7 @@ export interface ChatRequestBrowserContext {
   }
   selectedTabs?: {
     id?: number
+    windowId?: number
     url?: string
     title?: string
   }[]

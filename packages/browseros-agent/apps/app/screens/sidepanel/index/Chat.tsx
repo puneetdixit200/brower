@@ -27,6 +27,7 @@ import type { ChatMode } from '@/modules/chat/chat-types'
 import { resumeHumanIntervention } from '@/modules/chat/human-intervention-client'
 import {
   buildChatSendParams,
+  toggleAttachedTabSelection,
   toSidepanelFileParts,
 } from '@/modules/chat-actions/chat-send-params'
 import { useJtbdPopup } from '@/modules/jtbd-popup/jtbd-popup.hooks'
@@ -350,16 +351,13 @@ export const Chat = () => {
   }
 
   const toggleTabSelection = (tab: chrome.tabs.Tab) => {
-    setAttachedTabs((prev) => {
-      const isSelected = prev.some((t) => t.id === tab.id)
-      track(SIDEPANEL_TAB_TOGGLED_EVENT, {
-        action: isSelected ? 'removed' : 'added',
-      })
-      if (isSelected) {
-        return prev.filter((t) => t.id !== tab.id)
-      }
-      return [...prev, tab]
+    const isSelected = attachedTabs.some((attached) => attached.id === tab.id)
+    track(SIDEPANEL_TAB_TOGGLED_EVENT, {
+      action: isSelected ? 'removed' : 'added',
     })
+    setAttachedTabs((prev) =>
+      toggleAttachedTabSelection(prev, tab, panelTabIdFromUrl(location.href)),
+    )
   }
 
   const removeTab = (tabId?: number) => {

@@ -3,6 +3,23 @@ import type { StagedAttachment } from '@/lib/attachments'
 import { createBrowserOSAction } from '@/lib/chat-actions/types'
 import type { ChatMode } from '@/modules/chat/chat-types'
 
+export function toggleAttachedTabSelection(
+  attachedTabs: chrome.tabs.Tab[],
+  tab: chrome.tabs.Tab,
+  implicitOwnerTabId?: number,
+): chrome.tabs.Tab[] {
+  if (attachedTabs.some((attached) => attached.id === tab.id)) {
+    return attachedTabs.filter((attached) => attached.id !== tab.id)
+  }
+
+  // The owner page is preselected by the sidepanel. Once the user chooses a
+  // different page, treat that explicit choice as the complete context set.
+  const withoutImplicitOwner = attachedTabs.filter(
+    (attached) => attached.id !== implicitOwnerTabId,
+  )
+  return [...withoutImplicitOwner, tab]
+}
+
 export function buildChatSendParams(input: {
   text: string
   mode: ChatMode

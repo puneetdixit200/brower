@@ -4,6 +4,8 @@ import { resolvePanelTabId } from '@/lib/browseros/panelTab'
 import { createBrowserOSAction } from '@/lib/chat-actions/types'
 import type { LlmProviderConfig } from '@/lib/llm-providers/types'
 import {
+  assertActionTabsUnchanged,
+  assertOwnerTabUnchanged,
   buildRequestBrowserContext,
   buildSidepanelPreparedSendMessagesRequest,
   getLastUserMessageAttachments,
@@ -19,6 +21,189 @@ import type { SidepanelChatTarget } from './sidepanel-chat-targets'
 const conversationId = '00000000-0000-4000-8000-000000000001'
 
 describe('chat request preparation', () => {
+  it('pins each explicitly attached tab to its submitted id, window, and URL', async () => {
+    const attached = {
+      id: 20,
+      windowId: 2,
+      url: 'http://127.0.0.1:43123/first',
+      title: 'First fixture page',
+    } as chrome.tabs.Tab
+    const action = createBrowserOSAction({
+      mode: 'agent',
+      message: 'Read the attached page',
+      tabs: [attached],
+    })
+
+    await expect(
+      assertActionTabsUnchanged(action, async (id) => ({
+        ...attached,
+        id,
+      })),
+    ).resolves.toBeUndefined()
+    await expect(
+      assertActionTabsUnchanged(action, async () => {
+        throw new Error('No tab with id')
+      }),
+    ).rejects.toThrow('closed or is no longer accessible')
+    await expect(
+      assertActionTabsUnchanged(action, async () => ({
+        ...attached,
+        windowId: 3,
+      })),
+    ).rejects.toThrow('moved to another window')
+    await expect(
+      assertActionTabsUnchanged(action, async () => ({
+        ...attached,
+        url: 'http://127.0.0.1:43123/second',
+      })),
+    ).rejects.toThrow('changed its address')
+  })
+
+  it('uses explicitly attached tabs as the only page context', () => {
+    const owner = {
+      id: 10,
+      windowId: 1,
+      url: 'https://owner.example/a',
+      title: 'Owner A',
+    } as chrome.tabs.Tab
+    const attached = {
+      id: 20,
+      windowId: 2,
+      url: 'https://attached.example/b',
+      title: 'Attached B',
+    } as chrome.tabs.Tab
+    const context = buildRequestBrowserContext({
+      activeTab: owner,
+      action: createBrowserOSAction({
+        mode: 'agent',
+        message: 'Use B',
+        tabs: [attached],
+      }),
+      enabledMcpServers: [],
+      customMcpServers: [],
+    })
+
+    expect(context).toEqual({
+      selectedTabs: [
+        {
+          id: 20,
+          windowId: 2,
+          url: attached.url,
+          title: attached.title,
+        },
+      ],
+    })
+    expect(JSON.stringify(context)).not.toContain(owner.url)
+    expect(JSON.stringify(context)).not.toContain(owner.title)
+  })
+
+  it('preserves owner context when there are no explicit attachments', () => {
+    const owner = {
+      id: 10,
+      windowId: 1,
+      url: 'https://owner.example/a',
+      title: 'Owner A',
+    } as chrome.tabs.Tab
+    expect(
+      buildRequestBrowserContext({
+        activeTab: owner,
+        action: undefined,
+        enabledMcpServers: [],
+        customMcpServers: [],
+      }),
+    ).toEqual({
+      windowId: 1,
+      activeTab: {
+        id: 10,
+        url: owner.url,
+        title: owner.title,
+      },
+    })
+  })
+
+  it('revalidates attached tabs after delayed server URL setup', async () => {
+    const initial = {
+      id: 20,
+      windowId: 2,
+      url: 'http://127.0.0.1:43123/first',
+      title: 'First fixture page',
+    } as chrome.tabs.Tab
+    const action = createBrowserOSAction({
+      mode: 'agent',
+      message: 'Read the attached page',
+      tabs: [initial],
+    })
+    let releaseServerUrl!: (url: string) => void
+    const serverUrl = new Promise<string>((resolve) => {
+      releaseServerUrl = resolve
+    })
+    let current = initial
+    const preparing = prepareSidepanelSendMessagesRequest({
+      resolveAgentServerUrl: () => serverUrl,
+      validateBrowserContext: () =>
+        assertActionTabsUnchanged(action, async () => current),
+      target: undefined,
+      fallbackProvider: undefined,
+      conversationId,
+      mode: 'agent',
+      browserContext: { selectedTabs: [{ id: initial.id, url: initial.url }] },
+    })
+
+    current = { ...initial, url: 'http://127.0.0.1:43123/second' }
+    releaseServerUrl('http://127.0.0.1:5151')
+    await expect(preparing).rejects.toThrow('changed its address')
+  })
+
+  it('revalidates the owner page after delayed server URL setup', async () => {
+    const initial = {
+      id: 10,
+      windowId: 1,
+      url: 'http://127.0.0.1:43123/owner',
+      title: 'Owner fixture page',
+    } as chrome.tabs.Tab
+    let releaseServerUrl!: (url: string) => void
+    const serverUrl = new Promise<string>((resolve) => {
+      releaseServerUrl = resolve
+    })
+    let current = initial
+    const preparing = prepareSidepanelSendMessagesRequest({
+      resolveAgentServerUrl: () => serverUrl,
+      validateBrowserContext: () =>
+        assertOwnerTabUnchanged(initial, async () => current),
+      target: undefined,
+      fallbackProvider: undefined,
+      conversationId,
+      mode: 'agent',
+      browserContext: {
+        windowId: initial.windowId,
+        activeTab: { id: initial.id, url: initial.url, title: initial.title },
+      },
+    })
+
+    current = { ...initial, url: 'http://127.0.0.1:43123/owner-changed' }
+    releaseServerUrl('http://127.0.0.1:5151')
+    await expect(preparing).rejects.toThrow('changed its address')
+  })
+
+  it('fails closed when the owner page closes or moves before request setup', async () => {
+    const owner = {
+      id: 10,
+      windowId: 1,
+      url: 'http://127.0.0.1:43123/owner',
+    } as chrome.tabs.Tab
+    await expect(
+      assertOwnerTabUnchanged(owner, async () => {
+        throw new Error('No tab with id')
+      }),
+    ).rejects.toThrow('closed or is no longer accessible')
+    await expect(
+      assertOwnerTabUnchanged(owner, async () => ({
+        ...owner,
+        windowId: 2,
+      })),
+    ).rejects.toThrow('moved to another window')
+  })
+
   it('does not replay files from earlier user turns', () => {
     const earlierFile = {
       type: 'file' as const,
@@ -94,6 +279,7 @@ describe('chat request preparation', () => {
     } as chrome.tabs.Tab
     const selectedTab = {
       id: 20,
+      windowId: 3,
       url: 'https://verify.example/SECRET_SELECTED?otp=SECRET_OTP',
       title: 'SECRET_SELECTED_TITLE',
     } as chrome.tabs.Tab
@@ -111,11 +297,7 @@ describe('chat request preparation', () => {
     })
     const serializedContext = JSON.stringify(context)
 
-    expect(context).toEqual({
-      windowId: 2,
-      activeTab: { id: 10 },
-      selectedTabs: [{ id: 20 }],
-    })
+    expect(context).toEqual({ selectedTabs: [{ id: 20, windowId: 3 }] })
     for (const secret of [
       'SECRET_PATH',
       'SECRET_QUERY',
@@ -132,13 +314,10 @@ describe('chat request preparation', () => {
       enabledMcpServers: [],
       customMcpServers: [],
     })
-    expect(ordinaryContext?.activeTab).toEqual({
-      id: 10,
-      url: activeTab.url,
-      title: activeTab.title,
-    })
+    expect(ordinaryContext?.activeTab).toBeUndefined()
     expect(ordinaryContext?.selectedTabs?.[0]).toEqual({
       id: 20,
+      windowId: 3,
       url: selectedTab.url,
       title: selectedTab.title,
     })

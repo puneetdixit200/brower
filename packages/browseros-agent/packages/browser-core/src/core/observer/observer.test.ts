@@ -26,6 +26,9 @@ function name(value: string): AXNode['name'] {
 interface StubState {
   loaderId: string
   url: string
+  targetId?: string
+  windowId?: number
+  disappeared?: boolean
   nodes: AXNode[]
   childLoaderId?: string
   childNodes?: AXNode[]
@@ -98,8 +101,23 @@ function stubObserverHarness(state: StubState): Observer {
   } as unknown as ProtocolApi
 
   const pages = {
-    getSession: async () => ({ targetId: 'target-1', session, url: state.url }),
-    refresh: async () => ({ url: state.url }),
+    getSession: async () => ({
+      targetId: state.targetId ?? 'target-1',
+      session,
+      url: state.url,
+    }),
+    getInfo: () => ({
+      targetId: state.targetId ?? 'target-1',
+      windowId: state.windowId ?? 7,
+    }),
+    refresh: async () =>
+      state.disappeared
+        ? undefined
+        : {
+            targetId: state.targetId ?? 'target-1',
+            windowId: state.windowId ?? 7,
+            url: state.url,
+          },
   } as unknown as PageManager
 
   const frames = {
@@ -274,6 +292,44 @@ describe('Observer stable refs', () => {
     const snapshot = await observer.snapshot()
 
     expect(snapshot.text).toBe('- button "Reloaded" [ref=e1]')
+  })
+
+  test('fails closed when a ref page disappears, navigates, or changes window', async () => {
+    const state = {
+      loaderId: 'loader-1',
+      url: 'https://example.com/',
+      targetId: 'target-1',
+      windowId: 7,
+      nodes: [
+        ax('1', 'RootWebArea', { children: ['2'] }),
+        ax('2', 'button', { name: name('Continue'), backendDOMNodeId: 10 }),
+      ],
+      disappeared: false,
+    }
+    const observer = stubObserverHarness(state)
+    await observer.snapshot()
+
+    state.disappeared = true
+    await expect(observer.resolveRef('e1')).rejects.toThrow(
+      'page identity changed',
+    )
+    state.disappeared = false
+    await observer.snapshot()
+    state.loaderId = 'loader-2'
+    await expect(observer.resolveRef('e1')).rejects.toThrow('page navigated')
+
+    await observer.snapshot()
+    state.targetId = 'target-2'
+    await expect(observer.resolveRef('e1')).rejects.toThrow(
+      'page identity changed',
+    )
+
+    state.targetId = 'target-1'
+    await observer.snapshot()
+    state.windowId = 8
+    await expect(observer.resolveRef('e1')).rejects.toThrow(
+      'page identity changed',
+    )
   })
 
   test('same-document navigation resets the public ref namespace', async () => {

@@ -131,13 +131,39 @@ describe('tool execution claim boundary', () => {
       { execute: (input: unknown, options: unknown) => Promise<unknown> }
     >
 
-    await tools.read.execute(
+    const result = await tools.read.execute(
       { selector: 'main' },
       { toolCallId: 'provider-call-2', context: { taskId } },
     )
 
     expect(claim).not.toHaveBeenCalled()
     expect(execute).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ text: 'page content' })
+  })
+
+  it('rejects a malformed provider tool-call id before running a read tool', async () => {
+    const taskId = crypto.randomUUID()
+    const claim = mock(() => true)
+    const execute = mock(async () => ({ text: 'page content' }))
+    const tools = addToolEnvelopeBoundary(
+      { read: { description: 'Read page content.', execute } } as never,
+      claim,
+      mock(() => true),
+      mock(async () => ({ decision: 'ask' as const, actionId: null })),
+    ) as unknown as Record<
+      string,
+      { execute: (input: unknown, options: unknown) => Promise<unknown> }
+    >
+
+    await expect(
+      tools.read.execute(
+        { selector: 'main' },
+        { toolCallId: 'invalid provider call id', context: { taskId } },
+      ),
+    ).rejects.toThrow()
+
+    expect(claim).not.toHaveBeenCalled()
+    expect(execute).not.toHaveBeenCalled()
   })
 
   it('validates the signed approved input before claiming, then refuses approval replay', async () => {

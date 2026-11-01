@@ -1,8 +1,28 @@
 import { describe, expect, it } from 'bun:test'
 import type { StagedAttachment } from '@/lib/attachments'
-import { buildChatSendParams, toSidepanelFileParts } from './chat-send-params'
+import {
+  buildChatSendParams,
+  toggleAttachedTabSelection,
+  toSidepanelFileParts,
+} from './chat-send-params'
 
 describe('chat send params and attachment projection', () => {
+  it('replaces the implicit owner attachment when another page is selected', () => {
+    const owner = { id: 10, url: 'https://owner.example' } as chrome.tabs.Tab
+    const selected = {
+      id: 20,
+      url: 'https://selected.example',
+    } as chrome.tabs.Tab
+
+    const attached = toggleAttachedTabSelection([owner], selected, owner.id)
+
+    expect(attached).toEqual([selected])
+    expect(toggleAttachedTabSelection(attached, owner, owner.id)).toEqual([
+      selected,
+      owner,
+    ])
+  })
+
   it('preserves image data URLs, media types, and filenames', () => {
     const attachment: StagedAttachment = {
       id: 'image-1',

@@ -61,6 +61,8 @@ import type {
   PendingOwnerTabSelection,
 } from './chat-session-request'
 import {
+  assertActionTabsUnchanged,
+  assertOwnerTabUnchanged,
   buildRequestBrowserContext,
   getLastUserMessageAttachments,
   getOwnerTabSelection,
@@ -122,11 +124,22 @@ async function getRequestActiveTab(
   isNewTab: boolean,
   ownerTabId: number | undefined,
 ) {
-  if (isNewTab) {
-    return (await chrome.tabs.query({ active: true, currentWindow: true }))[0]
+  // A new-tab composer has no owning page. Its page context comes only from
+  // tabs explicitly attached to the submitted action; querying the active tab
+  // here could silently substitute a page selected after the user submitted.
+  if (isNewTab) return undefined
+  if (ownerTabId === undefined) {
+    throw new Error(
+      'This sidepanel is no longer attached to a page. Reopen it from the page you want to use.',
+    )
   }
-  if (ownerTabId === undefined) return undefined
-  return chrome.tabs.get(ownerTabId).catch(() => undefined)
+  try {
+    return await chrome.tabs.get(ownerTabId)
+  } catch {
+    throw new Error(
+      'The page that owns this sidepanel was closed or is no longer accessible. Reopen the sidepanel from the page you want to use.',
+    )
+  }
 }
 
 const getApprovalResponseForTarget = (
@@ -562,6 +575,13 @@ export const useChatSession = (options?: ChatSessionOptions) => {
 
         const result = await prepareSidepanelSendMessagesRequest({
           resolveAgentServerUrl,
+          validateBrowserContext: async () => {
+            if (action?.tabs?.length) {
+              await assertActionTabsUnchanged(action)
+            } else {
+              await assertOwnerTabUnchanged(activeTab)
+            }
+          },
           target,
           fallbackProvider,
           message,

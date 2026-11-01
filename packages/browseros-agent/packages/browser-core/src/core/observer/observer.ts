@@ -90,6 +90,8 @@ interface MainFrameState {
 }
 
 interface RefScope {
+  targetId: string
+  windowId?: number
   documentId: DocumentId
   url: string
 }
@@ -178,7 +180,37 @@ export class Observer {
     if (!entry) {
       throw new Error(`Unknown ref ${ref}; take a new snapshot.`)
     }
-    await this.pages.getSession(this.pageId)
+    const scope = this.refScope
+    if (!scope) {
+      throw new Error(`Stale ref ${ref}; take a new snapshot.`)
+    }
+    const current = await this.pages.refresh(this.pageId)
+    if (
+      !current ||
+      current.targetId !== scope.targetId ||
+      (scope.windowId !== undefined && current.windowId !== scope.windowId)
+    ) {
+      this.refs.reset()
+      throw new Error(
+        `Stale ref ${ref}; page identity changed. Take a new snapshot.`,
+      )
+    }
+    const pageSession = await this.pages.getSession(this.pageId)
+    if (pageSession.targetId !== scope.targetId) {
+      this.refs.reset()
+      throw new Error(
+        `Stale ref ${ref}; page identity changed. Take a new snapshot.`,
+      )
+    }
+    const tree = await pageSession.session.Page.getFrameTree()
+    const mainFrame = (tree.frameTree as FrameTreeNode).frame
+    if (
+      frameDocumentId(mainFrame) !== scope.documentId ||
+      knownUrlsDiffer(scope.url, frameUrl(mainFrame))
+    ) {
+      this.refs.reset()
+      throw new Error(`Stale ref ${ref}; page navigated. Take a new snapshot.`)
+    }
     const { session, axParams } = this.frames.resolveFrameTarget(
       this.pageId,
       entry.frameId,
@@ -201,7 +233,16 @@ export class Observer {
       )
       const after = await this.readMainFrameState(pageSession.session)
       if (!knownMainFrameChanged(before, after)) {
-        return { text, refs, url: after.url, scope: refScopeFrom(after) }
+        return {
+          text,
+          refs,
+          url: after.url,
+          scope: refScopeFrom(
+            after,
+            pageSession.targetId,
+            this.pages.getInfo(this.pageId)?.windowId,
+          ),
+        }
       }
     }
     throw new Error('Page document changed during snapshot capture; retry.')
@@ -404,9 +445,13 @@ function shouldResetRefs(
   return knownUrlsDiffer(current.url, next.url)
 }
 
-function refScopeFrom(state: MainFrameState): RefScope | undefined {
+function refScopeFrom(
+  state: MainFrameState,
+  targetId: string,
+  windowId?: number,
+): RefScope | undefined {
   if (state.documentId === undefined) return undefined
-  return { documentId: state.documentId, url: state.url }
+  return { targetId, windowId, documentId: state.documentId, url: state.url }
 }
 
 function collectFrameDocuments(
