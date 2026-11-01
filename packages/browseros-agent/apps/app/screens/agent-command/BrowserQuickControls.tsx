@@ -46,7 +46,10 @@ export function BrowserQuickControls({
   screenshotContextEnabled?: boolean
 }) {
   const [address, setAddress] = useState('')
-  const [webTabs, setWebTabs] = useState<{ id: number; title: string }[]>([])
+  const tabRefreshGeneration = useRef(0)
+  const [webTabs, setWebTabs] = useState<
+    { id: number; title: string; active: boolean }[]
+  >([])
   const [selectedTabId, setSelectedTabId] = useState<number | null>(null)
   const [downloads, setDownloads] = useState<DownloadProgressRow[]>([])
   const [downloadActionErrors, setDownloadActionErrors] = useState<
@@ -92,12 +95,20 @@ export function BrowserQuickControls({
   }, [])
 
   const refreshWebTabs = useCallback(async () => {
+    const generation = ++tabRefreshGeneration.current
     const allTabs = await chrome.tabs.query({ currentWindow: true })
+    if (generation !== tabRefreshGeneration.current) return
     const web = allTabs
       .flatMap((tab) =>
         tab.id !== undefined &&
         (tab.url?.startsWith('https://') || tab.url?.startsWith('http://'))
-          ? [{ id: tab.id, title: tab.title || tab.url || 'Webpage' }]
+          ? [
+              {
+                id: tab.id,
+                title: tab.title || tab.url || 'Webpage',
+                active: tab.active === true,
+              },
+            ]
           : [],
       )
       .slice(0, 50)
@@ -105,12 +116,27 @@ export function BrowserQuickControls({
     setSelectedTabId((previous) =>
       previous !== null && web.some((tab) => tab.id === previous)
         ? previous
-        : (web[0]?.id ?? null),
+        : (web.find((tab) => tab.active)?.id ?? web[0]?.id ?? null),
     )
   }, [])
 
   useEffect(() => {
     void refreshWebTabs().catch(() => undefined)
+    const scheduleRefresh = () => void refreshWebTabs().catch(() => undefined)
+    const onActivated = (info: chrome.tabs.OnActivatedInfo) => {
+      setSelectedTabId(info.tabId)
+      scheduleRefresh()
+    }
+    chrome.tabs.onCreated.addListener(scheduleRefresh)
+    chrome.tabs.onRemoved.addListener(scheduleRefresh)
+    chrome.tabs.onUpdated.addListener(scheduleRefresh)
+    chrome.tabs.onActivated.addListener(onActivated)
+    return () => {
+      chrome.tabs.onCreated.removeListener(scheduleRefresh)
+      chrome.tabs.onRemoved.removeListener(scheduleRefresh)
+      chrome.tabs.onUpdated.removeListener(scheduleRefresh)
+      chrome.tabs.onActivated.removeListener(onActivated)
+    }
   }, [refreshWebTabs])
 
   const action = async (operation: () => Promise<unknown>) => {

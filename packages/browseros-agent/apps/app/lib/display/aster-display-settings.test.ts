@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import {
   ASTER_DISPLAY_SETTINGS_KEY,
+  applyAsterDisplaySettings,
   DEFAULT_ASTER_DISPLAY_SETTINGS,
   installAsterDisplaySettings,
   normalizeAsterDisplaySettings,
@@ -85,6 +86,21 @@ describe('Aster display settings', () => {
         reducedMotion: 'true',
       }),
     ).toEqual({ scale: 110, reducedMotion: false })
+  })
+
+  it('applies scale and reduced-motion state to the app document root', () => {
+    const root = {
+      style: { fontSize: '' },
+      dataset: {} as Record<string, string>,
+    } as unknown as HTMLElement
+
+    applyAsterDisplaySettings({ scale: 90, reducedMotion: true }, root)
+    expect(root.style.fontSize).toBe('90%')
+    expect(root.dataset.asterReducedMotion).toBe('true')
+
+    applyAsterDisplaySettings({ scale: 110, reducedMotion: false }, root)
+    expect(root.style.fontSize).toBe('110%')
+    expect(root.dataset.asterReducedMotion).toBeUndefined()
   })
 
   it('does not let a stale initial read overwrite a newer storage change', async () => {

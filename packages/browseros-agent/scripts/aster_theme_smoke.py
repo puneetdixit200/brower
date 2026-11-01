@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Exercise Aster theme selection in a disposable headed BrowserOS profile.
+"""Exercise Aster display customization in a disposable headed BrowserOS profile.
 
-The caller owns BrowserOS startup and cleanup. This smoke uses the real theme
-selector and CDP color-scheme emulation; it does not access network or profile
-data beyond the theme preference under test.
+The caller owns BrowserOS startup and cleanup. This smoke uses the actual
+customization controls and a loopback CDP endpoint; no external pages or data
+are accessed.
 """
 
 from __future__ import annotations
@@ -12,13 +12,18 @@ import argparse
 import json
 import sys
 import time
+import urllib.parse
 import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import Thread
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "tests/e2e"))
 from aster_ui_latency_benchmark import CDP  # noqa: E402
 
 ASTER_ID = "oifdmombnijnaiocijiacjhajbnpdlhb"
+# WXT's logical `local:theme` item is stored as `theme` in chrome.storage.local.
+DISPLAY_KEY = "aster.display.settings.v1"
 WAIT_SECONDS = 15.0
 
 
@@ -43,6 +48,25 @@ def main() -> int:
     if not target:
         raise RuntimeError("Open Aster Settings > Customization in the disposable profile")
 
+    class OrdinaryPageHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            body = (
+                "<!doctype html><meta charset=utf-8><title>Ordinary page fixture</title>"
+                "<style>html{font-size:23px;transition-duration:2s}"
+                "body{color:rgb(1, 2, 3)}</style><body>ordinary page</body>"
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_args: object) -> None:
+            return
+
+    ordinary_page_server = ThreadingHTTPServer(("127.0.0.1", 0), OrdinaryPageHandler)
+    Thread(target=ordinary_page_server.serve_forever, daemon=True).start()
+    ordinary_page_url = f"http://127.0.0.1:{ordinary_page_server.server_port}/ordinary"
     cdp = CDP(target["webSocketDebuggerUrl"])
     checks: dict[str, str] = {}
     try:
@@ -53,6 +77,9 @@ def main() -> int:
             "typeof chrome!=='undefined' && chrome.runtime?.id==="
             + json.dumps(ASTER_ID),
         )
+        wait_for(cdp, "document.querySelector('button[aria-label=\"Aster theme\"]')")
+        wait_for(cdp, "document.querySelector('button[aria-label=\"Aster interface scale\"]')")
+        wait_for(cdp, "document.querySelector('#aster-reduced-motion')")
 
         select_theme(cdp, "Light")
         wait_for(cdp, "document.documentElement.classList.contains('light')")
@@ -64,6 +91,36 @@ def main() -> int:
         assert_theme(cdp, "dark")
         checks["explicit_light_dark_selection"] = "passed"
 
+        select_scale(cdp, "90%")
+        wait_for_display_settings(cdp, {"scale": 90, "reducedMotion": False})
+        wait_for(cdp, "getComputedStyle(document.documentElement).fontSize==='14.4px'")
+        select_scale(cdp, "100%")
+        wait_for_display_settings(cdp, {"scale": 100, "reducedMotion": False})
+        wait_for(cdp, "getComputedStyle(document.documentElement).fontSize==='16px'")
+        select_scale(cdp, "110%")
+        wait_for_display_settings(cdp, {"scale": 110, "reducedMotion": False})
+        wait_for(cdp, "getComputedStyle(document.documentElement).fontSize==='17.6px'")
+        checks["interface_scale_90_100_110"] = "passed"
+
+        toggle_reduced_motion(cdp, True)
+        wait_for_display_settings(cdp, {"scale": 110, "reducedMotion": True})
+        wait_for(cdp, "document.documentElement.dataset.asterReducedMotion==='true'")
+        wait_for(
+            cdp,
+            "getComputedStyle(document.querySelector('#aster-reduced-motion')).transitionDuration==='1e-05s' || "
+            "getComputedStyle(document.querySelector('#aster-reduced-motion')).transitionDuration==='0.00001s'",
+        )
+        toggle_reduced_motion(cdp, False)
+        wait_for_display_settings(cdp, {"scale": 110, "reducedMotion": False})
+        wait_for(cdp, "!document.documentElement.dataset.asterReducedMotion")
+        checks["reduced_motion_control_and_scoped_style"] = "passed"
+
+        # Exercise Radix Select's keyboard path and assert focus stays on the control.
+        select_theme(cdp, "System")
+        keyboard_select_theme(cdp, "Light")
+        wait_for(cdp, "document.documentElement.classList.contains('light')")
+        wait_for_stored_theme(cdp, "light")
+        checks["keyboard_selection_and_focus"] = "passed"
         select_theme(cdp, "System")
         emulate_scheme(cdp, "light")
         wait_for(cdp, "document.documentElement.classList.contains('light')")
@@ -71,6 +128,8 @@ def main() -> int:
         wait_for(cdp, "document.documentElement.classList.contains('dark')")
         wait_for_stored_theme(cdp, "system")
         assert_theme(cdp, "system")
+        wait_for_display_settings(cdp, {"scale": 110, "reducedMotion": False})
+        wait_for(cdp, "getComputedStyle(document.documentElement).fontSize==='17.6px'")
         checks["system_follows_light_and_dark_preference_changes"] = "passed"
 
         # This attach-only smoke cannot own a BrowserOS process restart.
@@ -84,8 +143,13 @@ def main() -> int:
         wait_for(cdp, "document.documentElement.classList.contains('dark')")
         wait_for_stored_theme(cdp, "system")
         assert_theme(cdp, "system")
+        wait_for_display_settings(cdp, {"scale": 110, "reducedMotion": False})
+        wait_for(cdp, "getComputedStyle(document.documentElement).fontSize==='17.6px'")
+        wait_for(cdp, "!document.documentElement.dataset.asterReducedMotion")
         checks["system_preference_persists_after_extension_page_reload"] = "passed"
         checks["full_browser_process_restart"] = "not exercised; caller-owned runtime"
+
+        assert_ordinary_page_isolation(base, ordinary_page_url, checks)
 
         print(
             json.dumps(
@@ -96,6 +160,8 @@ def main() -> int:
         return 0
     finally:
         cdp.ws.close()
+        ordinary_page_server.shutdown()
+        ordinary_page_server.server_close()
 
 
 def emulate_scheme(cdp: CDP, scheme: str) -> None:
@@ -110,18 +176,129 @@ def emulate_scheme(cdp: CDP, scheme: str) -> None:
 
 def select_theme(cdp: CDP, label: str) -> None:
     click_element(cdp, "document.querySelector('button[aria-label=\"Aster theme\"]')")
-    wait_for(cdp, "document.querySelector('[role=option]')")
+    wait_for_option(cdp, label)
     click_element(
         cdp,
         "[...document.querySelectorAll('[role=option]')].find(item=>item.innerText.trim()==="
         + json.dumps(label)
-        + ")",
+        + " && item.getClientRects().length)",
     )
     wait_for(
         cdp,
         "document.querySelector('button[aria-label=\"Aster theme\"]')?.innerText.trim()==="
         + json.dumps(label),
     )
+    wait_for(cdp, "!document.querySelector('[data-slot=select-content]')")
+
+
+def select_scale(cdp: CDP, label: str) -> None:
+    trigger = "document.querySelector('button[aria-label=\"Aster interface scale\"]')"
+    wait_for(cdp, f"{trigger} && !{trigger}.disabled")
+    click_element(cdp, trigger)
+    wait_for_option(cdp, label)
+    click_element(
+        cdp,
+        "[...document.querySelectorAll('[role=option]')].find(item=>item.innerText.trim()==="
+        + json.dumps(label)
+        + " && item.getClientRects().length)",
+    )
+    wait_for(
+        cdp,
+        "document.querySelector('button[aria-label=\"Aster interface scale\"]')?.innerText.trim()==="
+        + json.dumps(label),
+    )
+
+
+def toggle_reduced_motion(cdp: CDP, enabled: bool) -> None:
+    wait_for(cdp, "!document.querySelector('#aster-reduced-motion')?.disabled")
+    current = bool(
+        cdp.evaluate(
+            "document.querySelector('#aster-reduced-motion')?.getAttribute('aria-checked')==='true'"
+        )
+    )
+    if current != enabled:
+        click_element(cdp, "document.querySelector('#aster-reduced-motion')")
+    wait_for(
+        cdp,
+        "document.querySelector('#aster-reduced-motion')?.getAttribute('aria-checked')==="
+        + json.dumps(str(enabled).lower()),
+    )
+
+
+def keyboard_select_theme(cdp: CDP, label: str) -> None:
+    click_element(cdp, "document.querySelector('button[aria-label=\"Aster theme\"]')")
+    wait_for_option(cdp, label)
+    for key, virtual_key in (("ArrowDown", 40), ("Enter", 13)):
+        for event_type in ("keyDown", "keyUp"):
+            cdp.call(
+                "Input.dispatchKeyEvent",
+                {
+                    "type": event_type,
+                    "key": key,
+                    "code": key,
+                    "windowsVirtualKeyCode": virtual_key,
+                },
+            )
+    wait_for(
+        cdp,
+        "document.querySelector('button[aria-label=\"Aster theme\"]')?.innerText.trim()==="
+        + json.dumps(label),
+    )
+    focused = cdp.evaluate("document.activeElement?.getAttribute('aria-label')")
+    if focused != "Aster theme":
+        raise AssertionError(f"Theme control lost focus after keyboard selection: {focused!r}")
+    has_visible_focus = cdp.evaluate(
+        "(()=>{const e=document.activeElement;const s=getComputedStyle(e);"
+        "return e.matches(':focus-visible')&&(s.boxShadow!=='none'||"
+        "(s.outlineStyle!=='none'&&s.outlineWidth!=='0px'))})()"
+    )
+    if not has_visible_focus:
+        raise AssertionError("Keyboard-selected theme control has no visible focus indicator")
+
+
+def wait_for_option(cdp: CDP, label: str) -> None:
+    wait_for(
+        cdp,
+        "[...document.querySelectorAll('[role=option]')].some(item=>item.innerText.trim()==="
+        + json.dumps(label)
+        + " && item.getClientRects().length)",
+    )
+
+
+def wait_for_display_settings(cdp: CDP, expected: dict[str, object]) -> None:
+    wait_for(
+        cdp,
+        "chrome.storage.local.get(" + json.dumps(DISPLAY_KEY) + ").then(value=>JSON.stringify(value["
+        + json.dumps(DISPLAY_KEY)
+        + "])===" + json.dumps(json.dumps(expected, separators=(",", ":"))) + ")",
+    )
+
+
+def assert_ordinary_page_isolation(
+    base: str, page_url: str, checks: dict[str, str]
+) -> None:
+    request = urllib.request.Request(
+        f"{base}/json/new?{urllib.parse.quote(page_url, safe='')}",
+        method="PUT",
+    )
+    with urllib.request.urlopen(request, timeout=5) as response:
+        target = json.load(response)
+    page_cdp = CDP(target["webSocketDebuggerUrl"])
+    try:
+        page_cdp.call("Runtime.enable")
+        wait_for(page_cdp, "document.body?.innerText==='ordinary page'")
+        actual = page_cdp.evaluate(
+            "({fontSize:getComputedStyle(document.documentElement).fontSize,"
+            "transition:getComputedStyle(document.documentElement).transitionDuration,"
+            "reducedMotion:document.documentElement.dataset.asterReducedMotion||null})"
+        )
+        if actual != {"fontSize": "23px", "transition": "2s", "reducedMotion": None}:
+            raise AssertionError(f"Ordinary webpage styles were affected: {actual!r}")
+        checks["ordinary_webpage_style_isolation"] = "passed"
+    finally:
+        page_cdp.ws.close()
+        with urllib.request.urlopen(f"{base}/json/close/{target['id']}", timeout=5):
+            pass
 
 
 def click_element(cdp: CDP, element_expression: str) -> None:
@@ -150,16 +327,15 @@ def click_element(cdp: CDP, element_expression: str) -> None:
 def wait_for_stored_theme(cdp: CDP, theme: str) -> None:
     wait_for(
         cdp,
-        "chrome.storage.local.get('local:theme').then(value=>value['local:theme']==="
+        # Read Chrome's backing key, not WXT's `local:` namespace prefix.
+        "chrome.storage.local.get('theme').then(value=>value.theme==="
         + json.dumps(theme)
         + ")",
     )
 
 
 def assert_theme(cdp: CDP, expected: str) -> None:
-    stored = cdp.evaluate(
-        "chrome.storage.local.get('local:theme').then(value=>value['local:theme'])"
-    )
+    stored = cdp.evaluate("chrome.storage.local.get('theme').then(value=>value.theme)")
     if stored != expected:
         raise AssertionError(f"Expected stored theme {expected!r}, got {stored!r}")
 
