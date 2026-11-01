@@ -1,5 +1,11 @@
 # Aster continuation handoff and full implementation plan
 
+### B04 restore identity and failure-safe cleanup — 2026-11-02
+
+At HEAD `c0abb822cd9c3896c72ee34363ebc4b518fe2ff7`, BrowserOS v0.51.0 / Chromium 155.0.8309.26 headed acceptance passed the B04 create/select/reorder/switch/navigation/pin/unpin/close steps. Restore failed closed: Chromium's Sessions API serialization omits the closed tab's owner window ID (its API test expects `windowId: 0`), while the current normal window was `868098139`. The `tabs.onRemoved` event reported the real window, and `sessions.onChanged` fired, but no API links that tab removal to a session ID; do not add a URL-only or random-session workaround. The updated selector rejects zero/invalid IDs, duplicate IDs and unknown privacy state. The revised smoke reports the original failure and independently verifies exact run-token fixture cleanup across windows (`remaining_fixture_tabs: []`). B04 remains PARTIAL; native Aster, true two-window negative behavior and private-window acceptance remain open. Details: [B04 restore and cleanup evidence](evidence/aster-b04-restore-cleanup-2026-11-02.md).
+
+Next substantial user-facing target: A01 real page-reading journey through visible browser controls. Keep the native Chromium checkout preserved and do not treat BrowserOS fixture evidence as Aster acceptance.
+
 Historical allowance stop — 2026-10-30: a prior batch stopped at 5% remaining in one window. The user later resumed the same goal; check the live account meter at each new batch boundary rather than relying on historical readings.
 
 ### Latest verified checkpoint — 2026-10-30
@@ -155,7 +161,7 @@ The canonical descriptions, dependencies and evidence remain in FEATURE_MATRIX.m
 | B01 | Start browser, render HTTPS pages securely | NOT_STARTED |
 | B02 | Navigate/search from address bar | PARTIAL |
 | B03 | Forward/back/reload/stop navigation | PARTIAL |
-| B04 | Tab create/select/close/reopen/pin/drag | NOT_STARTED |
+| B04 | Tab create/select/close/reopen/pin/drag | PARTIAL |
 | B05 | Downloads, progress, files on disk | NOT_STARTED |
 | B06 | History, bookmarks, search/import/export where supported | NOT_STARTED |
 | B07 | Incognito separated from normal history/tasks | NOT_STARTED |

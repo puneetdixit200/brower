@@ -5,7 +5,7 @@ describe('selectRecentlyClosedTabSessionId', () => {
   test('selects an eligible tab from the current window', () => {
     expect(
       selectRecentlyClosedTabSessionId(
-        [{ tab: { sessionId: 'session-1', windowId: 7 } }],
+        [{ tab: { sessionId: 'session-1', windowId: 7, incognito: false } }],
         7,
       ),
     ).toBe('session-1')
@@ -15,8 +15,10 @@ describe('selectRecentlyClosedTabSessionId', () => {
     expect(
       selectRecentlyClosedTabSessionId(
         [
-          { tab: { sessionId: 'other-window', windowId: 8 } },
-          { tab: { sessionId: 'current-window', windowId: 7 } },
+          { tab: { sessionId: 'other-window', windowId: 8, incognito: false } },
+          {
+            tab: { sessionId: 'current-window', windowId: 7, incognito: false },
+          },
         ],
         7,
       ),
@@ -25,6 +27,7 @@ describe('selectRecentlyClosedTabSessionId', () => {
 
   test.each([
     ['missing session id', { tab: { windowId: 7 } }],
+    ['unknown privacy state', { tab: { sessionId: 'unknown', windowId: 7 } }],
     [
       'incognito tab',
       { tab: { sessionId: 'private', windowId: 7, incognito: true } },
@@ -48,12 +51,47 @@ describe('selectRecentlyClosedTabSessionId', () => {
     ).toBeUndefined()
   })
 
+  test('rejects the zero window id sentinel', () => {
+    expect(
+      selectRecentlyClosedTabSessionId(
+        [
+          {
+            tab: { sessionId: 'unknown-window', windowId: 0, incognito: false },
+          },
+        ],
+        0,
+      ),
+    ).toBeUndefined()
+    expect(
+      selectRecentlyClosedTabSessionId(
+        [
+          {
+            tab: { sessionId: 'unknown-window', windowId: 0, incognito: false },
+          },
+        ],
+        7,
+      ),
+    ).toBeUndefined()
+  })
+
+  test('rejects duplicate session ids as ambiguous', () => {
+    expect(
+      selectRecentlyClosedTabSessionId(
+        [
+          { tab: { sessionId: 'duplicate', windowId: 7, incognito: false } },
+          { tab: { sessionId: 'duplicate', windowId: 8, incognito: false } },
+        ],
+        7,
+      ),
+    ).toBeUndefined()
+  })
+
   test('preserves the most-recent eligible tab ordering', () => {
     expect(
       selectRecentlyClosedTabSessionId(
         [
-          { tab: { sessionId: 'newest', windowId: 7 } },
-          { tab: { sessionId: 'older', windowId: 7 } },
+          { tab: { sessionId: 'newest', windowId: 7, incognito: false } },
+          { tab: { sessionId: 'older', windowId: 7, incognito: false } },
         ],
         7,
       ),

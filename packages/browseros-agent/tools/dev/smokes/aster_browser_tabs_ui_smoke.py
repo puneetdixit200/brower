@@ -62,7 +62,9 @@ def main() -> int:
     app_target_id: str | None = None
     evidence: dict[str, object] = {}
     result: dict[str, object] | None = None
-    cleanup_error: str | None = None
+    failure: BaseException | None = None
+    failure_traceback = None
+    cleanup: dict[str, object] = {"attempted": False, "verified": False}
     try:
         target = wait_target(cdp_base, args.target_timeout)
         app_target_id = target["id"]
@@ -72,6 +74,11 @@ def main() -> int:
         cdp = CDP(target["webSocketDebuggerUrl"])
         cdp.call("Runtime.enable")
         cdp.call("Page.enable")
+        cdp.evaluate("""(()=>{if(window.__asterB04Events)return;window.__asterB04Events=[];
+          const record=(type,data)=>{window.__asterB04Events.push({type,data,at:Date.now()});
+            if(window.__asterB04Events.length>100)window.__asterB04Events.shift()};
+          chrome.tabs.onRemoved.addListener((tabId,info)=>record('tabs.onRemoved',{tabId,...info}));
+          chrome.sessions.onChanged.addListener(()=>record('sessions.onChanged',{}));})()""")
         activate_page(browser_cdp, app_target_id)
         cdp.evaluate("location.hash='#/home'")
         wait_js(cdp, "!!document.querySelector('[aria-label=\"Open URL or search in new tab\"]')")
@@ -200,9 +207,34 @@ def main() -> int:
         # Close via the sidebar and restore via Browser actions; restored ID may differ.
         click(cdp, f'{fixture_row} button[aria-label="Close tab"]')
         wait_js(cdp, f"chrome.tabs.get({id_a}).then(()=>false).catch(()=>true)")
+        evidence["restore_identity_observations"] = bounded_restore_observations(cdp)
         close_sidebar(cdp)
         click(cdp, 'button[aria-label="Reopen closed tab"]')
-        wait_js(cdp, f"chrome.tabs.query({{currentWindow:true}}).then(ts=>ts.some(t=>t.url==={json.dumps(url_a)}&&t.windowId==={window['id']}))")
+        try:
+            wait_js(
+                cdp,
+                f"chrome.tabs.query({{currentWindow:true}}).then(ts=>ts.some(t=>t.url==={json.dumps(url_a)}&&t.windowId==={window['id']}))",
+                timeout=5,
+            )
+        except TimeoutError as restore_error:
+            observations = bounded_restore_observations(cdp)
+            matching = [
+                session
+                for session in observations["sessions"]
+                if session.get("url") == url_a
+            ]
+            no_restore_message = cdp.evaluate(
+                "document.body.innerText.includes('No recently closed tab in this window.')"
+            )
+            if no_restore_message and matching and all(
+                session.get("windowId") != window["id"] for session in matching
+            ):
+                evidence["restore_outcome"] = "unsupported: no session has verified current-window identity"
+                evidence["restore_identity_observations"] = observations
+                raise RuntimeError(
+                    "restore unsupported: Sessions API entries for the closed tab lack a verified current-window ID"
+                ) from restore_error
+            raise
         activate_page(browser_cdp, app_target_id)
         restored = next(t for t in current_fixture_tabs(cdp, base) if t.get("url") == url_a)
         evidence["close_restore"] = {"closed_id": id_a, "restored_id": restored["id"]}
@@ -224,16 +256,20 @@ def main() -> int:
         evidence["chrome_api_scope"] = "read-only tabs/windows inspection; no tab-mutating API calls"
         evidence["limitations"] = ["No Aster-native control claim", "No claim about other windows or private-window behavior"]
         result = {"result": "passed", "fixture_base": base, **evidence}
+    except BaseException as error:
+        failure = error
+        failure_traceback = error.__traceback__
     finally:
         if cdp:
             # Clean only this run's fixture pages, by clicking their visible
             # sidebar close controls. Do not close unrelated tabs or call tabs.remove.
+            cleanup["attempted"] = True
             try:
                 if browser_cdp is not None and app_target_id is not None:
                     activate_page(browser_cdp, app_target_id)
                 if cdp.evaluate("!document.querySelector('input[aria-label=\"Search tabs\"]')"):
                     ensure_tabs_section(cdp)
-                for _ in range(4):
+                for _ in range(12):
                     owned = current_fixture_tabs(cdp, base)
                     if not owned:
                         break
@@ -244,19 +280,30 @@ def main() -> int:
                     wait_js(cdp, f"!!document.querySelector({json.dumps(close_selector)})")
                     click(cdp, close_selector)
                     wait_tab_gone(cdp, int(owned[0]["id"]), timeout=3)
+                remaining = all_fixture_tabs(cdp, base, token)
+                cleanup["remaining_fixture_tabs"] = remaining
+                cleanup["verified"] = not remaining
+                cleanup["events"] = cdp.evaluate("window.__asterB04Events||[]")
             except Exception as error:
-                cleanup_error = str(error)
+                cleanup["error"] = str(error)
             cdp.ws.close()
+        else:
+            cleanup["error"] = "CDP page connection was unavailable; cleanup could not run"
         if browser_cdp:
             browser_cdp.ws.close()
         server.shutdown()
         server.server_close()
-    if cleanup_error:
-        raise RuntimeError(f"fixture cleanup failed: {cleanup_error}")
+    report = result or {"result": "failed", "fixture_base": base, **evidence}
+    if failure is not None:
+        report["failure"] = {"type": type(failure).__name__, "message": str(failure)}
+    report["cleanup"] = cleanup
+    print(json.dumps(report, indent=2))
+    if failure is not None:
+        raise failure.with_traceback(failure_traceback)
+    if not cleanup["verified"]:
+        raise RuntimeError("fixture cleanup verification failed; see cleanup evidence above")
     if result is None:
         raise RuntimeError("tab smoke ended without a result")
-    result["cleanup"] = "passed"
-    print(json.dumps(result, indent=2))
     return 0
 
 
@@ -295,6 +342,24 @@ def wait_js(cdp: CDP, expression: str, timeout: float = 20) -> None:
 
 def current_fixture_tabs(cdp: CDP, base: str) -> list[dict]:
     return cdp.evaluate(f"chrome.tabs.query({{currentWindow:true}}).then(ts=>ts.filter(t=>t.url?.startsWith({json.dumps(base)})).map(t=>({{id:t.id,url:t.url,title:t.title,windowId:t.windowId,index:t.index,active:t.active,pinned:t.pinned}})))")
+
+
+def all_fixture_tabs(cdp: CDP, base: str, token: str) -> list[dict]:
+    return cdp.evaluate(
+        f"chrome.tabs.query({{}}).then(ts=>ts.filter(t=>{{if(!t.url?.startsWith({json.dumps(base)}))return false;try{{return new URL(t.url).searchParams.get('run')==={json.dumps(token)}}}catch{{return false}}}}).map(t=>({{id:t.id,url:t.url,title:t.title,windowId:t.windowId,index:t.index,active:t.active,pinned:t.pinned}})))"
+    )
+
+
+def bounded_restore_observations(cdp: CDP) -> dict[str, object]:
+    return cdp.evaluate("""Promise.all([
+      chrome.windows.getCurrent().then(w=>({id:w.id,incognito:w.incognito})),
+      chrome.tabs.query({currentWindow:true}).then(ts=>ts.map(t=>({id:t.id,url:t.url,windowId:t.windowId}))),
+      chrome.sessions.getRecentlyClosed({maxResults:10}).then(s=>s.map(x=>({
+        sessionId:x.tab?.sessionId,lastModified:x.lastModified,
+        windowId:x.tab?.windowId,incognito:x.tab?.incognito,
+        url:x.tab?.url,title:x.tab?.title,closedWindowSession:Boolean(x.window),
+      }))),
+    ]).then(([window,tabs,sessions])=>({window,tabs,sessions,events:globalThis.__asterB04Events||[]}))""")
 
 
 def click(cdp: CDP, selector: str, optional: bool = False) -> None:
