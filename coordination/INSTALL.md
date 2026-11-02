@@ -47,3 +47,39 @@ path using a systemd user service override:
 No tokens are ever copied into the public repository. The worker is safe by
 default: it requires an exact source SHA and clean checkout, one immutable
 claim per task, workspace-write Codex sandbox, and a normal non-force push.
+
+## Important 2026-11-02 repair (before restart)
+
+The original worker asked Codex to `git commit` from a workspace-write
+sandbox where `.git` is read-only. That caused task 001 to leave a dirty
+checkout; task 002 correctly blocked. The control-branch worker has been
+revised to **commit source edits from the trusted wrapper after Codex exits**.
+
+Do **not** resume the timer while uncommitted task-001 changes remain.
+Review and reconcile those files manually first. The revised worker does
+not automatically retry task 001 or task 002.
+
+With the timer disabled, update the worker safely:
+
+```bash
+cd /home/puneet/Projects/aster-browser/upstream-browseros
+git fetch aster aster-control
+git show aster/aster-control:coordination/worker.py > /tmp/aster-worker-update.py
+PYTHONPYCACHEPREFIX="$HOME/.cache/aster-worker-pycache" python3 -m py_compile /tmp/aster-worker-update.py
+install -m 700 /tmp/aster-worker-update.py "$HOME/.local/bin/aster-codex-worker.py"
+systemctl --user daemon-reload
+```
+
+The test file lives on `aster-control`, not necessarily the source checkout.
+If testing locally, fetch it through `git show` into a temporary test
+directory next to the worker or inspect the passing GitHub Actions control
+worker safety run. Do not merge the control branch into the feature branch.
+
+Only after a human has reconciled task-001 source changes and ChatGPT has
+published a **new task ID with the updated exact source SHA**, reenable the
+timer using `systemctl --user enable --now aster-codex-worker.timer`.
+
+The wrapper's automatic staging policy intentionally refuses files outside
+the source/docs allowlist, sensitive or oversized files, symlinks, changed
+HEADs, failed normal commit hooks and no-op runs. These cases require
+manual review; no automatic reset, force push or claim replay is permitted.
