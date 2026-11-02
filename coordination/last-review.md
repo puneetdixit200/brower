@@ -77,3 +77,38 @@ edit source only; a trusted wrapper checks path/size/diff/commit hooks and
 makes a normal source commit and push. Its [GitHub offline checks](https://github.com/puneetdixit200/brower/actions/runs/41387796456)
 passed syntax and local Git fixture tests. **This does not update the user's
 installed worker or repair task 001 automatically.**
+
+
+## 2026-11-02: manual reconciliation remains blocked by stream cancellation defect
+
+The laptop operator reports the **updated wrapper is installed** and passes
+Python compilation plus five offline Git tests; `gh` and Codex authentication
+are functional. The laptop timer is **disabled/inactive**. This is a reported
+local state, not independently observable by GitHub.
+
+The operator reports that ten task-001 source files remain **uncommitted and
+unchanged**, with **46 focused tests passing** on the laptop, including the
+formerly socket-blocked provider fixture. However, local review of an edited
+`apps/server/src/agent/provider-factory.ts` identified a **new unresolved
+stream-lifecycle defect**: the caller abort listener is removed on receipt of
+response headers, and the new timeout ends at headers. This may leave an
+ongoing streaming response body uncancelable and unbounded. The private local
+diff is not available in the pushed GitHub source branch; do **not** claim
+independent verification of this local implementation.
+
+**Safety decision: retain MANUAL HOLD** on task IDs 001 and 002. Do not
+publish task 003 or retry/overwrite task 001. Do not instruct laptop worker
+to commit the ten-file patch until:
+1. The provider abort/timeout lifecycle is repaired on the preserved local
+   diff, including abort and timeout after headers while the body is stalled.
+2. Focused tests verify both header-phase and body-phase interruption, final
+   cleanup of signals/readers, and no late provider/browser side effects.
+3. An independent read-only source review checks the full staged diff and
+   exact tests; any risky security or regression concerns are resolved.
+4. The user explicitly confirms a normal Git commit/push and clean local
+   worktree. The reviewer fetches and verifies the new exact source SHA.
+
+The original source branch remains `648f9499c1287016780aa88e977b6b0a447d0f05`
+as of this GitHub check. The timer is not to be reenabled on the old task ID.
+The revised wrapper's five passing offline tests do not prove an end-to-end
+laptop worker execution.
