@@ -100,6 +100,84 @@ def save_report(task_id: str, payload: dict[str, Any]) -> None:
     send_pending_reports()
 
 
+
+# Only the trusted wrapper may touch .git. Codex's workspace-write sandbox
+# intentionally does not grant .git write access.
+ALLOWED_SOURCE_PREFIXES = ("packages/", "docs/", "tools/", "scripts/", "skills/")
+MAX_FILES_PER_TASK = 80
+MAX_FILE_BYTES = 2_000_000
+MAX_TOTAL_BYTES = 8_000_000
+SENSITIVE_SUFFIXES = (".pem", ".key", ".p12", ".pfx", ".sqlite", ".db", ".log")
+SENSITIVE_PARTS = (".git", ".ssh", "node_modules", ".env", ".npmrc",
+                   ".netrc", "credentials", "secrets", "tokens")
+
+
+def git_command(repo: Path, *args: str, timeout: int = 90
+                ) -> subprocess.CompletedProcess[str]:
+    return command(["git", "-C", str(repo), *args], timeout=timeout)
+
+
+def commit_codex_changes(repo: Path, task_id: str, expected_head: str
+                         ) -> tuple[str | None, list[str]]:
+    """Stage bounded source changes and run normal commit hooks outside sandbox.
+
+    The starting checkout was clean and exact-SHA matched; refuse any surprise
+    commit, path outside source ownership, secret-looking file, or binary/symlink.
+    On failure leave the diff untouched for human inspection, never retry a task.
+    """
+    if git(repo, "rev-parse", "HEAD") != expected_head:
+        raise RuntimeError("HEAD changed during task; preserve all work for review")
+    changed = git_command(repo, "diff", "--name-only", "-z", "HEAD", "--")
+    unknown = git_command(repo, "ls-files", "--others", "--exclude-standard", "-z")
+    if changed.returncode or unknown.returncode:
+        raise RuntimeError("Cannot inspect task diff safely")
+    files = sorted(set(path for path in
+                       (changed.stdout + unknown.stdout).split("\0") if path))
+    if not files:
+        return None, []
+    if len(files) > MAX_FILES_PER_TASK:
+        raise RuntimeError("Task changed too many files; inspect manually")
+
+    total_bytes = 0
+    for name in files:
+        parts = Path(name).parts
+        if (not name.startswith(ALLOWED_SOURCE_PREFIXES) or
+                Path(name).is_absolute() or ".." in parts or
+                any(part in SENSITIVE_PARTS or part.startswith(".env")
+                    for part in parts) or
+                name.lower().endswith(SENSITIVE_SUFFIXES)):
+            raise RuntimeError(f"Refusing to auto-stage sensitive/unowned path: {name}")
+        target = repo / name
+        if target.is_symlink():
+            raise RuntimeError(f"Refusing to auto-stage symlink: {name}")
+        if target.exists():
+            if not target.is_file():
+                raise RuntimeError(f"Not an ordinary file: {name}")
+            size = target.stat().st_size
+            total_bytes += size
+            if size > MAX_FILE_BYTES or total_bytes > MAX_TOTAL_BYTES:
+                raise RuntimeError("Source diff exceeds bounded staging size")
+    if git_command(repo, "diff", "--check").returncode:
+        raise RuntimeError("Git whitespace check failed; source needs review")
+    added = git_command(repo, "add", "-A", "--", *files, timeout=120)
+    if added.returncode:
+        raise RuntimeError("Git staging failed: " + added.stderr.strip()[:260])
+    if git_command(repo, "diff", "--cached", "--check").returncode:
+        raise RuntimeError("Staged whitespace check failed")
+    staged = git_command(repo, "diff", "--cached", "--name-only", "-z")
+    staged_files = sorted(x for x in staged.stdout.split("\0") if x)
+    if staged.returncode or not staged_files or any(x not in files for x in staged_files):
+        raise RuntimeError("Unexpected staged files: preserve index for manual review")
+    committed = git_command(
+        repo, "commit", "-m", f"feat(aster): implement {task_id.lower()}",
+        timeout=300,
+    )
+    if committed.returncode:
+        raise RuntimeError("Commit hooks/commit failed: " + committed.stderr.strip()[:300])
+    return git(repo, "rev-parse", "HEAD"), staged_files
+
+
+
 def do_work(repo: Path) -> int:
     if not (repo / ".git").exists():
         raise RuntimeError("Expected an ordinary local Aster Git checkout")
@@ -161,8 +239,10 @@ def do_work(repo: Path) -> int:
             "coordination task below. Do not edit the control branch. "
             "Work only in the verified feature branch. Read authoritative "
             "docs and actual code; do not hallucinate. Produce reviewed "
-            "implementation, focused tests, and evidence. Commit with "
-            "Conventional Commits, without force pushing. If blocked, "
+            "implementation, focused tests, and evidence. DO NOT git add, "
+            "commit or push inside the sandbox: .git is intentionally "
+            "read-only. The trusted wrapper validates, commits and "
+            "normally pushes changed source after you exit. If blocked, "
             "stop and explain, do not bypass security. Max three Luna-medium "
             "subagents if such workers are actually available; never "
             "substitute Sol or Terra. End with a factual concise report.\n\n"
@@ -188,9 +268,26 @@ def do_work(repo: Path) -> int:
         report["end_sha"] = git(repo, "rev-parse", "HEAD")
         report["dirty_at_end"] = bool(git(repo, "status", "--porcelain=v1"))
         report["branch_at_end"] = git(repo, "branch", "--show-current")
-        if ran.returncode != 0 or report["dirty_at_end"] or                 report["branch_at_end"] != FEATURE:
+        if ran.returncode != 0 or report["branch_at_end"] != FEATURE:
             report["status"] = "needs-review"
-            report["reason"] = "Codex nonzero exit, dirty worktree, or branch changed"
+            report["reason"] = "Codex exited with error or changed source branch"
+            return 1
+
+        # Codex workspace-write cannot modify .git. Only this unsandboxed,
+        # preflight-verified wrapper may create a normal source commit.
+        new_head, changed_files = commit_codex_changes(repo, task_id, head)
+        report["changed_file_count"] = len(changed_files)
+        if new_head is None:
+            report["status"] = "no-changes"
+            report["reason"] = "Codex created no new source changes; no implementation commit"
+            return 1
+        report["committed_by_worker"] = True
+        report["end_sha"] = new_head
+        report["dirty_at_end"] = bool(git(repo, "status", "--porcelain=v1"))
+        if report["dirty_at_end"]:
+            report["status"] = "needs-review"
+            report["reason"] = "Commit hooks changed worktree after commit"
+            return 1
         else:
             push = command([
                 "git", "-C", str(repo), "push", "aster",
