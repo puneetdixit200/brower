@@ -1,7 +1,12 @@
 import { buildContentMarkdownExpression } from '@browseros/browser-core/content-markdown'
 import { TOOL_LIMITS } from '@browseros/shared/constants/limits'
 import { z } from 'zod/v4'
-import { defineTool, errorResult, textResult } from './framework'
+import {
+  defineTool,
+  errorResult,
+  textResult,
+  throwIfAborted,
+} from './framework'
 import { writeTempToolOutputFile } from './output-file'
 import { wrapUntrusted } from './trust-boundary'
 
@@ -16,6 +21,10 @@ async function mainFrameLoaderId(session: {
   } catch {
     return undefined
   }
+}
+
+function connectionEpoch(session: { connectionEpoch?: () => number }) {
+  return session.connectionEpoch?.()
 }
 
 function expressionFor(
@@ -55,9 +64,18 @@ export const read = defineTool({
     .strict(),
   annotations: { title: 'Read page content', readOnlyHint: true },
   handler: async (args, ctx) => {
+    throwIfAborted(ctx.signal)
+    const epochBefore = connectionEpoch(ctx.session)
     const pageSession = await ctx.session.pages.getSession(args.page)
+    throwIfAborted(ctx.signal)
     const { session } = pageSession
     const loaderBefore = await mainFrameLoaderId(session)
+    if (!loaderBefore) {
+      return errorResult(
+        'read: cannot verify selected document identity; retry',
+      )
+    }
+    throwIfAborted(ctx.signal)
     const code =
       args.format === 'markdown'
         ? buildContentMarkdownExpression({
@@ -71,6 +89,7 @@ export const read = defineTool({
       expression: code,
       returnByValue: true,
     })
+    throwIfAborted(ctx.signal)
     if (result.exceptionDetails) {
       return errorResult(
         `read: ${
@@ -82,23 +101,34 @@ export const read = defineTool({
 
     // Refresh from the browser after evaluation: getInfo() alone can be stale
     // while navigation or tab replacement is in flight.
-    const currentPage =
-      (await ctx.session.pages.refresh(args.page)) ??
-      ctx.session.pages.getInfo(args.page)
+    const currentPage = await ctx.session.pages.refresh(args.page)
+    throwIfAborted(ctx.signal)
     const loaderAfter = await mainFrameLoaderId(session)
+    if (!loaderAfter) {
+      return errorResult(
+        'read: cannot verify selected document identity after read; retry',
+      )
+    }
     if (
+      (epochBefore !== undefined &&
+        connectionEpoch(ctx.session) !== epochBefore) ||
       !currentPage ||
-      (pageSession.targetId && currentPage.targetId !== pageSession.targetId) ||
-      (pageSession.url && currentPage.url !== pageSession.url) ||
-      (loaderBefore && loaderAfter && loaderBefore !== loaderAfter)
+      currentPage.pageId !== args.page ||
+      currentPage.targetId !== pageSession.targetId ||
+      currentPage.url !== pageSession.url ||
+      loaderBefore !== loaderAfter
     ) {
       return errorResult(
         `read: page ${args.page} navigated, changed, or closed during read; retry`,
       )
     }
 
-    const text = (result.result?.value as string) ?? ''
-    const origin = pageSession.url || currentPage.url || 'unknown'
+    const value = result.result?.value
+    if (typeof value !== 'string') {
+      return errorResult('read: CDP returned no page text; retry')
+    }
+    const text = value
+    const origin = pageSession.url
     const structured = {
       page: args.page,
       format: args.format,
@@ -114,11 +144,13 @@ export const read = defineTool({
       })
     }
 
+    throwIfAborted(ctx.signal)
     const path = await writeTempToolOutputFile({
       toolName: 'read',
       extension: args.format === 'markdown' ? 'md' : 'txt',
       content: wrapUntrusted(text, origin),
     })
+    throwIfAborted(ctx.signal)
     const truncated = text.slice(0, TOOL_LIMITS.INLINE_PAGE_CONTENT_MAX_CHARS)
     return textResult(
       [

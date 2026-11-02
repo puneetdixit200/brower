@@ -1,6 +1,10 @@
 # Aster native development path
 
-Planning checkpoint: 2026-10-28. Terra inspected the existing Python source-resource pipeline and native extension loader. The original path was proposed at this checkpoint. Later 2026-10-28 GitHub source commits implemented much of its Python resource/GN/native-loader wiring, but **nothing has been compiled or runtime-tested**. It does not replace the release requirements.
+## Progress checkpoint — 2026-11-02
+
+The pinned Chromium checkout was verified at `16c3e55476d3564bea713314b2fff638749ce3e6` with 319 pre-existing dirty paths; it remained unchanged. A single syntax-only check of the untracked native `browseros_extension_loader.cc`, using its existing generated compile metadata, exited 0 under 4 GiB address-space, 150-second CPU, and 180-second wall limits. The full command and result are in [`aster-native-loader-syntax-2026-11-02.json`](evidence/aster-native-loader-syntax-2026-11-02.json), SHA-256 `f5d8d67c4aed1d37b1e8c650abfa4d00707ddd1672fad259af92c9468bdd8b57`, and were independently reviewed. This did not generate an object or linked binary. `.ninja_log` remains absent, staged extension resources are empty, and no native BrowserOS/Aster executable was linked or launched. No GN regeneration or Ninja build was attempted. Keep T20a / native-dependent rows PARTIAL until a safe low-concurrency build/link and disposable-profile native acceptance are available.
+
+Planning checkpoint: 2026-10-28. Terra inspected the existing Python source-resource pipeline and native extension loader. The original path was proposed at this checkpoint. Later 2026-10-28 GitHub source commits implemented much of its Python resource/GN/native-loader wiring. At the planning checkpoint nothing had been compiled or runtime-tested; the 2026-11-02 bounded syntax-only result is recorded above and does not replace native build or release requirements.
 
 ## Why the current source build stops
 

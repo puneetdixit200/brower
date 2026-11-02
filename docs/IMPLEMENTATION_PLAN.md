@@ -1,6 +1,6 @@
 # Aster Browser implementation plan
 
-Last reviewed: 2026-10-30. Scope: pinned BrowserOS `0792066b8fc7377e59a9dbb2ced3a977cd6a1310`, branch `feat/aster-linux-ui`, Omarchy x86_64 target. This is a work plan, not a feature-completion claim. [`FEATURE_MATRIX.md`](FEATURE_MATRIX.md) is the row-level acceptance ledger; [`PROGRESS.md`](PROGRESS.md) is the execution record. A PASS row requires Aster runtime evidence, not a stock BrowserOS baseline.
+Last reviewed: 2026-11-02. Scope: pinned BrowserOS `0792066b8fc7377e59a9dbb2ced3a977cd6a1310`, branch `feat/aster-linux-ui`, Omarchy x86_64 target. This is a work plan, not a feature-completion claim. [`FEATURE_MATRIX.md`](FEATURE_MATRIX.md) is the row-level acceptance ledger; [`PROGRESS.md`](PROGRESS.md) is the execution record. A PASS row requires Aster runtime evidence, not a stock BrowserOS baseline.
 
 ## Goal instructions (user updates 2026-10-27 and 2026-10-28)
 
@@ -13,6 +13,8 @@ The authoritative master source is [`OMARCHY_ASIDE_INSPIRED_BROWSER_MASTER_BUILD
 Interpret the user’s 5% limit as **5% remaining account usage allowance**. Check the current account usage at batch boundaries. When either applicable usage window reaches 95% used (5% remaining), stop dispatching work, bring task-owned agents to a safe stopping point, stop task-owned disposable test processes, commit and push reviewed current work with honest incomplete-work notes, update `NEXT_STEPS.md`, and stop project work for the session. Do not mark the overall goal complete or change its active status solely because the quota threshold was reached.
 
 ## Execution rules and gates
+
+Latest integration evidence is recorded in [`evidence/aster-a01-a02-production-integration-2026-11-02.md`](evidence/aster-a01-a02-production-integration-2026-11-02.md). The native check in that milestone is one resource-bounded `-fsyntax-only` translation unit against existing generated metadata; it does not satisfy the native build/link/runtime gate below. Preserve native dirty state and do not regenerate GN or launch Ninja until the documented state and resource gate is satisfied.
 
 1. At each batch start, capture `git status --short`, read all touched code and current matrix rows, and reserve exclusive file ownership. Existing edits are valuable; do not reset, overwrite, or commit them implicitly. A worker handles one bounded task or a tightly coupled pair. Separate worktrees are preferred when overlap is likely; this checkout's uncommitted changes do not copy automatically to them.
 2. Luna medium workers implement code, focused tests and short evidence reports. Use Luna medium for independent review and difficult integration as well. Keep handoffs bounded, avoid duplicate investigation, and independently inspect evidence rather than accepting implementation assertions as proof.

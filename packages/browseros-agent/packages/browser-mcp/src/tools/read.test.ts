@@ -7,11 +7,29 @@ function sessionWithRead(result: unknown): BrowserSession {
   return {
     pages: {
       getSession: async () => ({
-        session: { Runtime: { evaluate: async () => result } },
+        targetId: 'target-a',
+        url: 'https://example.com/article?edition=1',
+        session: {
+          Page: {
+            getFrameTree: async () => ({
+              frameTree: { frame: { loaderId: 'loader-a' } },
+            }),
+          },
+          Runtime: { evaluate: async () => result },
+        },
       }),
-      getInfo: () => ({ url: 'https://example.com/article?edition=1' }),
-      refresh: async () => ({ url: 'https://example.com/article?edition=1' }),
+      getInfo: () => ({
+        pageId: 7,
+        targetId: 'target-a',
+        url: 'https://example.com/article?edition=1',
+      }),
+      refresh: async () => ({
+        pageId: 7,
+        targetId: 'target-a',
+        url: 'https://example.com/article?edition=1',
+      }),
     },
+    connectionEpoch: () => 1,
   } as unknown as BrowserSession
 }
 
@@ -47,6 +65,169 @@ describe('read tool source URL metadata', () => {
     expect(result.structuredContent).toBeUndefined()
   })
 
+  it('does not use stale cached identity when refresh reports a closed page', async () => {
+    const session = sessionWithRead({
+      result: { value: 'possibly stale text' },
+    })
+    ;(
+      session.pages as unknown as { refresh: () => Promise<undefined> }
+    ).refresh = async () => undefined
+
+    const result = await executeTool(
+      read,
+      { page: 7, format: 'text' },
+      { session },
+    )
+
+    expect(result.isError).toBe(true)
+    expect(result.structuredContent).toBeUndefined()
+  })
+
+  it('does not report success when CDP has no string value', async () => {
+    const result = await executeTool(
+      read,
+      { page: 7, format: 'text' },
+      { session: sessionWithRead({ result: {} }) },
+    )
+
+    expect(result.isError).toBe(true)
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: 'read: CDP returned no page text; retry',
+    })
+    expect(result.structuredContent).toBeUndefined()
+  })
+
+  it('fails closed when the main-frame loader identity cannot be verified', async () => {
+    let evaluateCalled = false
+    const session = sessionWithRead({ result: { value: 'unverified content' } })
+    ;(
+      session.pages as unknown as {
+        getSession: () => Promise<{
+          targetId: string
+          url: string
+          session: { Runtime: { evaluate: () => Promise<unknown> } }
+        }>
+      }
+    ).getSession = async () => ({
+      targetId: 'target-a',
+      url: 'https://example.com/article?edition=1',
+      session: {
+        Runtime: {
+          evaluate: async () => {
+            evaluateCalled = true
+            return { result: { value: 'unverified content' } }
+          },
+        },
+      },
+    })
+
+    const result = await executeTool(
+      read,
+      { page: 7, format: 'text' },
+      { session },
+    )
+
+    expect(result.isError).toBe(true)
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: 'read: cannot verify selected document identity; retry',
+    })
+    expect(evaluateCalled).toBe(false)
+    expect(result.structuredContent).toBeUndefined()
+  })
+
+  it('fails closed if the loader identity disappears after evaluation', async () => {
+    let frameTreeCalls = 0
+    const session = sessionWithRead({ result: { value: 'unverified content' } })
+    ;(
+      session.pages as unknown as {
+        getSession: () => Promise<{
+          targetId: string
+          url: string
+          session: {
+            Page: { getFrameTree: () => Promise<unknown> }
+            Runtime: { evaluate: () => Promise<unknown> }
+          }
+        }>
+      }
+    ).getSession = async () => ({
+      targetId: 'target-a',
+      url: 'https://example.com/article?edition=1',
+      session: {
+        Page: {
+          getFrameTree: async () => {
+            frameTreeCalls += 1
+            return frameTreeCalls === 1
+              ? { frameTree: { frame: { loaderId: 'loader-a' } } }
+              : { frameTree: { frame: {} } }
+          },
+        },
+        Runtime: {
+          evaluate: async () => ({
+            result: { value: 'unverified content' },
+          }),
+        },
+      },
+    })
+
+    const result = await executeTool(
+      read,
+      { page: 7, format: 'text' },
+      { session },
+    )
+
+    expect(result.isError).toBe(true)
+    expect(result.content[0]).toMatchObject({
+      type: 'text',
+      text: 'read: cannot verify selected document identity after read; retry',
+    })
+    expect(result.structuredContent).toBeUndefined()
+  })
+
+  it('rejects content if CDP reconnects during evaluation', async () => {
+    let epoch = 1
+    const session = sessionWithRead({
+      result: { value: 'old connection text' },
+    })
+    ;(session as unknown as { connectionEpoch: () => number }).connectionEpoch =
+      () => epoch
+    ;(
+      session.pages as unknown as {
+        getSession: () => Promise<{
+          targetId: string
+          url: string
+          session: { Runtime: { evaluate: () => Promise<unknown> } }
+        }>
+      }
+    ).getSession = async () => ({
+      targetId: 'target-a',
+      url: 'https://example.com/article?edition=1',
+      session: {
+        Page: {
+          getFrameTree: async () => ({
+            frameTree: { frame: { loaderId: 'loader-a' } },
+          }),
+        },
+        Runtime: {
+          evaluate: async () => {
+            epoch = 2
+            return { result: { value: 'old connection text' } }
+          },
+        },
+      },
+    })
+
+    const result = await executeTool(
+      read,
+      { page: 7, format: 'text' },
+      { session },
+    )
+
+    expect(result.isError).toBe(true)
+    expect(result.structuredContent).toBeUndefined()
+  })
+
   it('rejects content if the selected page ID is rebound during evaluation', async () => {
     let current = { pageId: 7, targetId: 'target-a', url: 'https://a.example' }
     let finish!: (value: unknown) => void
@@ -58,7 +239,14 @@ describe('read tool source URL metadata', () => {
         getSession: async () => ({
           targetId: 'target-a',
           url: 'https://a.example',
-          session: { Runtime: { evaluate: async () => pending } },
+          session: {
+            Page: {
+              getFrameTree: async () => ({
+                frameTree: { frame: { loaderId: 'loader-a' } },
+              }),
+            },
+            Runtime: { evaluate: async () => pending },
+          },
         }),
         getInfo: () => current,
         refresh: async () => current,
@@ -96,7 +284,14 @@ describe('read tool source URL metadata', () => {
         getSession: async () => ({
           targetId: 'target-a',
           url: 'https://a.example/start',
-          session: { Runtime: { evaluate: async () => pending } },
+          session: {
+            Page: {
+              getFrameTree: async () => ({
+                frameTree: { frame: { loaderId: 'loader-a' } },
+              }),
+            },
+            Runtime: { evaluate: async () => pending },
+          },
         }),
         getInfo: () => staleCache,
         refresh: async () => livePage,
@@ -183,6 +378,11 @@ describe('read tool source URL metadata', () => {
       targetId: 'target-source',
       url: 'https://source.example/article',
       session: {
+        Page: {
+          getFrameTree: async () => ({
+            frameTree: { frame: { loaderId: 'loader-source' } },
+          }),
+        },
         Runtime: {
           evaluate: async () => ({ result: { value: 'Page contents' } }),
         },
@@ -192,11 +392,13 @@ describe('read tool source URL metadata', () => {
       session.pages as unknown as { getSession: typeof pageSession }
     ).getSession = pageSession
     ;(session.pages as unknown as { getInfo: () => unknown }).getInfo = () => ({
+      pageId: 7,
       targetId: 'target-source',
       url: 'https://source.example/article',
     })
     ;(session.pages as unknown as { refresh: () => Promise<unknown> }).refresh =
       async () => ({
+        pageId: 7,
         targetId: 'target-source',
         url: 'https://source.example/article',
       })

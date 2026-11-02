@@ -104,6 +104,9 @@ def main() -> int:
         "B_ONLY": f"ASTER_CASE_B_ONLY_{run_id}",
         "COMPARE": f"ASTER_CASE_COMPARE_{run_id}",
         "CANCEL": f"ASTER_CASE_CANCEL_{run_id}",
+        "NAVIGATE": f"ASTER_CASE_NAVIGATE_{run_id}",
+        "DISAPPEAR": f"ASTER_CASE_DISAPPEAR_{run_id}",
+        "PROVIDER_401": f"ASTER_CASE_PROVIDER_401_{run_id}",
     }
     marker_to_case = {marker: case for case, marker in case_markers.items()}
 
@@ -114,16 +117,31 @@ def main() -> int:
     cancel_waiting = threading.Event()
     cancel_release = threading.Event()
     cancel_requested = threading.Event()
+    read_started = threading.Event()
     issued_calls: list[dict] = []
     observed_results: dict[str, list[dict]] = {
         case: [] for case in case_markers
     }
     page_by_id: dict[str, dict[int, str]] = {case: {} for case in case_markers}
     failure_messages: list[str] = []
+    provider_statuses: list[dict] = []
     context_lock = threading.Lock()
 
     class PageHandler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:
+            if self.path.startswith("/read-start"):
+                read_started.set()
+                self.send_response(204)
+                self.end_headers()
+                return
+            self.send_error(404)
+
         def do_GET(self) -> None:
+            if self.path.startswith("/read-start"):
+                read_started.set()
+                self.send_response(204)
+                self.end_headers()
+                return
             spec = next(
                 (page for page in pages.values() if self.path.startswith(page["path"])),
                 None,
@@ -131,6 +149,17 @@ def main() -> int:
             if spec is None:
                 self.send_error(404)
                 return
+            delay_script = ""
+            if "slowread=1" in self.path:
+                delay_script = (
+                    "<script>(()=>{const native=Object.getOwnPropertyDescriptor("
+                    "HTMLElement.prototype,'innerText').get;Object.defineProperty("
+                    "document.body,'innerText',{configurable:true,get(){"
+                    "navigator.sendBeacon('/read-start?case='+(location.search.includes('disappear=1')?"
+                    "'DISAPPEAR':'NAVIGATE'));"
+                    "const end=performance.now()+1500;while(performance.now()<end){};"
+                    "return native.call(this)}})})()</script>"
+                )
             body = (
                 "<!doctype html><meta charset=utf-8><title>"
                 + spec["title"]
@@ -141,6 +170,7 @@ def main() -> int:
                 + "</p><p>Evidence token: "
                 + spec["token"]
                 + "</p></main>"
+                + delay_script
             ).encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -182,6 +212,22 @@ def main() -> int:
             context_waiting[marker].set()
             if not context_ready[marker].wait(timeout=25):
                 self._fixture_error(case, "UI did not verify the submitted page context")
+                return
+            if case == "PROVIDER_401":
+                provider_statuses.append({"case": case, "status": 401})
+                body = json.dumps(
+                    {
+                        "error": {
+                            "message": "Synthetic provider authentication failure",
+                            "type": "authentication_error",
+                        }
+                    }
+                ).encode()
+                self.send_response(401)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
                 return
             tools = request.get("tools", [])
             tool_names = {
@@ -306,6 +352,54 @@ def main() -> int:
                 return
 
             if read_calls:
+                if case in {"NAVIGATE", "DISAPPEAR"}:
+                    if len(read_calls) != 1:
+                        self._fixture_error(case, "expected one pending navigation read")
+                        return
+                    call = read_calls[0]
+                    call_id = str(call.get("id", ""))
+                    result_message = results.get(call_id)
+                    if result_message is None:
+                        self._fixture_error(case, "navigation read result was not returned")
+                        return
+                    result_text = _message_text(result_message)
+                    error_match = re.fullmatch(
+                        r"read: page ([0-9]+) navigated, changed, or closed during read; retry",
+                        result_text.strip(),
+                    )
+                    args = json.loads(call.get("function", {}).get("arguments", "{}"))
+                    page_id = int(args.get("page", -1))
+                    if (
+                        not error_match
+                        or int(error_match.group(1)) != page_id
+                        or page_id not in page_by_id[case]
+                    ):
+                        self._fixture_error(
+                            case,
+                            "pending-read result did not name the selected page's exact read error",
+                        )
+                        return
+                    observed_results[case].append(
+                        {
+                            "toolCallId": call_id,
+                            "page": page_id,
+                            "url": page_by_id[case].get(page_id),
+                            "content": result_text,
+                        }
+                    )
+                    self._complete(
+                        _json_response(
+                            {
+                                "role": "assistant",
+                                "content": (
+                                    "The selected source changed or disappeared during the read; its content is unavailable, "
+                                    "so no page status is claimed. Browser MCP result: "
+                                    + result_text
+                                ),
+                            }
+                        )
+                    )
+                    return
                 facts: list[str] = []
                 for call in read_calls:
                     call_id = str(call.get("id", ""))
@@ -447,6 +541,10 @@ def main() -> int:
         previous_default = app.evaluate(
             f"fetch({json.dumps(api + '/providers/default')}).then(r=>r.json()).then(x=>x.provider?.id||null)"
         )
+        # Mark this for cleanup before the request: the server may create the
+        # row even if the response or the following default-selection request
+        # fails on the client side.
+        provider_created = True
         setup = app.evaluate(
             f"(async()=>{{const h={{'Content-Type':'application/json'}};"
             f"const s=await fetch({json.dumps(api + '/providers/' + provider_id)},"
@@ -456,17 +554,16 @@ def main() -> int:
             f"{{method:'PUT',headers:h,body:JSON.stringify({{providerId:{json.dumps(provider_id)}}})}});"
             "return {created:true,selected:d.status}})()"
         )
-        provider_created = bool(isinstance(setup, dict) and setup.get("created"))
         if setup != {"created": True, "selected": 200}:
             raise RuntimeError(f"could not configure deterministic local provider: {setup!r}")
 
         page_ids = app.evaluate(
-            "Promise.all(["
+            "Promise.allSettled(["
             + ",".join(
                 f"chrome.tabs.create({{url:{json.dumps(spec['url'])},active:{'true' if key == 'C' else 'false'}}})"
                 for key, spec in pages.items()
             )
-            + "]).then(tabs=>tabs.map(tab=>tab.id))"
+            + "]).then(results=>results.flatMap(result=>result.status==='fulfilled'?[result.value.id]:[]))"
         )
         if not isinstance(page_ids, list) or len(page_ids) != 3:
             raise RuntimeError(f"could not create A/B/unrelated loopback tabs: {page_ids!r}")
@@ -596,6 +693,101 @@ def main() -> int:
                 }
                 return case_results[case]
 
+            if case in {"NAVIGATE", "DISAPPEAR"}:
+                if not read_started.wait(timeout=20):
+                    raise TimeoutError("Browser MCP read never entered the delayed page getter")
+                if case == "NAVIGATE":
+                    navigated_url = base + pages["A"]["path"] + f"?run={run_id}&navigation=committed"
+                    pending_target = wait_target(
+                        cdp_base,
+                        lambda target: target.get("type") == "page"
+                        and target.get("url") == slow_read_url,
+                        args.target_timeout,
+                    )
+                    page_cdp = CDP(pending_target["webSocketDebuggerUrl"])
+                    try:
+                        page_cdp.call("Page.navigate", {"url": navigated_url})
+                    finally:
+                        page_cdp.ws.close()
+                    pages["A"]["url"] = navigated_url
+                    wait_target(
+                        cdp_base,
+                        lambda target: target.get("type") == "page"
+                        and target.get("url") == navigated_url,
+                        args.target_timeout,
+                    )
+                else:
+                    disappeared_url = "about:blank"
+                    pending_target = wait_target(
+                        cdp_base,
+                        lambda target: target.get("type") == "page"
+                        and target.get("url") == slow_close_url,
+                        args.target_timeout,
+                    )
+                    page_cdp = CDP(pending_target["webSocketDebuggerUrl"])
+                    try:
+                        page_cdp.call("Page.navigate", {"url": disappeared_url})
+                    finally:
+                        page_cdp.ws.close()
+                    pages["B"]["url"] = disappeared_url
+                    wait_target(
+                        cdp_base,
+                        lambda target: target.get("type") == "page"
+                        and target.get("url") == disappeared_url,
+                        args.target_timeout,
+                    )
+                wait_js(
+                    panel,
+                    "document.body.innerText.includes('content is unavailable')",
+                    timeout=35,
+                )
+                visible = panel.evaluate("document.body.innerText.slice(-2000)")
+                if "no page status is claimed" not in visible:
+                    raise AssertionError(f"navigation response did not avoid a stale status claim: {visible!r}")
+                rows = observed_results[case]
+                if len(rows) != 1 or not any(
+                    phrase in rows[0]["content"].lower()
+                    for phrase in ("navigated, changed, or closed", "read failed:")
+                ):
+                    raise AssertionError(f"pending navigation did not produce a read error: {rows!r}")
+                case_results[case] = {
+                    "selected_url_at_submit": expected_urls[0],
+                    "interruption": "navigation" if case == "NAVIGATE" else "source navigated to about:blank",
+                    "navigated_url_during_read": navigated_url if case == "NAVIGATE" else disappeared_url,
+                    "tabs_calls": sum(
+                        call["case"] == case and call["name"] == "tabs"
+                        for call in issued_calls
+                    ),
+                    "read_calls": sum(
+                        call["case"] == case and call["name"] == "read"
+                        for call in issued_calls
+                    ),
+                    "tool_call_id": rows[0]["toolCallId"],
+                    "read_error": rows[0]["content"],
+                    "visible_answer": visible,
+                    "stale_page_status_claimed": False,
+                }
+                return case_results[case]
+
+            if case == "PROVIDER_401":
+                wait_js(
+                    panel,
+                    "document.body.innerText.includes('Authentication failed') && "
+                    "document.body.innerText.includes('Synthetic provider authentication failure')",
+                    timeout=35,
+                )
+                visible = panel.evaluate("document.body.innerText.slice(-2000)")
+                if provider_statuses.count({"case": case, "status": 401}) != 1:
+                    raise AssertionError(f"provider fixture did not return exactly one 401: {provider_statuses!r}")
+                if any(call["case"] == case for call in issued_calls):
+                    raise AssertionError("Browser MCP was called after the provider rejected authentication")
+                case_results[case] = {
+                    "provider_status": 401,
+                    "visible_error": visible,
+                    "browser_tool_calls": 0,
+                }
+                return case_results[case]
+
             expected_tokens = [pages[key]["token"] for key in selected]
             expected_facts = [pages[key]["component"] + ": " + pages[key]["status"] for key in selected]
             wait_js(
@@ -701,6 +893,53 @@ def main() -> int:
             "Read both selected pages and compare their statuses. Stop should cancel before any read.",
         )
 
+        slow_read_url = base + pages["A"]["path"] + f"?run={run_id}&slowread=1"
+        read_started.clear()
+        updated = app.evaluate(
+            f"chrome.tabs.update({ids['A']},{{url:{json.dumps(slow_read_url)}}}).then(()=>true)"
+        )
+        if updated is not True:
+            raise AssertionError(f"could not dispatch delayed-read navigation: {updated!r}")
+        pages["A"]["url"] = slow_read_url
+        wait_target(
+            cdp_base,
+            lambda target: target.get("type") == "page" and target.get("url") == slow_read_url,
+            args.target_timeout,
+        )
+        _select_page(panel, pages["A"]["title"])
+        case_results["NAVIGATE"] = submit_case(
+            "NAVIGATE",
+            ["A"],
+            "Read the selected Authentication page. If it changes during the read, report that it is unavailable.",
+        )
+
+        slow_close_url = base + pages["B"]["path"] + f"?run={run_id}&slowread=1&disappear=1"
+        read_started.clear()
+        updated = app.evaluate(
+            f"chrome.tabs.update({ids['B']},{{url:{json.dumps(slow_close_url)}}}).then(()=>true)"
+        )
+        if updated is not True:
+            raise AssertionError(f"could not dispatch disappearing-page navigation: {updated!r}")
+        pages["B"]["url"] = slow_close_url
+        wait_target(
+            cdp_base,
+            lambda target: target.get("type") == "page" and target.get("url") == slow_close_url,
+            args.target_timeout,
+        )
+        _select_page(panel, pages["B"]["title"])
+        case_results["DISAPPEAR"] = submit_case(
+            "DISAPPEAR",
+            ["B"],
+            "Read the selected Database Migration page. If its source disappears during the read, report it unavailable.",
+        )
+
+        _select_page(panel, pages["A"]["title"])
+        case_results["PROVIDER_401"] = submit_case(
+            "PROVIDER_401",
+            ["A"],
+            "Test the provider connection and report any authentication failure clearly.",
+        )
+
         for case, expected_count in (("A_ONLY", 1), ("B_ONLY", 1), ("COMPARE", 2)):
             if case_results[case]["tabs_calls"] != 1:
                 raise AssertionError(f"{case} did not call Browser MCP tabs exactly once")
@@ -710,6 +949,16 @@ def main() -> int:
                 )
         if case_results["CANCEL"]["read_calls"] != 0:
             raise AssertionError("canceled task dispatched a read")
+        if case_results["NAVIGATE"]["tabs_calls"] != 1 or case_results["NAVIGATE"]["read_calls"] != 1:
+            raise AssertionError("navigation-during-read case did not dispatch exactly one tabs/read call")
+        if case_results["DISAPPEAR"]["tabs_calls"] != 1 or case_results["DISAPPEAR"]["read_calls"] != 1:
+            raise AssertionError("disappearing-page case did not dispatch exactly one tabs/read call")
+        if case_results["PROVIDER_401"]["provider_status"] != 401:
+            raise AssertionError("provider authentication case did not receive a 401")
+        if len(provider_requests) != 18:
+            raise AssertionError(
+                f"expected exactly 18 provider turns across the fixture journeys, got {len(provider_requests)}"
+            )
         if failure_messages:
             raise AssertionError(f"provider fixture errors: {failure_messages!r}")
 
@@ -728,6 +977,7 @@ def main() -> int:
                 for call in issued_calls
             ],
             "provider_turns": len(provider_requests),
+            "provider_statuses": provider_statuses,
             "provider_errors": failure_messages,
             "real_model_evaluation": "unavailable; no authorized configured model found",
             "egress_enforcement_claim": False,
@@ -746,7 +996,7 @@ def main() -> int:
                     "Promise.all(" + json.dumps(page_ids) + ".map(async id=>{try{await chrome.tabs.remove(id);return true}"
                     "catch{try{await chrome.tabs.get(id);return false}catch{return true}}}))"
                 )
-                if removed != [True, True, True]:
+                if removed != [True] * len(page_ids):
                     cleanup_errors.append(f"fixture tab removal was not confirmed: {removed!r}")
             except Exception as error:
                 cleanup_errors.append(f"fixture tab cleanup failed: {error}")
