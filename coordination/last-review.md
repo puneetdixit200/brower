@@ -1,32 +1,58 @@
-# ChatGPT review checkpoint — 2026-11-02
+# Aster GitHub reviewer checkpoint — 2026-11-02 09:26 IST
 
-Feature branch: `feat/aster-linux-ui`
-Reviewed HEAD: `648f9499c1287016780aa88e977b6b0a447d0f05`
-Task published: `ASTER-20261102-001`
-Status: **awaiting laptop claim**
+Source branch: `feat/aster-linux-ui`
+Verified source HEAD: `648f9499c1287016780aa88e977b6b0a447d0f05`
+Control task reviewed: `ASTER-20261102-001`
+Result: **NEEDS-REVIEW / MANUAL LOCAL RECONCILIATION REQUIRED**
+Next task planned: `ASTER-20261102-002`, inspection-only and not an implementation retry.
 
-## Evidence checked
-- `docs/evidence/aster-a01-a02-production-integration-2026-11-02.md`
-- `docs/evidence/aster-native-loader-syntax-2026-11-02.json`
-- `docs/NEXT_STEPS.md`
+## Verified GitHub evidence
 
-Headed deterministic BrowserOS integration demonstrated Page A/B comparison,
-real selected-page reads and stale-page navigation errors. The server fixture
-covers several provider error modes, but a real provider/model has not been
-authorized and provider timeouts remain unverified. Actual tab-close during
-read was not demonstrated cleanly. Native loader compilation was syntax-only,
-not an object, link or native runtime launch.
+- Immutable claim created at `2026-11-02T02:50:12Z`, clean local preflight.
+- Immutable report created at `2026-11-02T02:54:08Z`.
+- Report states Codex exit code `0`, but `dirty_at_end: true` and
+  `end_sha` unchanged from the starting commit. The worker therefore
+  correctly classified the run `needs-review`, did **not** push and
+  did **not** verify implementation success.
+- GitHub source branch still equals the pre-task SHA. No new task-001
+  implementation commit or source evidence was published.
+- The earlier A01/A02 deterministic headed evidence and feature matrix remain
+  as previously recorded: provider timeout and actual tab-close-during-read
+  are unverified, native Aster is not linked, real-model evaluation is
+  unverified, and A01/A02 remain PARTIAL.
 
-## Decision
-Task 001 implements and measures **provider timeout handling** and
-**tab-close-during-read** in the existing headed pipeline. It must not invent
-real-model evidence, disable security guards or touch unsafe native build
-state. Do not publish task 002 until task 001 has a terminal immutable report,
-or an explicit stalled-run recovery decision is made.
+## Safety decision
 
-## Operational note
-ChatGPT's built-in scheduled automation cannot run every 30 minutes. This
-control branch provides the durable mailbox; the laptop polls every 30
-minutes. ChatGPT review cadence requires an eligible scheduled task (hourly
-minimum) or a separately authorized API-based reviewer. No such ChatGPT
-automation has been activated by writing this file.
+The missing information is the laptop's uncommitted working-tree diff and
+Codex's local log for task 001. The worker has no authority to clean, reset,
+stash, overwrite, or replay uncertain changes. A successful CLI exit does not
+prove source changes were committed or tested.
+
+Publish a **single inspection-only recovery task** (`ASTER-20261102-002`)
+with the unchanged exact source SHA. Its clean-worktree preflight will
+deliberately block while the local checkout remains dirty. Do not publish
+another implementation task or repeatedly rotate recovery IDs until the
+local changes have been reviewed and safely reconciled.
+
+## Human inspection required
+
+On the laptop, preserve the work and inspect:
+```bash
+systemctl --user disable --now aster-codex-worker.timer
+cd /home/puneet/Projects/aster-browser/upstream-browseros
+git status --short --branch
+git diff --stat
+git diff --cached --stat
+git ls-files --others --exclude-standard
+tail -n 80 ~/.local/state/aster-codex-loop/logs/ASTER-20261102-001.log
+```
+Do not run `git reset --hard`, `git clean`, `git checkout -- .`,
+`git restore`, or delete the local log. Inspect before deciding whether
+to commit, preserve or revert individual changes. If user-approved changes
+are committed and pushed, create a fresh task against the new verified SHA.
+
+## Source references
+
+- Claim: https://github.com/puneetdixit200/brower/blob/aster-control/coordination/claims/ASTER-20261102-001.json
+- Report: https://github.com/puneetdixit200/brower/blob/aster-control/coordination/reports/ASTER-20261102-001.json
+- Source: https://github.com/puneetdixit200/brower/commit/648f9499c1287016780aa88e977b6b0a447d0f05
