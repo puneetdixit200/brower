@@ -32,10 +32,14 @@ Every run:
    review, existing feature acceptance criteria, and at-most-three Luna
    medium workers (if truly supported).
 8. If the report says `blocked`, `needs-review` or `push-rejected`:
-   write a safe, narrow recovery task with a new ID, without replaying
-   uncertain side effects or overwriting local commits. If local worktree
-   is dirty or diverged, explain required human action rather than directing
-   a reset/clean/force push.
+   STOP automatic task issuance whenever a source worktree is dirty, commits
+   are unpushed, or an earlier task's side effects are uncertain. The current
+   task's `Safety-mode: inspection-only-manual-hold` is an absolute gate:
+   do not create task 003 or rotate recovery IDs until the user explicitly
+   reports that the local source diff has been reviewed and safely committed
+   or otherwise reconciled, and GitHub confirms its new source SHA. Note the
+   blocker in last-review, not another execution task. Never replay uncertain
+   work, reset/clean/stash without human approval or overwrite local commits.
 9. Update only `coordination/last-review.md` and
    `coordination/next-task.md` on **aster-control**, using exact latest
    blob SHAs and separate SHA-checked writes. Never commit to the feature
