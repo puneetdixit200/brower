@@ -1,0 +1,14 @@
+{
+  "base_sha": "648f9499c1287016780aa88e977b6b0a447d0f05",
+  "dirty_at_start": true,
+  "end_sha": "648f9499c1287016780aa88e977b6b0a447d0f05",
+  "finished_at": "2026-11-02T04:00:14.502599+00:00",
+  "observed_head": "648f9499c1287016780aa88e977b6b0a447d0f05",
+  "observed_remote": "648f9499c1287016780aa88e977b6b0a447d0f05",
+  "reason": "branch, source SHA, or working tree differs from task baseline",
+  "schema": 1,
+  "source_branch": "feat/aster-linux-ui",
+  "started_at": "2026-11-02T04:00:14.502574+00:00",
+  "status": "blocked",
+  "task_id": "ASTER-20261102-002"
+}
