@@ -112,3 +112,37 @@ The original source branch remains `648f9499c1287016780aa88e977b6b0a447d0f05`
 as of this GitHub check. The timer is not to be reenabled on the old task ID.
 The revised wrapper's five passing offline tests do not prove an end-to-end
 laptop worker execution.
+
+## 2026-11-02: corrected local inventory and remaining streaming error boundary
+
+A subsequent operator review in the **authoritative** checkout
+`/home/puneet/Projects/aster-browser/upstream-browseros` reports **14** changed
+files, not the previously reported ten: 12 tracked modifications and two
+untracked files (`apps/server/src/agent/provider-timeout.ts` and
+`apps/server/tests/agent/provider-fetch-lifecycle.test.ts`, relative to
+`packages/browseros-agent/`). Nothing is staged. Tracked diff is reported as
+320 insertions and 16 deletions, excluding the untracked files. The T3 scratch
+checkout is unrelated and must not be used for this recovery.
+
+The reviewer reports that the local uncommitted `provider-factory.ts` now
+preserves caller abortion and deadline after HTTP headers, cancels the body
+reader, and passes local fetch lifecycle tests. **GitHub cannot inspect these
+local-only modifications, so this is not independently verified here.**
+
+Outstanding production gap: the post-header timeout integration test merely
+catches an SDK exception and calls `toChatError` directly. It does **not**
+prove the real `ChatService` streamed response emits a typed retryable
+error envelope or that the actual UI renders it. A pre-header synthetic 504
+is a separate case. The current 120-second limit is an **absolute request
+lifetime** that may also terminate a healthy slow stream; its intended
+semantics require an explicit decision and regression tests.
+
+**Queue remains on MANUAL HOLD.** No task 003, no automatic replay, no new
+implementation, no timer restart, and no source commit until the preserved
+14-file local patch is completed/reviewed. Acceptance must exercise the
+production stream endpoint (not only the helper), error envelope and actual
+visible retryable state after headers, include bounded idle/deadline behavior,
+verify final reader/timer cleanup and no late tool dispatch, and distinguish
+mock evidence from browser acceptance. Once the user confirms normal commit,
+push and clean worktree, the reviewer can verify the new exact source SHA and
+publish a new task.
