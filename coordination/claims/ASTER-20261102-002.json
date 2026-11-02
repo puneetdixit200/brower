@@ -1,0 +1,8 @@
+{
+  "base_sha": "648f9499c1287016780aa88e977b6b0a447d0f05",
+  "claimed_at": "2026-11-02T04:00:13.397571+00:00",
+  "preflight": "blocked",
+  "preflight_reason": "branch, source SHA, or working tree differs from task baseline",
+  "schema": 1,
+  "task_id": "ASTER-20261102-002"
+}
