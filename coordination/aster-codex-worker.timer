@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Aster GitHub task mailbox every 30 minutes
+
+[Timer]
+OnCalendar=*-*-* *:00,30:00
+Persistent=true
+AccuracySec=1min
+Unit=aster-codex-worker.service
+
+[Install]
+WantedBy=timers.target
