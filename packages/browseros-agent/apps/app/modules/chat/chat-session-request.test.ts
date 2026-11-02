@@ -66,6 +66,12 @@ describe('chat request preparation', () => {
       url: 'https://owner.example/a',
       title: 'Owner A',
     } as chrome.tabs.Tab
+    const attachedSecond = {
+      id: 21,
+      windowId: 2,
+      url: 'https://attached.example/c',
+      title: 'Attached C',
+    } as chrome.tabs.Tab
     const attached = {
       id: 20,
       windowId: 2,
@@ -77,7 +83,7 @@ describe('chat request preparation', () => {
       action: createBrowserOSAction({
         mode: 'agent',
         message: 'Use B',
-        tabs: [attached],
+        tabs: [attached, attachedSecond],
       }),
       enabledMcpServers: [],
       customMcpServers: [],
@@ -90,6 +96,12 @@ describe('chat request preparation', () => {
           windowId: 2,
           url: attached.url,
           title: attached.title,
+        },
+        {
+          id: attachedSecond.id,
+          windowId: attachedSecond.windowId,
+          url: attachedSecond.url,
+          title: attachedSecond.title,
         },
       ],
     })

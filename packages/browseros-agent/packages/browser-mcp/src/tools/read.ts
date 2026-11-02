@@ -5,6 +5,19 @@ import { defineTool, errorResult, textResult } from './framework'
 import { writeTempToolOutputFile } from './output-file'
 import { wrapUntrusted } from './trust-boundary'
 
+async function mainFrameLoaderId(session: {
+  Page?: { getFrameTree?: () => Promise<unknown> }
+}): Promise<string | undefined> {
+  try {
+    const result = (await session.Page?.getFrameTree?.()) as
+      | { frameTree?: { frame?: { loaderId?: string } } }
+      | undefined
+    return result?.frameTree?.frame?.loaderId
+  } catch {
+    return undefined
+  }
+}
+
 function expressionFor(
   format: 'markdown' | 'text' | 'links',
   selector?: string,
@@ -42,7 +55,9 @@ export const read = defineTool({
     .strict(),
   annotations: { title: 'Read page content', readOnlyHint: true },
   handler: async (args, ctx) => {
-    const { session } = await ctx.session.pages.getSession(args.page)
+    const pageSession = await ctx.session.pages.getSession(args.page)
+    const { session } = pageSession
+    const loaderBefore = await mainFrameLoaderId(session)
     const code =
       args.format === 'markdown'
         ? buildContentMarkdownExpression({
@@ -65,12 +80,30 @@ export const read = defineTool({
       )
     }
 
+    // Refresh from the browser after evaluation: getInfo() alone can be stale
+    // while navigation or tab replacement is in flight.
+    const currentPage =
+      (await ctx.session.pages.refresh(args.page)) ??
+      ctx.session.pages.getInfo(args.page)
+    const loaderAfter = await mainFrameLoaderId(session)
+    if (
+      !currentPage ||
+      (pageSession.targetId && currentPage.targetId !== pageSession.targetId) ||
+      (pageSession.url && currentPage.url !== pageSession.url) ||
+      (loaderBefore && loaderAfter && loaderBefore !== loaderAfter)
+    ) {
+      return errorResult(
+        `read: page ${args.page} navigated, changed, or closed during read; retry`,
+      )
+    }
+
     const text = (result.result?.value as string) ?? ''
-    const origin = ctx.session.pages.getInfo(args.page)?.url ?? 'unknown'
+    const origin = pageSession.url || currentPage.url || 'unknown'
     const structured = {
       page: args.page,
       format: args.format,
       url: origin,
+      ...(pageSession.targetId && { targetId: pageSession.targetId }),
     }
 
     if (text.length <= TOOL_LIMITS.INLINE_PAGE_CONTENT_MAX_CHARS) {

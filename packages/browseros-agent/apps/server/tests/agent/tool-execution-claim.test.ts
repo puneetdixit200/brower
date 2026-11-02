@@ -30,6 +30,92 @@ describe('tool execution claim boundary', () => {
     tempDir = undefined
   })
 
+  it('returns the exact MCP result to the next provider turn with the original call id', async () => {
+    const taskId = crypto.randomUUID()
+    const conversationId = crypto.randomUUID()
+    const toolCallId = 'provider-mcp-read-opaque-id'
+    const mcpResult = {
+      content: [{ type: 'text' as const, text: 'fixture MCP page contents' }],
+      structuredContent: { title: 'Fixture page' },
+    }
+    const execute = mock(async () => mcpResult)
+    const requests: Array<{ prompt: unknown }> = []
+    let modelCall = 0
+    const model = new MockLanguageModelV3({
+      doGenerate: async (request): Promise<LanguageModelV3GenerateResult> => {
+        requests.push({ prompt: request.prompt })
+        modelCall++
+        return {
+          content:
+            modelCall === 1
+              ? [
+                  {
+                    type: 'tool-call',
+                    toolCallId,
+                    toolName: 'browser_read',
+                    input: '{}',
+                  },
+                ]
+              : [{ type: 'text', text: 'Read completed.' }],
+          finishReason: {
+            unified: modelCall === 1 ? 'tool-calls' : 'stop',
+            raw: modelCall === 1 ? 'tool_calls' : 'stop',
+          },
+          usage,
+          warnings: [],
+        }
+      },
+    })
+    const tools = addToolEnvelopeBoundary(
+      {
+        browser_read: {
+          description: 'Read the current browser page.',
+          inputSchema: z.object({}),
+          execute,
+        },
+      } as ToolSet,
+      undefined,
+      undefined,
+      undefined,
+    )
+    const agent = new ToolLoopAgent<AgentToolCallOptions, ToolSet>({
+      model,
+      tools,
+      prepareCall: ({ options, ...call }) => ({
+        ...call,
+        toolsContext: buildAgentToolRunContexts(tools, options.taskId),
+      }),
+    })
+
+    await agent.generate({
+      prompt: 'Read this page.',
+      options: { taskId, conversationId } as AgentToolCallOptions & {
+        conversationId: string
+      },
+    })
+
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(requests).toHaveLength(2)
+    const secondTurn = requests[1]?.prompt
+    expect(Array.isArray(secondTurn)).toBe(true)
+    if (!Array.isArray(secondTurn))
+      throw new Error('Expected provider prompt messages')
+    const toolResultMessage = secondTurn.find(
+      (message) => message.role === 'tool',
+    )
+    expect(toolResultMessage).toEqual({
+      role: 'tool',
+      content: [
+        {
+          type: 'tool-result',
+          toolCallId,
+          toolName: 'browser_read',
+          output: { type: 'json', value: mcpResult },
+        },
+      ],
+    })
+  })
+
   it('claims a side-effect call before dispatch using the active run and provider call id', async () => {
     const taskId = crypto.randomUUID()
     const claim = mock(() => true)

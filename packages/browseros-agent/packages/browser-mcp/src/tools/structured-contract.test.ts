@@ -107,7 +107,11 @@ function createContractSession(): BrowserSession {
       refresh: async () => page,
       getInfo: (pageId: number) =>
         pageId === 1 ? page : { ...page, pageId, tabId: pageId + 10 },
-      getSession: async () => ({ session: pageSession }),
+      getSession: async () => ({
+        targetId: page.targetId,
+        url: page.url,
+        session: pageSession,
+      }),
       resolveTabIds: async (tabIds: number[]) =>
         new Map(tabIds.map((tabId) => [tabId, tabId - 10])),
     },
@@ -311,7 +315,14 @@ describe('browser tool structured contract', () => {
         act: ['changed', 'kind'],
         download: ['artifact'],
         upload: ['files', 'page', 'ref', 'uploaded'],
-        read: ['contentLength', 'format', 'page', 'writtenToFile'],
+        read: [
+          'contentLength',
+          'format',
+          'page',
+          'targetId',
+          'url',
+          'writtenToFile',
+        ],
         grep: ['count', 'matches', 'over', 'page'],
         screenshot: ['bytes', 'format', 'page'],
         pdf: ['bytes', 'page', 'path'],
