@@ -1,39 +1,60 @@
-Task-ID: ASTER-20261102-001
+Task-ID: ASTER-20261102-002
 Base-SHA: 648f9499c1287016780aa88e977b6b0a447d0f05
-Safety-mode: implementation
+Safety-mode: inspection-only-manual-hold
 
-# Aster task 001: provider timeouts and closed-page failures
+# Aster task 002: preserve and reconcile local changes from task 001
 
-## Goal
-Continue Aster source implementation, not another project-wide planning cycle.
-Review the current feature branch and latest evidence (particularly
-`docs/evidence/aster-a01-a02-production-integration-2026-11-02.md`).
-Build and verify two currently unverified failure paths in the real
-UI → ChatService → ToolLoopAgent → Browser MCP pipeline.
+## Why this is a recovery task, not a replay
 
-## Priority 1: a genuine provider timeout
-Inspect actual provider adapter and HTTP/stream timeout behavior. Use a
-controllable local OpenAI-compatible provider fixture that stalls, then
-verify the appropriate bounded timeout, cancellation and user-visible error.
-Preserve exact toolCallId, existing approval grants, task IDs and no-replay
-boundaries. Fix a demonstrated production defect, not simply a fake response.
-Do not contact or invent a real cloud model.
+Task `ASTER-20261102-001` claimed successfully and ran Codex, which exited
+with code 0 but left the laptop worktree **dirty**. No new source commit was
+pushed. Its immutable GitHub report is `needs-review`:
+`coordination/reports/ASTER-20261102-001.json`.
 
-## Priority 2: page disappears during an actual read
-Extend the existing headed A01/A02 BrowserOS smoke, using a disposable
-profile and a run-unique loopback fixture. Close the attached tab while
-read is pending and verify the tool reports an explicit error, no unrelated
-page data is consumed and the visible answer makes no false factual claim.
-Use existing smoke helpers; no duplicate framework.
+**Do not rerun the previous implementation request.** The uncommitted
+changes may contain useful work, failed experiments or partial modifications.
+Only the laptop can inspect them. Do not assume they are safe to discard.
 
-## Work protocol
-Use at most three Luna medium subagents if actually available; assign
-non-overlapping ownership and cross-review. Do not use Sol/Terra.
-If local native Chromium resources are unsafe, leave that checkout untouched.
-Run focused Bun tests, typechecks, Biome, Python compile and headed checks
-where feasible. Commit reviewed code and evidence with Conventional Commits.
-Do not mark A01/A02 PASS from BrowserOS fixtures. Never force push. Work
-within the verified local feature branch and do not touch `aster-control`.
-Report actual implementation, tests, exact source SHA, native boundaries,
-cleanup and the next productive task. The worker separately publishes an
-immutable outcome report after Codex exits.
+## Mandatory preflight
+
+The existing worker must refuse to execute this task if the feature checkout
+is dirty or does not exactly match the Base-SHA. This is intentional. Do not
+bypass the preflight, change the worker or auto-stash/reset/clean the checkout.
+
+A human must first inspect the local source status and task 001 log:
+```bash
+systemctl --user disable --now aster-codex-worker.timer
+cd /home/puneet/Projects/aster-browser/upstream-browseros
+git status --short --branch
+git diff --stat
+git diff --cached --stat
+git ls-files --others --exclude-standard
+tail -n 80 ~/.local/state/aster-codex-loop/logs/ASTER-20261102-001.log
+```
+Preserve the working tree, logs and any user data. No automatic destructive
+cleanup or force-push is permitted.
+
+## If the user has already reconciled the checkout safely
+
+Perform **read-only inspection**, not implementation:
+1. Verify the exact source SHA and clean state. Confirm that no uncommitted
+   task-001 work was lost; if the local changes were committed and pushed,
+   this Base-SHA will no longer match and the worker must refuse the task.
+2. Read the prior local log and summarize what task 001 actually attempted,
+   without leaking credentials or raw private logs into GitHub.
+3. Confirm provider-timeout and tab-close-during-read evidence from actual
+   repository files. Never claim they passed unless independently verified.
+4. Do not modify source, launch builds, start a model provider, commit, reset,
+   stash, clean, or attempt the original implementation again.
+5. Finish with a concise factual audit. The wrapper may report `pushed`
+   for a successful no-op Git push; this **does not** mean any source
+   implementation was completed.
+
+## Reviewer hold
+
+This is the only recovery task issued for task 001. If its report is blocked
+because the local checkout is still dirty, do not automatically generate a
+new recovery ID every hour. Wait for a human-confirmed safe reconciliation
+and an exact verified source SHA before issuing new implementation work.
+
+A01/A02 remain PARTIAL; native Aster and real-model evaluation remain open.
