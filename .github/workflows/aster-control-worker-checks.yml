@@ -1,0 +1,28 @@
+name: Aster control worker safety checks
+
+on:
+  push:
+    branches: [aster-control]
+    paths:
+      - "coordination/worker.py"
+      - "coordination/test_worker.py"
+      - ".github/workflows/aster-control-worker-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-worker-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Python syntax
+        run: python3 -m py_compile coordination/worker.py coordination/test_worker.py
+      - name: Local Git fixture tests
+        run: python3 -m unittest discover -s coordination -p 'test_worker.py' -v
+      - name: No whitespace errors
+        run: git diff --check
