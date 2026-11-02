@@ -56,3 +56,24 @@ are committed and pushed, create a fresh task against the new verified SHA.
 - Claim: https://github.com/puneetdixit200/brower/blob/aster-control/coordination/claims/ASTER-20261102-001.json
 - Report: https://github.com/puneetdixit200/brower/blob/aster-control/coordination/reports/ASTER-20261102-001.json
 - Source: https://github.com/puneetdixit200/brower/commit/648f9499c1287016780aa88e977b6b0a447d0f05
+
+
+## Follow-up recovery confirmation: task 002 is blocked, not lost
+
+GitHub's immutable [task 002 report](reports/ASTER-20261102-002.json)
+confirms `dirty_at_start: true`, source HEAD still
+`648f9499c1287016780aa88e977b6b0a447d0f05`, and status `blocked`.
+The attached laptop log independently confirms task 001 produced actual local
+code edits, and `.git` was read-only inside the Codex workspace-write sandbox.
+
+**Reviewer hold:** do not publish task 003, rotate another recovery ID, or
+tell the worker to rerun 001 or 002. User must first inspect and reconcile
+task 001's local diff with a normal Git commit/push. The timer should remain
+disabled during that review. Ask for the resulting exact source SHA and
+confirmation of a clean worktree before issuing a *new* implementation task.
+
+The [control worker](worker.py) was revised so future sandboxed Codex turns
+edit source only; a trusted wrapper checks path/size/diff/commit hooks and
+makes a normal source commit and push. Its [GitHub offline checks](https://github.com/puneetdixit200/brower/actions/runs/41387796456)
+passed syntax and local Git fixture tests. **This does not update the user's
+installed worker or repair task 001 automatically.**
