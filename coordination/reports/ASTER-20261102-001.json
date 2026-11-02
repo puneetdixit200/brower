@@ -1,0 +1,17 @@
+{
+  "base_sha": "648f9499c1287016780aa88e977b6b0a447d0f05",
+  "branch_at_end": "feat/aster-linux-ui",
+  "codex_exit_code": 0,
+  "dirty_at_end": true,
+  "dirty_at_start": false,
+  "end_sha": "648f9499c1287016780aa88e977b6b0a447d0f05",
+  "finished_at": "2026-11-02T02:54:08.536090+00:00",
+  "observed_head": "648f9499c1287016780aa88e977b6b0a447d0f05",
+  "observed_remote": "648f9499c1287016780aa88e977b6b0a447d0f05",
+  "reason": "Codex nonzero exit, dirty worktree, or branch changed",
+  "schema": 1,
+  "source_branch": "feat/aster-linux-ui",
+  "started_at": "2026-11-02T02:50:13.891554+00:00",
+  "status": "needs-review",
+  "task_id": "ASTER-20261102-001"
+}
